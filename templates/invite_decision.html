@@ -1,0 +1,17 @@
+<!-- templates/invite_decision.html -->
+{% extends "base.html" %}
+
+{% block title %}Invite a Friend{% endblock %}
+
+{% block content %}
+<div class="invite-container">
+    <h2>Enter a friend's phone number and we'll text them an invite to the site</h2>
+    <form action="{{ url_for('invite_decision') }}" method="post">
+        <input type="text" id="friend_phone" name="friend_phone" placeholder="Friend's phone number">
+        <button type="submit" name="action" value="invite">Send Invite</button>
+    </form>
+    <form action="{{ url_for('invite_decision') }}" method="post">
+        <button type="submit" name="action" value="no_thanks">No thanks</button>
+    </form>
+</div>
+{% endblock %}

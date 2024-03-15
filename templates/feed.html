@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Professional Community Feed{% endblock %}
+
+{% block content %}
+
+<div class="feed-container">
+    {% for post in posts %}
+    <div class="card">
+        <div class="card-header">
+            <img src="{{ post.profile_pic_url | default('https://via.placeholder.com/50', true) }}" alt="Profile Picture" class="community-pic">
+            <div>{{ post.community_name }}</div>
+        </div>
+        <!-- Make the title a clickable link to the post detail page -->
+        <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-title">{{ post.title }}</a>
+        <div class="card-content">{{ post.content }}</div>
+        <div class="card-meta">Posted {{ post.posted_time }} · {{ post.upvotes }} upvotes · {{ post.downvotes }} downvotes</div>
+        <div class="card-actions">
+            <!-- Optionally make the Comments a clickable link as well -->
+            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">Comments</a> · 
+            <span class="card-action">Share</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+
+
+
+

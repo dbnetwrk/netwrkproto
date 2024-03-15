@@ -1,0 +1,31 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <a href="{{ url_for('show_feed') }}">Feed</a>
+    <a href="#">Post</a>
+    <a href="#">Communities</a>
+    {% if current_user %}
+        <!-- Display the user's profile picture as a clickable image -->
+        <a href="{{ url_for('profile') }}">
+            <img src="{{ current_user.profile_pic_url}}" alt="Profile Picture" class="navbar-profile-pic">
+        </a>
+    {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+    {% endif %}
+</div>
+
+
+{% block content %}
+{% endblock %}
+
+</body>
+</html>

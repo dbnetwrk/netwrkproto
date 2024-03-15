@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+
+    <div class="feed-container">
+    <div class="card">
+        <div class="card-header">
+            <img src="{{ post.profile_pic_url | default('https://via.placeholder.com/50', true) }}" alt="Profile Picture" class="community-pic">
+            <div class="post-info">
+                <div>{{ post.community_name }}</div>
+                <small>{{ post.user.first_name }} {{ post.user.last_name }}</small>
+            </div>
+        </div>
+        <h2>{{post.title}}</h2>
+        <div class="card-content">{{ post.content }}</div>
+        <div class="card-meta">Posted {{ post.posted_time }} · {{ post.upvotes }} upvotes · {{ post.downvotes }} downvotes</div>
+    </div>
+
+
+
+
+
+    <div class="comments-section">
+        <h3>Comments</h3>
+        {% for comment in comments %}
+    <div class="comment">
+        {% if comment.is_burner %}
+            <small>{{ comment.user.burner_username }} · {{ comment.posted_time|time_ago }}</small>
+            <!-- Display a default or no profile picture -->
+            
+        {% else %}
+            <small><img src="{{ comment.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic"> {{ comment.user.first_name }} {{ comment.user.last_name }} · {{ comment.posted_time|time_ago }}</small>
+            <!-- Display the user's actual profile picture -->
+            
+        {% endif %}
+        <p>{{ comment.content }}</p>
+    </div>
+{% endfor %}
+
+
+
+</div>
+
+
+
+
+
+        <<div class="comment-form">
+    <h3>Leave a Comment</h3>
+    <form action="{{ url_for('submit_comment', post_id=post.id) }}" method="POST">
+        <textarea name="comment_content" required></textarea>
+        <div class="form-footer">
+            <button type="submit">Post Comment</button>
+            <label class="burner-switch">
+                Post from Burner<input type="checkbox" id="post_as_burner" name="post_as_burner">
+                <span class="slider round"></span>
+            </label>
+            
+        </div>
+    </form>
+</div>
+
+
+
+
+</div>
+    </div>
+</div>
+{% endblock %}

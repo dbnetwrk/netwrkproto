@@ -1,0 +1,336 @@
+body {
+
+
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+}
+.navbar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: #333;
+    color: white;
+    padding: 10px 0;
+}
+.navbar a {
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+.navbar a:hover {
+    background-color: #ddd;
+    color: #333;
+    border-radius: 5px;
+}
+.feed-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+}
+.card {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+}
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.community-pic {
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    margin-right: 10px;
+    background-color: #ddd; /* Placeholder for profile picture */
+}
+.card-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+.card-meta {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+.card-actions {
+    font-size: 14px;
+}
+.card-action {
+    margin-right: 10px;
+    cursor: pointer;
+    color: #007bff;
+}
+.card-content {
+font-size: 14px;
+color: #333;
+margin-bottom: 10px;
+}
+
+/* Add these styles to your existing style.css file */
+
+.profile-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80vh; /* Adjust height as needed */
+}
+
+.profile-card {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    text-align: center;
+    width: 300px; /* Adjust width as needed */
+}
+
+.profile-pic {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin-bottom: 20px;
+}
+
+.comments-section {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.comment {
+    background-color: #f9f9f9; /* Light grey background for contrast */
+    padding: 15px;
+    margin-bottom: 10px; /* Space between comments */
+    border-radius: 5px; /* Match the card's border radius */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Subtle shadow for depth */
+}
+
+
+
+.comment small {
+    color: #666; /* Lighter text color for meta information */
+    flex-grow: 1; /* Ensure the text takes up the remaining space */
+    display: flex;
+    align-items: center; /* Center the text with the image */
+    font-size: 0.9rem; /* Adjust the size of the text as needed */
+
+}
+
+/* Comment Form Styling */
+
+.comment-form {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.comment-form textarea {
+    width: 100%; /* Full width to match the form's width */
+    padding: 10px; /* Adequate padding for text input */
+    border: 1px solid #ccc; /* Subtle border */
+    border-radius: 4px; /* Rounded corners for the textarea */
+    height: 100px; /* Enough height to write a comment */
+    margin-bottom: 20px; /* Space before the submit button */
+    resize: vertical; /* Allows the user to resize the textarea vertically */
+}
+
+.comment-form button {
+    background-color: #007bff; /* A bright, noticeable color for the button */
+    color: white; /* White text on the button for readability */
+    padding: 10px 20px; /* Padding inside the button */
+    border: none; /* No border for a cleaner look */
+    border-radius: 5px; /* Rounded corners for the button */
+    cursor: pointer; /* Changes the cursor to indicate it's clickable */
+    font-size: 16px; /* Slightly larger text within the button */
+}
+
+.comment-form button:hover {
+    background-color: #0056b3; /* Darker shade when hovered for feedback */
+}
+
+.post-info {
+    display: flex;
+    flex-direction: column; /* Ensures the community name and author info stack vertically */
+}
+
+.card-title, .card-action {
+    text-decoration: none;  /* Removes the underline from links */
+    color: #000000;  /* Sets the link color, choose what fits your design */
+}
+
+.user-profile-pic {
+    width: 40px; /* Adjust size as needed */
+    height: 40px; /* Adjust size as needed */
+    border-radius: 50%; /* Makes the image circular */
+    margin-right: 10px; /* Adds some space between the image and text */
+}
+.comment-header {
+    display: flex;
+    align-items: center; /* Aligns the image and text vertically */
+}
+
+.navbar-profile-pic {
+    height: 50px;  /* Or whatever size you prefer */
+    width: 50px;
+    border-radius: 50%;  /* Makes the image circular */
+    object-fit: cover;  /* Ensures the image covers the space without stretching */
+}
+
+/* General form styling */
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box; /* Ensures padding doesn't increase the width */
+    margin-bottom: 10px; /* Space between the input and the next element */
+}
+
+button {
+    background-color: #007bff; /* Bootstrap primary blue */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: #0056b3; /* A darker shade of blue */
+}
+
+/* Style for the footer of the form */
+.form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Adjust or remove this if you want elements closer */
+    gap: 10px; /* Space between elements */
+    margin-top: 10px; /* Space above the form footer */
+}
+
+/* Styling for the switch label, including checkbox and text */
+.burner-switch {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.burner-switch input {
+    display: none; /* Hide the checkbox */
+}
+
+.burner-switch .slider {
+    margin-left: 10px; /* Space between the label text and the slider */
+    position: relative;
+    width: 60px; /* Width of the slider */
+    height: 34px; /* Height of the slider */
+    background-color: #ccc;
+    border-radius: 34px;
+}
+
+.burner-switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.burner-switch input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.burner-switch input:checked + .slider {
+    background-color: #2196F3;
+}
+
+/* Focused state for keyboard navigation */
+.burner-switch input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+}
+
+
+/* General Styles for the Invite Form Container */
+.invite-container {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: #ffffff;
+    text-align: center;
+}
+
+/* Styling for Headings inside the Container */
+.invite-container h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+/* Styling for Input Fields */
+.invite-container input[type="text"] {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* General Styles for Buttons */
+.invite-container button {
+    width: calc(50%);
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    background-color: #007bff;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: block; /* Makes it possible to apply margin auto for centering */
+    margin: 10px auto 20px;
+}
+
+.invite-container button:hover {
+    background-color: #0056b3;
+}
+
+/* Style for the 'No thanks' Button for a softer look */
+.invite-container form:last-of-type button {
+    background-color: #6c757d;
+}
+
+.invite-container form:last-of-type button:hover {
+    background-color: #545b62;
+}
+
