@@ -1,10 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-from openai import OpenAI
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sentence_transformers import SentenceTransformer, util
-import numpy as np
-import torch
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
