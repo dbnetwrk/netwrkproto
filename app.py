@@ -11,8 +11,6 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
