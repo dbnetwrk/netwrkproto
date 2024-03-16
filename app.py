@@ -265,5 +265,30 @@ def invite_decision():
     return render_template('invite_decision.html')
 
 
+@app.route('/create_post', methods=['GET', 'POST'])
+def create_post():
+    if 'user_id' not in session:
+        flash("Please log in to create a post.")
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        # Retrieve form data
+        title = request.form.get('title')
+        content = request.form.get('content')
+        community_name = request.form.get('community_name')
+        user_id = session['user_id']
+
+        # Create and save the new post
+        new_post = Post(title=title, content=content, community_name=community_name, user_id=user_id, posted_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), upvotes=0, downvotes=0)
+        db.session.add(new_post)
+        db.session.commit()
+        
+        flash("Post created successfully.")
+        return redirect(url_for('show_feed'))
+
+    return render_template('create_post.html')
+
+
+
 if __name__ == '__main__':
 	app.run(debug=True)
