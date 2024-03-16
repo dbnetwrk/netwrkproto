@@ -7,7 +7,7 @@
     <div class="feed-container">
     <div class="card">
         <div class="card-header">
-            <img src="{{ post.profile_pic_url | default('https://via.placeholder.com/50', true) }}" alt="Profile Picture" class="community-pic">
+            <img src="{{ post.profile_pic_url}}" alt="Profile Picture" class="community-pic">
             <div class="post-info">
                 <div>{{ post.community_name }}</div>
                 <small>{{ post.user.first_name }} {{ post.user.last_name }}</small>
