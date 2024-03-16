@@ -132,7 +132,7 @@ def show_post(post_id):
 @app.route('/feed')
 def show_feed():
     posts = Post.query.order_by(Post.posted_time.desc()).all()
-    return render_template("feed.html", posts=posts)
+    return render_template("feed.html", posts=posts, active_page='feed')
 
 
 @app.route('/profile')
@@ -148,7 +148,7 @@ def profile():
         # User not found, maybe redirect to logout to clear the session
         return redirect(url_for('login'))
     
-    return render_template('profile.html', user=user)
+    return render_template('profile.html', user=user, active_page='profile')
 
 
 @app.route('/post/<int:post_id>/comment', methods=['POST'])

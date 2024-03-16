@@ -10,18 +10,19 @@
 <body>
 
 <div class="navbar">
-    <a href="{{ url_for('show_feed') }}">Feed</a>
-    <a href="#">Post</a>
-    <a href="#">Communities</a>
+    <a href="{{ url_for('show_feed') }}" class="{{ 'active' if active_page == 'feed' else '' }}">Feed</a>
+    <!-- Adjust other links similarly as needed -->
+    <a href="#" class="{{ 'active' if active_page == 'post' else '' }}">Post</a>
+    <a href="#" class="{{ 'active' if active_page == 'communities' else '' }}">Communities</a>
     {% if current_user %}
-        <!-- Display the user's profile picture as a clickable image -->
-        <a href="{{ url_for('profile') }}">
-            <img src="{{ current_user.profile_pic_url}}" alt="Profile Picture" class="navbar-profile-pic">
+        <a href="{{ url_for('profile') }}" class="{{ 'active' if active_page == 'profile' else '' }}">
+            <img src="{{ current_user.profile_pic_url | default('https://via.placeholder.com/50', true) }}" alt="Profile Picture" class="navbar-profile-pic">
         </a>
     {% else %}
-        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('login') }}" class="{{ 'active' if active_page == 'login' else '' }}">Login</a>
     {% endif %}
 </div>
+
 
 
 {% block content %}

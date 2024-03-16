@@ -334,3 +334,7 @@ button:hover {
     background-color: #545b62;
 }
 
+.navbar a.active {
+    color: #ff4500; /* Example: change the text color for the active link */
+    font-weight: bold;
+}
