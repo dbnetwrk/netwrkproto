@@ -131,7 +131,7 @@ def show_post(post_id):
 
 @app.route('/feed')
 def show_feed():
-    posts = Post.query.all()
+    posts = Post.query.order_by(Post.posted_time.desc()).all()
     return render_template("feed.html", posts=posts)
 
 
