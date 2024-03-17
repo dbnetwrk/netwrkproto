@@ -338,3 +338,40 @@ button:hover {
     color: #ff4500; /* Example: change the text color for the active link */
     font-weight: bold;
 }
+
+/* Community List Styles */
+.community-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.community-item {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.community-item img {
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    margin-right: 20px;
+}
+
+.community-item strong {
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.community-item-description {
+    font-size: 14px;
+    color: #666;
+}
+
