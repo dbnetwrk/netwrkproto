@@ -33,6 +33,11 @@ user_community_association = db.Table('user_community',
     db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True)
 )
 
+user_interest_association = db.Table('user_interest',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('interest_id', db.Integer, db.ForeignKey('interest.id'), primary_key=True)
+)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -43,6 +48,8 @@ class User(db.Model):
     burner_username = db.Column(db.String(50), nullable=True)
     communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
     industry = db.Column(db.String(100), nullable=True) 
+    interests = db.relationship('Interest', secondary=user_interest_association, backref=db.backref('users', lazy='dynamic'))
+
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -87,6 +94,9 @@ class Community(db.Model):
 
     creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
 
+class Interest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
 
 
 # Initialize the database
@@ -109,17 +119,28 @@ def signup():
         first_name = request.form.get('first_name')
         last_name = request.form.get('last_name')
         password = request.form.get('password')
-        industry = request.form.get('industry')  # Get the selected industry
+        industry = request.form.get('industry')  # Assuming you've already added this
+        selected_interests_ids = request.form.getlist('interests')  # 'interests' is the name attribute in your select tag
 
-        # Create a new user with the provided info, including the industry
+        # Create a new user with the provided info
         user = User(first_name=first_name, last_name=last_name, password=password, industry=industry)
+        
+        # Add selected interests to the user
+        for interest_id in selected_interests_ids:
+            interest = Interest.query.get(interest_id)
+            if interest:
+                user.interests.append(interest)
+        
         db.session.add(user)
         db.session.commit()
 
         session['user_id'] = user.id
         return redirect(url_for('show_feed'))
+    else:
+        # Fetch all available interests to display in the form
+        interests = Interest.query.all()
+        return render_template("signup.html", interests=interests)
 
-    return render_template("signup.html")
 
 
 
