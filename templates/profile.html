@@ -9,6 +9,12 @@
         <img src="{{ user.profile_pic_url}}" alt="Profile Picture" class="profile-pic">
         <h2>Welcome, {{ user.first_name }} {{ user.last_name }}!</h2>
         <p>This is your profile page.</p>
+        
+        <!-- Display the user's industry if it exists -->
+        {% if user.industry %}
+            <p>Your Industry: {{ user.industry }}</p>
+        {% endif %}
+
         <!-- Display the burner username if it exists -->
         {% if user.burner_username %}
             <p>Your Burner Username: {{ user.burner_username }}</p>
@@ -22,14 +28,14 @@
         {% endif %}
         
 
-        <!-- Add this within the profile-container div in your profile.html -->
-<form action="{{ url_for('logout') }}" method="post">
-    <button type="submit" class="logout-button">Logout</button>
-</form>
+        <!-- Logout form -->
+        <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit" class="logout-button">Logout</button>
+        </form>
 
-        
     </div>
 </div>
 {% endblock %}
+
 
 
