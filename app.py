@@ -173,34 +173,10 @@ def show_post(post_id):
     return render_template('post_detail.html', post=post, comments=comments)
 
 
-
 @app.route('/feed')
 def show_feed():
-    if 'user_id' not in session:
-        flash("Please log in to view the feed.")
-        return redirect(url_for('login'))
-
-    user_id = session['user_id']
-    current_user = User.query.get(user_id)
-    if not current_user:
-        flash("User not found.")
-        return redirect(url_for('login'))
-
-    # Assuming 'interests' and 'industry' are accessible directly from the User model
-    user_interest_ids = [interest.id for interest in current_user.interests]
-    user_industry = current_user.industry
-
-    # This is a more complex query that might need to be adjusted.
-    posts = Post.query.join(Post.community)\
-                      .join(Community.creator)\
-                      .filter(Community.created_by.has(industry=user_industry))\
-                      .filter(Community.created_by.has(User.interests.any(Interest.id.in_(user_interest_ids))))\
-                      .order_by(Post.posted_time.desc())\
-                      .all()
-
+    posts = Post.query.join(Community, Post.community_id == Community.id).order_by(Post.posted_time.desc()).all()
     return render_template("feed.html", posts=posts, active_page='feed')
-
-
 
 
 @app.route('/profile')
