@@ -13,7 +13,7 @@
     <div class="card">
         <div class="card-header">
             <!-- Use the community's profile_pic_url -->
-            <img src="{{ url_for('static', filename=post.community.profile_pic_url.strip()) }}" alt="Profile Picture" class="community-pic">
+            <img src="{{ community.profile_pic_url }}" alt="Profile Picture" width="50" height="50">
             <!-- Use the community's name -->
             <div>{{ post.community.name }}</div>
         </div>
