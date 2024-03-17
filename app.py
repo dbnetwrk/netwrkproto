@@ -5,6 +5,7 @@ import os
 from openai import OpenAI
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from random import choice
 
 
 UPLOAD_FOLDER = 'C:\\flasker\\static\\uploads'
@@ -332,6 +333,51 @@ def create_community():
 def communities():
     all_communities = Community.query.all()
     return render_template('communities.html', communities=all_communities)
+
+
+
+@app.route('/generate_and_post', methods=['GET'])
+def generate_and_post():
+    # Select a random community for the post
+    community = Community.query.order_by(db.func.random()).first()
+    # Select a random user for the post
+    user = User.query.order_by(db.func.random()).first()
+    
+    if not community or not user:
+        flash('No communities or users available.', 'error')
+        return redirect(url_for('show_feed'))
+    
+    # Prepare the prompt for the OpenAI API
+    prompt = f"Generate a meaningful post title and content for the community '{community.name}' which focuses on '{community.description}'."
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": prompt}
+            ]
+        )
+        
+        # Assuming the response format is "Title: <title>\nContent: <content>"
+        generated_text = response.choices[0].message['content']
+        title, content = generated_text.split('\n', 1)
+        
+        # Create and save the new post to the selected community with the selected user
+        new_post = Post(
+            title=title.strip(), 
+            content=content.strip(), 
+            user_id=user.id,  # Now using the randomly selected user's ID
+            community_id=community.id, 
+            posted_time=datetime.utcnow()
+        )
+        db.session.add(new_post)
+        db.session.commit()
+        
+        flash('Generated and posted successfully!', 'success')
+    except Exception as e:
+        flash(f'Failed to generate post: {str(e)}', 'error')
+    
+    return redirect(url_for('show_feed'))
 
 
 
