@@ -7,7 +7,7 @@
     <div class="card">
         <div class="card-header">
             <!-- Update to use the community's profile picture from the Community model -->
-            <img src="{{ url_for('static', filename=post.community.profile_pic_url) }}" alt="Profile Picture" class='user-profile-pic'>
+            <img src="{{ url_for('static', filename=post.community.profile_pic_url.strip()) }}" alt="Profile Picture" class='user-profile-pic'>
             <div class="post-info">
                 <!-- Update to use the community name from the Community model -->
                 <div>{{ post.community.name }}</div>
