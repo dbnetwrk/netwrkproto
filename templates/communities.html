@@ -3,16 +3,20 @@
 {% block title %}Communities{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>Communities</h1>
-    <ul>
-        {% for community in communities %}
-            <li>
-                <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class='user-profile-pic'>
-                <strong>{{ community.name }}</strong> - {{ community.description }}
-                <!-- You can add a link to a community page if you have one -->
-            </li>
-        {% endfor %}
-    </ul>
+<div class="feed-container">
+    {% for community in communities %}
+    <div class="card">
+        <div class="card-header">
+            <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class="community-pic">
+            <div>{{ community.name }}</div>
+        </div>
+        <div class="card-content">{{ community.description }}</div>
+        <!-- You can add a link to a community page if you have one -->
+        <div class="card-actions">
+            <a href="#" class="card-action">Join Community</a>
+        </div>
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}
+
