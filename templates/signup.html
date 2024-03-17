@@ -75,16 +75,14 @@
     </div>
 
     <div class="form-group">
-        <label for="industry">Industry:</label>
-        <select id="industry" name="industry" required>
-            <option value="">Select your industry</option>
-            <option value="Technology">Technology</option>
-            <option value="Healthcare">Healthcare</option>
-            <option value="Finance">Finance</option>
-            <option value="Education">Marketing</option>
-            <option value="Education">Retail</option>
-        </select>
-    </div>
+    <label for="industry">Industry:</label>
+    <select id="industry" name="industry_id" required>
+        <option value="">Select your industry</option>
+        {% for industry in industries %}
+            <option value="{{ industry.id }}">{{ industry.name }}</option>
+        {% endfor %}
+    </select>
+</div>
 
     <div class="form-group">
         <label>Select 3 interests:</label>

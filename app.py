@@ -51,6 +51,8 @@ class User(db.Model):
     communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
     industry = db.Column(db.String(100), nullable=True) 
     interests = db.relationship('Interest', secondary=user_interest_association, backref=db.backref('users', lazy='dynamic'))
+    industry_id = db.Column(db.Integer, db.ForeignKey('industry.id'), nullable=True)
+    industry = db.relationship('Industry', backref=db.backref('users', lazy=True))
 
 
 class Post(db.Model):
@@ -101,6 +103,12 @@ class Interest(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
 
 
+class Industry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+
+
+
 # Initialize the database
 @app.before_first_request
 def create_tables():
@@ -123,11 +131,13 @@ def signup():
         password = request.form.get('password')
         industry = request.form.get('industry')  # Assuming you've already added this
         selected_interests_ids = request.form.getlist('interests')  # 'interests' is the name attribute in your select tag
+        industry_id = request.form.get('industry_id')
+        user.industry_id = industry_id
 
         # Create a new user with the provided info
         user = User(first_name=first_name, last_name=last_name, password=password, industry=industry)
 
-        
+        industries = Industry.query.all()
         # Add selected interests to the user
         for interest_id in selected_interests_ids:
             interest = Interest.query.get(interest_id)
@@ -142,7 +152,7 @@ def signup():
     else:
         # Fetch all available interests to display in the form
         interests = Interest.query.all()
-        return render_template("signup.html", interests=interests)
+        return render_template("signup.html", interests=interests, industries=industries)
 
 
 
