@@ -347,7 +347,7 @@ def generate_and_post():
     if not community or not user:
         return render_template('generated_post.html', error='No communities or users available.')
     
-    prompt = f"Please write a post for the community '{community.name}', which focuses on '{community.description}'. Begin your response with a single sentence title, followed by a blank line, and then the post content."
+    prompt = f"Please write a post for the community '{community.name}', which focuses on '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, and then the post content."
 
     try:
         response = client.chat.completions.create(
