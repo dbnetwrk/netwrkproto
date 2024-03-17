@@ -344,12 +344,10 @@ def generate_and_post():
     user = User.query.order_by(db.func.random()).first()
     
     if not community or not user:
-        flash('No communities or users available.', 'error')
-        return redirect(url_for('show_feed'))
+        return render_template('generated_post.html', error='No communities or users available.')
     
-    # Prepare the prompt for the OpenAI API
     prompt = f"Generate a meaningful post title and content for the community '{community.name}' which focuses on '{community.description}'."
-    
+
     try:
         response = client.chat.completions(
             model="gpt-4",
@@ -358,26 +356,12 @@ def generate_and_post():
             ]
         )
         
-        # Assuming the response format is "Title: <title>\nContent: <content>"
         generated_text = response.choices[0].message['content']
-        title, content = generated_text.split('\n', 1)
-        
-        # Create and save the new post to the selected community with the selected user
-        new_post = Post(
-            title=title.strip(), 
-            content=content.strip(), 
-            user_id=user.id,  # Now using the randomly selected user's ID
-            community_id=community.id, 
-            posted_time=datetime.utcnow()
-        )
-        db.session.add(new_post)
-        db.session.commit()
-        
-        flash('Generated and posted successfully!', 'success')
+        # Display generated text directly on the page
+        return render_template('generated_post.html', generated_text=generated_text, community=community, user=user)
     except Exception as e:
-        flash(f'Failed to generate post: {str(e)}', 'error')
-    
-    return redirect(url_for('show_feed'))
+        return render_template('generated_post.html', error=f'Failed to generate post: {str(e)}')
+
 
 
 
