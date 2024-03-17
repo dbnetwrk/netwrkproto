@@ -40,6 +40,11 @@ user_interest_association = db.Table('user_interest',
     db.Column('interest_id', db.Integer, db.ForeignKey('interest.id'), primary_key=True)
 )
 
+community_interest_association = db.Table('community_interest',
+    db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True),
+    db.Column('interest_id', db.Integer, db.ForeignKey('interest.id'), primary_key=True)
+)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -96,10 +101,12 @@ class Community(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
+    interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
 
 class Interest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
+
 
 
 class Industry(db.Model):
