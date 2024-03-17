@@ -389,7 +389,7 @@ def generate_and_comment():
 
     user = users[0]  # Select the first user that is not the post's author
 
-    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion."
+    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion. Use verbiage of a 8thth grade reading level in your response."
 
     try:
         response = client.chat.completions.create(
