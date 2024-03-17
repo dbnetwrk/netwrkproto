@@ -351,7 +351,7 @@ def generate_and_post():
     prompt = f"Generate a meaningful post title and content for the community '{community.name}' which focuses on '{community.description}'."
     
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": prompt}
