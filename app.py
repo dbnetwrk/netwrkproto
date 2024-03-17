@@ -375,21 +375,21 @@ def generate_and_post():
 
 @app.route('/generate_and_comment', methods=['GET'])
 def generate_and_comment():
-    # Select a random post
-    post = Post.query.order_by(db.func.random()).first()
+    # Select a random user
+    user = User.query.order_by(db.func.random()).first()
+    
+    if not user:
+        return render_template('generate_comment_page.html', error='No users available.')
+
+    # Find posts that the user hasn't commented on yet
+    commented_post_ids = db.session.query(Comment.post_id).filter_by(user_id=user.id).subquery()
+    post = Post.query.filter(Post.user_id != user.id, ~Post.id.in_(commented_post_ids)).order_by(db.func.random()).first()
 
     if not post:
-        return render_template('generate_comment_page.html', error='No posts available to comment on.')
+        # If no suitable post is found, display a message
+        return render_template('generate_comment_page.html', error="No posts available for this user to comment on. Please try again.")
 
-    # Select a random user who is not the post creator
-    users = User.query.filter(User.id != post.user_id).order_by(db.func.random()).all()
-
-    if not users:
-        return render_template('generate_comment_page.html', error='No users available to comment.')
-
-    user = users[0]  # Select the first user that is not the post's author
-
-    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion. Use verbiage of a 8thth grade reading level in your response."
+    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion. Use verbiage of an 8th-grade reading level in your response."
 
     try:
         response = client.chat.completions.create(
@@ -401,7 +401,7 @@ def generate_and_comment():
 
         generated_comment = response.choices[0].message.content.strip()
 
-        # Optionally, create and save the new comment to the database
+        # Create and save the new comment
         new_comment = Comment(
             content=generated_comment, 
             user_id=user.id,
@@ -412,7 +412,7 @@ def generate_and_comment():
         db.session.add(new_comment)
         db.session.commit()
 
-        # Pass the details to the template instead of redirecting or using flash
+        # Display the generated comment details
         return render_template(
             'generate_comment_page.html', 
             post_title=post.title, 
@@ -423,7 +423,6 @@ def generate_and_comment():
     except Exception as e:
         return render_template('generate_comment_page.html', error=f'Failed to generate comment: {str(e)}')
 
-# No need for redirect here; the information is displayed directly on the page
 
 
 if __name__ == '__main__':
