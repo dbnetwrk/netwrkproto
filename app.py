@@ -176,33 +176,30 @@ def show_post(post_id):
 
 @app.route('/feed')
 def show_feed():
-    user_id = session.get('user_id')
-    if not user_id:
-        flash("Please log in to view the feed.", "warning")
+    if 'user_id' not in session:
+        flash("Please log in to view the feed.")
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
-    if not user:
-        flash("User not found.", "danger")
+    user_id = session['user_id']
+    current_user = User.query.get(user_id)
+    if not current_user:
+        flash("User not found.")
         return redirect(url_for('login'))
 
-    # Assuming 'interests' is accessible via user.interests and returns a list of interest objects.
-    user_interest_ids = [interest.id for interest in user.interests]
-    user_industry = user.industry
+    # Assuming 'interests' and 'industry' are accessible directly from the User model
+    user_interest_ids = [interest.id for interest in current_user.interests]
+    user_industry = current_user.industry
 
-    # Find communities created by users with the same industry and overlapping interests
-    # This part needs adjustment based on your actual database schema and relationships
-    communities_of_interest = Community.query.join(User).filter(
-        User.industry == user_industry,
-        Community.creator.has(Interests.any(Interest.id.in_(user_interest_ids)))
-    ).all()
-
-    community_ids = [community.id for community in communities_of_interest]
-
-    # Now get the posts from these communities
-    posts = Post.query.filter(Post.community_id.in_(community_ids)).order_by(Post.posted_time.desc()).all()
+    # This is a more complex query that might need to be adjusted.
+    posts = Post.query.join(Post.community)\
+                      .join(Community.creator)\
+                      .filter(Community.created_by.has(industry=user_industry))\
+                      .filter(Community.created_by.has(User.interests.any(Interest.id.in_(user_interest_ids))))\
+                      .order_by(Post.posted_time.desc())\
+                      .all()
 
     return render_template("feed.html", posts=posts, active_page='feed')
+
 
 
 
