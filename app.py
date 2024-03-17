@@ -389,7 +389,7 @@ def generate_and_comment():
         # If no suitable post is found, display a message
         return render_template('generate_comment_page.html', error="No posts available for this user to comment on. Please try again.")
 
-    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion. Use verbiage of an 8th-grade reading level in your response."
+    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a concise, thoughtful and engaging one or two sentence comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion. Use verbiage of an 8th-grade reading level in your response."
 
     try:
         response = client.chat.completions.create(
