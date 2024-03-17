@@ -347,7 +347,7 @@ def generate_and_post():
     if not community or not user:
         return render_template('generated_post.html', error='No communities or users available.')
     
-    prompt = f"Generate a meaningful post title and content for the community '{community.name}' which focuses on '{community.description}'."
+    prompt = f"Please write a post for the community '{community.name}', which focuses on '{community.description}'. Begin your response with a single sentence title, followed by a blank line, and then the post content."
 
     try:
         response = client.chat.completions.create(
@@ -358,7 +358,9 @@ def generate_and_post():
         )
         
         generated_text = response.choices[0].message.content
-        title, content = generated_text.split('\n', 1)
+        parts = generated_text.split('\n\n', 1)
+        title = parts[0].strip() if parts else "Untitled"
+        content = parts[1].strip() if len(parts) > 1 else "No content"
         
         # Create and save the new post to the selected community with the selected user
         new_post = Post(
