@@ -174,7 +174,22 @@ def show_post(post_id):
 
 @app.route('/feed')
 def show_feed():
-    posts = Post.query.join(Community, Post.community_id == Community.id).order_by(Post.posted_time.desc()).all()
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("You must be logged in to view the feed.", "danger")
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('login'))
+
+    # Assuming each user has a 'interests' relationship
+    user_interest_ids = {interest.id for interest in user.interests}
+
+    # Fetch posts from communities created by users with at least one matching interest
+    posts = Post.query.join(Community).join(User, Community.created_by == User.id).join(User.interests).filter(Interest.id.in_(user_interest_ids)).order_by(Post.posted_time.desc()).distinct()
+
     return render_template("feed.html", posts=posts, active_page='feed')
 
 
