@@ -49,7 +49,6 @@ class User(db.Model):
     profile_pic_url = db.Column(db.String(255), default='/static/images/default_profile.png')
     burner_username = db.Column(db.String(50), nullable=True)
     communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
-    industry = db.Column(db.String(100), nullable=True) 
     interests = db.relationship('Interest', secondary=user_interest_association, backref=db.backref('users', lazy='dynamic'))
     industry_id = db.Column(db.Integer, db.ForeignKey('industry.id'), nullable=True)
     industry = db.relationship('Industry', backref=db.backref('users', lazy=True))
@@ -185,8 +184,26 @@ def show_post(post_id):
 
 @app.route('/feed')
 def show_feed():
-    posts = Post.query.join(Community, Post.community_id == Community.id).order_by(Post.posted_time.desc()).all()
+    user_id = session.get('user_id')
+    if not user_id:
+        # Handle case where user is not logged in, possibly redirecting to login page
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if not user:
+        # Handle case where user does not exist, possibly due to session mismatch
+        return redirect(url_for('logout'))  # Assuming you have a logout route to clear session
+
+    user_industry_id = user.industry_id
+
+    # Filter communities to those created by users in the same industry as the current user
+    communities_in_same_industry = Community.query.join(User, Community.created_by == User.id).filter(User.industry_id == user_industry_id).all()
+
+    # Get posts from those communities
+    posts = Post.query.filter(Post.community_id.in_([community.id for community in communities_in_same_industry])).order_by(Post.posted_time.desc()).all()
+
     return render_template("feed.html", posts=posts, active_page='feed')
+
 
 
 @app.route('/profile')
