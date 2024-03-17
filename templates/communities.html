@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Communities{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Communities</h1>
+    <ul>
+        {% for community in communities %}
+            <li>
+                <img src="{{ community.profile_pic_url }}" alt="Profile Picture" width="50" height="50">
+                <strong>{{ community.name }}</strong> - {{ community.description }}
+                <!-- You can add a link to a community page if you have one -->
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

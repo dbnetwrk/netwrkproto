@@ -32,17 +32,17 @@ class User(db.Model):
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    community_name = db.Column(db.String(100), nullable=False)
-    profile_pic_url = db.Column(db.String(255), nullable=True)  # Optional
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    posted_time = db.Column(db.String(50), nullable=False)
+    posted_time = db.Column(db.DateTime, default=datetime.utcnow)
     upvotes = db.Column(db.Integer, nullable=False, default=0)
     downvotes = db.Column(db.Integer, nullable=False, default=0)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    community_id = db.Column(db.Integer, db.ForeignKey('community.id'), nullable=False)
 
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_post_user_id'), nullable=False)  # Add this line
+    user = db.relationship('User', backref=db.backref('posts', lazy=True))
+    community = db.relationship('Community', backref=db.backref('posts', lazy=True))
 
-    user = db.relationship('User', backref=db.backref('posts', lazy=True))  # Add this line
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -63,6 +63,15 @@ class UserAction(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', backref=db.backref('actions', lazy=True))
+
+class Community(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    profile_pic_url = db.Column(db.String(255), nullable=True, default='/static/images/default_community.png')
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
 
 
 
@@ -131,7 +140,7 @@ def show_post(post_id):
 
 @app.route('/feed')
 def show_feed():
-    posts = Post.query.order_by(Post.posted_time.desc()).all()
+    posts = Post.query.join(Community, Post.community_id == Community.id).order_by(Post.posted_time.desc()).all()
     return render_template("feed.html", posts=posts, active_page='feed')
 
 
@@ -287,6 +296,39 @@ def create_post():
         return redirect(url_for('show_feed'))
 
     return render_template('create_post.html')
+
+
+@app.route('/create_community', methods=['GET', 'POST'])
+def create_community():
+    if 'user_id' not in session:
+        flash("Please log in to create a community.")
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        # Assume a file input named 'profile_pic' for uploading community profile pictures
+        file = request.files.get('profile_pic')
+        profile_pic_url = '/static/images/default_community.png'  # Default picture
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            profile_pic_url = url_for('static', filename='uploads/' + filename)
+
+        new_community = Community(name=name, description=description, profile_pic_url=profile_pic_url, created_by=session['user_id'])
+        db.session.add(new_community)
+        db.session.commit()
+
+        flash("Community created successfully.")
+        return redirect(url_for('show_feed'))
+
+    return render_template('create_community.html')
+
+@app.route('/communities')
+def communities():
+    all_communities = Community.query.all()
+    return render_template('communities.html', communities=all_communities)
 
 
 

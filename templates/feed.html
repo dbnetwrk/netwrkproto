@@ -8,15 +8,15 @@
     {% for post in posts %}
     <div class="card">
         <div class="card-header">
-            <img src="{{ url_for('static', filename=post.profile_pic_url.strip()) }}" alt="Profile Picture" class="community-pic">
-            <div>{{ post.community_name }}</div>
+            <!-- Use the community's profile_pic_url -->
+            <img src="{{ url_for('static', filename=post.community.profile_pic_url.strip()) }}" alt="Profile Picture" class="community-pic">
+            <!-- Use the community's name -->
+            <div>{{ post.community.name }}</div>
         </div>
-        <!-- Make the title a clickable link to the post detail page -->
         <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-title">{{ post.title }}</a>
         <div class="card-content">{{ post.content }}</div>
         <div class="card-meta">Posted {{ post.posted_time|time_ago }} · {{ post.upvotes }} upvotes · {{ post.downvotes }} downvotes</div>
         <div class="card-actions">
-            <!-- Optionally make the Comments a clickable link as well -->
             <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">Comments</a> · 
             <span class="card-action">Share</span>
         </div>
@@ -25,6 +25,7 @@
 </div>
 
 {% endblock %}
+
 
 
 
