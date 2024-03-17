@@ -356,14 +356,20 @@ def communities():
 
 @app.route('/generate_and_post', methods=['GET'])
 def generate_and_post():
-    # Select a random community for the post
-    community = Community.query.order_by(db.func.random()).first()
-    # Select a random user for the post
+    # Select a random user
     user = User.query.order_by(db.func.random()).first()
     
-    if not community or not user:
-        error_message = 'No communities or users available.'
-        return render_template('generate_post_page.html', title=None, content=None, error=error_message)
+    if not user:
+        return render_template('generate_post_page.html', error='No users available.')
+
+    # Get the communities the randomly selected user has joined
+    joined_communities = user.communities.all()
+    
+    if not joined_communities:
+        return render_template('generate_post_page.html', error='The selected user has not joined any communities.')
+
+    # Select a random community from the ones the user has joined
+    community = choice(joined_communities)
     
     prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 8th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
 
@@ -377,16 +383,13 @@ def generate_and_post():
         title = parts[0].strip() if parts else "Untitled"
         content = parts[1].strip() if len(parts) > 1 else "No content"
         
-        # Optionally, create and save the new post to the database as before
         new_post = Post(title=title, content=content, user_id=user.id, community_id=community.id, posted_time=datetime.utcnow())
         db.session.add(new_post)
         db.session.commit()
         
-        # Render the template with the generated post information
-        return render_template('generate_post_page.html', title=title, content=content)
+        return render_template('generate_post_page.html', title=title, content=content, success='Generated and posted successfully!')
     except Exception as e:
-        error_message = f'Failed to generate post: {str(e)}'
-        return render_template('generate_post_page.html', title=None, content=None, error=error_message)
+        return render_template('generate_post_page.html', error=f'Failed to generate post: {str(e)}')
 
 
 
