@@ -359,17 +359,11 @@ def generate_and_post():
     # Select a random user
     user = User.query.order_by(db.func.random()).first()
     
-    if not user:
-        return render_template('generate_post_page.html', error='No users available.')
-
-    # Get the communities the randomly selected user has joined
-    joined_communities = user.communities.all()
-    
-    if not joined_communities:
-        return render_template('generate_post_page.html', error='The selected user has not joined any communities.')
+    if not user or not user.communities:
+        return render_template('generate_post_page.html', error='You have not joined any communities or user does not exist')
 
     # Select a random community from the ones the user has joined
-    community = choice(joined_communities)
+    community = choice(user.communities)
     
     prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 8th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
 
