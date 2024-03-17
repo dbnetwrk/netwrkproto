@@ -342,7 +342,15 @@ def create_community():
 @app.route('/communities')
 def communities():
     all_communities = Community.query.all()
-    return render_template('communities.html', communities=all_communities)
+    user_id = session.get('user_id')
+
+    # Fetching user's communities
+    if user_id:
+        user_communities = set(community.id for community in User.query.get(user_id).communities)
+    else:
+        user_communities = set()
+
+    return render_template('communities.html', communities=all_communities, user_communities=user_communities)
 
 
 
