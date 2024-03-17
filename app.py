@@ -378,21 +378,17 @@ def generate_and_comment():
     # Select a random post
     post = Post.query.order_by(db.func.random()).first()
 
-    # Ensure a post is available
     if not post:
-        flash('No posts available to comment on.', 'error')
-        return redirect(url_for('show_feed'))
+        return render_template('generate_comment_page.html', error='No posts available to comment on.')
 
     # Select a random user who is not the post creator
     users = User.query.filter(User.id != post.user_id).order_by(db.func.random()).all()
 
     if not users:
-        flash('No users available to comment.', 'error')
-        return redirect(url_for('show_feed'))
+        return render_template('generate_comment_page.html', error='No users available to comment.')
 
     user = users[0]  # Select the first user that is not the post's author
 
-    # Prepare the prompt for the OpenAI API to generate a comment based on the post's content
     prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion."
 
     try:
@@ -403,26 +399,31 @@ def generate_and_comment():
             ]
         )
 
-        # Extract the generated comment from the response
         generated_comment = response.choices[0].message.content.strip()
 
-        # Create and save the new comment
+        # Optionally, create and save the new comment to the database
         new_comment = Comment(
             content=generated_comment, 
             user_id=user.id,
             post_id=post.id, 
             posted_time=datetime.utcnow(),
-            is_burner=False  # Adjust this based on your requirements
+            is_burner=False
         )
         db.session.add(new_comment)
         db.session.commit()
 
-        flash('Comment generated and posted successfully!', 'success')
+        # Pass the details to the template instead of redirecting or using flash
+        return render_template(
+            'generate_comment_page.html', 
+            post_title=post.title, 
+            post_content=post.content, 
+            commenter_name=user.first_name + " " + user.last_name, 
+            generated_comment=generated_comment
+        )
     except Exception as e:
-        flash(f'Failed to generate comment: {str(e)}', 'error')
+        return render_template('generate_comment_page.html', error=f'Failed to generate comment: {str(e)}')
 
-    return redirect(url_for('show_feed'))
-
+# No need for redirect here; the information is displayed directly on the page
 
 
 if __name__ == '__main__':
