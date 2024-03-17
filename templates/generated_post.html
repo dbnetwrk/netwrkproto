@@ -1,17 +1,3 @@
-{% extends "base.html" %}
-
-{% block content %}
-<div class="container">
-    <h2>Generated Post</h2>
-    {% if generated_text %}
-        <p><strong>Generated for Community:</strong> {{ community.name }} ({{ community.description }})</p>
-        <p><strong>By User:</strong> {{ user.first_name }} {{ user.last_name }}</p>
-        <div>{{ generated_text|safe }}</div>
-    {% elif error %}
-        <p>Error: {{ error }}</p>
-    {% else %}
-        <p>No generated content to display.</p>
-    {% endif %}
-    <a href="{{ url_for('generate_and_post') }}" class="btn btn-primary">Generate Another Post</a>
-</div>
-{% endblock %}
+<form action="{{ url_for('generate_and_post') }}" method="get">
+    <button type="submit">Generate and Post Content</button>
+</form>
