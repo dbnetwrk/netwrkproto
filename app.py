@@ -19,7 +19,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://ubjg47i7g7isg8:p7b28d89d1d5c485255cd8f3ec14ffd4eedc961ef6e2d551b4c1be75734150385@cb889jp6h2eccm.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d7t68f59g1ep1t'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = '1'
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 
 
 db = SQLAlchemy(app)
