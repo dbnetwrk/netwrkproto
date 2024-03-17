@@ -15,6 +15,20 @@
             <p>Your Industry: {{ user.industry }}</p>
         {% endif %}
 
+
+        {% if user.interests %}
+            <p>Your Interests:</p>
+            <ul>
+                {% for interest in user.interests %}
+                    <li>{{ interest.name }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>You haven't added any interests yet.</p>
+        {% endif %}
+
+        
+
         <!-- Display the burner username if it exists -->
         {% if user.burner_username %}
             <p>Your Burner Username: {{ user.burner_username }}</p>
