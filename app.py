@@ -357,11 +357,25 @@ def generate_and_post():
             ]
         )
         
-        generated_text = str(response.choices[0].message.content)
-        # Display generated text directly on the page
-        return render_template('generated_post.html', generated_text=generated_text, community=community, user=user)
+        generated_text = response.choices[0].message.content
+        title, content = generated_text.split('\n', 1)
+        
+        # Create and save the new post to the selected community with the selected user
+        new_post = Post(
+            title=title.strip(), 
+            content=content.strip(), 
+            user_id=user.id,  # Now using the randomly selected user's ID
+            community_id=community.id, 
+            posted_time=datetime.utcnow()
+        )
+        db.session.add(new_post)
+        db.session.commit()
+        
+        flash('Generated and posted successfully!', 'success')
     except Exception as e:
-        return render_template('generated_post.html', error=f'Failed to generate post: {str(e)}')
+        flash(f'Failed to generate post: {str(e)}', 'error')
+    
+    return redirect(url_for('show_feed'))
 
 
 
