@@ -6,6 +6,8 @@ from openai import OpenAI
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from random import choice
+from sqlalchemy.sql import exists
+
 
 
 UPLOAD_FOLDER = 'C:\\flasker\\static\\uploads'
@@ -176,7 +178,6 @@ def show_post(post_id):
 def show_feed():
     user_id = session.get('user_id')
     if not user_id:
-        # Redirect to login if the user is not logged in
         flash("Please log in to view the feed.", "warning")
         return redirect(url_for('login'))
 
@@ -185,18 +186,24 @@ def show_feed():
         flash("User not found.", "danger")
         return redirect(url_for('login'))
 
-    user_interest_ids = {interest.id for interest in user.interests}
+    # Assuming 'interests' is accessible via user.interests and returns a list of interest objects.
+    user_interest_ids = [interest.id for interest in user.interests]
     user_industry = user.industry
 
-    # Query for posts in communities created by users with matching industry and at least one overlapping interest
-    posts = Post.query.join(Community, Post.community_id == Community.id)\
-                      .join(User, Community.created_by == User.id)\
-                      .filter(User.industry == user_industry)\
-                      .filter(exists().where(User.interests.any(Interest.id.in_(user_interest_ids))))\
-                      .order_by(Post.posted_time.desc())\
-                      .all()
+    # Find communities created by users with the same industry and overlapping interests
+    # This part needs adjustment based on your actual database schema and relationships
+    communities_of_interest = Community.query.join(User).filter(
+        User.industry == user_industry,
+        Community.creator.has(Interests.any(Interest.id.in_(user_interest_ids)))
+    ).all()
+
+    community_ids = [community.id for community in communities_of_interest]
+
+    # Now get the posts from these communities
+    posts = Post.query.filter(Post.community_id.in_(community_ids)).order_by(Post.posted_time.desc()).all()
 
     return render_template("feed.html", posts=posts, active_page='feed')
+
 
 
 @app.route('/profile')
