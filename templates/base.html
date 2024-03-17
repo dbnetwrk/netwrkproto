@@ -14,7 +14,7 @@
 <div class="navbar">
     <a href="{{ url_for('show_feed') }}" class="{{ 'active' if active_page == 'feed' else '' }}">Feed</a>
     <!-- Adjust other links similarly as needed -->
-    <a href="#" class="{{ 'active' if active_page == 'post' else '' }}">Post</a>
+    <a href="{{ url_for('create_post') }}" class="{{ 'active' if active_page == 'post' else '' }}">Post</a>
     <a href="#" class="{{ 'active' if active_page == 'communities' else '' }}">Communities</a>
     {% if current_user %}
         <a href="{{ url_for('profile') }}" class="{{ 'active' if active_page == 'profile' else '' }}">

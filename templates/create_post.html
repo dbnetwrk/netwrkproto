@@ -13,10 +13,15 @@
             <textarea id="content" name="content" required class="form-control"></textarea>
         </div>
         <div class="form-group">
-            <label for="community_name">Community Name:</label>
-            <input type="text" id="community_name" name="community_name" required class="form-control">
+            <label for="community">Community:</label>
+            <select id="community" name="community" required class="form-control">
+                {% for community in communities %}
+                <option value="{{ community.id }}">{{ community.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 </div>
 {% endblock %}
+

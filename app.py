@@ -280,22 +280,23 @@ def create_post():
         flash("Please log in to create a post.")
         return redirect(url_for('login'))
     
+    communities = Community.query.all()  # Assuming you have a Community model
+
     if request.method == 'POST':
-        # Retrieve form data
         title = request.form.get('title')
         content = request.form.get('content')
-        community_name = request.form.get('community_name')
+        community_id = request.form.get('community')  # Note the change here
         user_id = session['user_id']
 
-        # Create and save the new post
-        new_post = Post(title=title, content=content, community_name=community_name, user_id=user_id, posted_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), upvotes=0, downvotes=0)
+        new_post = Post(title=title, content=content, community_id=community_id, user_id=user_id, posted_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), upvotes=0, downvotes=0)
         db.session.add(new_post)
         db.session.commit()
         
         flash("Post created successfully.")
         return redirect(url_for('show_feed'))
 
-    return render_template('create_post.html')
+    return render_template('create_post.html', communities=communities)
+
 
 
 @app.route('/create_community', methods=['GET', 'POST'])
