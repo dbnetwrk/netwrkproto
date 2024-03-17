@@ -186,23 +186,29 @@ def show_post(post_id):
 def show_feed():
     user_id = session.get('user_id')
     if not user_id:
-        # Handle case where user is not logged in, possibly redirecting to login page
-        return redirect(url_for('login'))
-
+        return redirect(url_for('login'))  # User is not logged in
+    
     user = User.query.get(user_id)
     if not user:
-        # Handle case where user does not exist, possibly due to session mismatch
-        return redirect(url_for('logout'))  # Assuming you have a logout route to clear session
-
+        return redirect(url_for('logout'))  # User not found, clear session
+    
+    # Get the user's industry and interests
     user_industry_id = user.industry_id
+    user_interest_ids = {interest.id for interest in user.interests}
 
-    # Filter communities to those created by users in the same industry as the current user
-    communities_in_same_industry = Community.query.join(User, Community.created_by == User.id).filter(User.industry_id == user_industry_id).all()
+    # Find communities where the creator is in the same industry and shares at least one interest
+    communities = Community.query \
+        .join(User, Community.created_by == User.id) \
+        .join(User.interests) \
+        .filter(User.industry_id == user_industry_id, Interest.id.in_(user_interest_ids)) \
+        .distinct()
 
-    # Get posts from those communities
-    posts = Post.query.filter(Post.community_id.in_([community.id for community in communities_in_same_industry])).order_by(Post.posted_time.desc()).all()
+    # Assuming you want posts from these communities
+    post_ids = [post.id for community in communities for post in community.posts]
+    posts = Post.query.filter(Post.id.in_(post_ids)).order_by(Post.posted_time.desc()).all()
 
     return render_template("feed.html", posts=posts, active_page='feed')
+
 
 
 
