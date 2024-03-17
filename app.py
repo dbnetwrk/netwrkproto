@@ -347,7 +347,7 @@ def generate_and_post():
     if not community or not user:
         return render_template('generated_post.html', error='No communities or users available.')
     
-    prompt = f"Please write a post for the community '{community.name}', which focuses on '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, and then the post content. Limit the verbiage to a 10th grade reading level, and use a tone that is conversational, spartan, and use less corporate jargon"
+    prompt = f"Craft a story for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then content that dives into a narrative that creatively unfolds your experience. Your story should celebrate a personal victory or reflect on a lesson learned from a setback. Aim to inspire, entertain, or spark discussion among community members. Ensure your language is accessible, aiming for a 9th grade reading level to keep your story relatable and engaging for a wide audience."
 
     try:
         response = client.chat.completions.create(
