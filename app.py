@@ -42,6 +42,7 @@ class User(db.Model):
     profile_pic_url = db.Column(db.String(255), default='/static/images/default_profile.png')
     burner_username = db.Column(db.String(50), nullable=True)
     communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
+    industry = db.Column(db.String(100), nullable=True) 
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -104,24 +105,22 @@ def index():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    if request.method == 'POST':
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        password = request.form.get('password')
+        industry = request.form.get('industry')  # Get the selected industry
 
-	if request.method == 'POST':
+        # Create a new user with the provided info, including the industry
+        user = User(first_name=first_name, last_name=last_name, password=password, industry=industry)
+        db.session.add(user)
+        db.session.commit()
 
-		first_name = request.form.get('first_name')
-		last_name = request.form.get('last_name')
-		password = request.form.get('password')
+        session['user_id'] = user.id
+        return redirect(url_for('show_feed'))
 
+    return render_template("signup.html")
 
-		user = User(first_name=first_name, last_name = last_name, password= password)
-		db.session.add(user)
-		db.session.commit()
-
-		session['user_id'] = user.id
-
-		return redirect(url_for('show_feed'))
-
-
-	return render_template("signup.html")
 
 
 @app.route('/login', methods=['GET', 'POST'])
