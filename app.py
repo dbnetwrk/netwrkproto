@@ -124,6 +124,10 @@ def signup():
 
         # Create a new user with the provided info
         user = User(first_name=first_name, last_name=last_name, password=password, industry=industry)
+
+        if len(selected_interests) < 3 or len(selected_interests) > 5:
+            flash('Please select between 3 to 5 interests.', 'error')
+            return redirect(url_for('signup'))
         
         # Add selected interests to the user
         for interest_id in selected_interests_ids:
