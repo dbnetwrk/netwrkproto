@@ -348,7 +348,7 @@ def generate_and_post():
         error_message = 'No communities or users available.'
         return render_template('generate_post_page.html', title=None, content=None, error=error_message)
     
-    prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 9th grade reading level, and keep in mind you are a 22 years old college student. Do not begin your content with a greeting to the audience."
+    prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 8th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
 
     try:
         response = client.chat.completions.create(
@@ -389,7 +389,7 @@ def generate_and_comment():
         # If no suitable post is found, display a message
         return render_template('generate_comment_page.html', error="No posts available for this user to comment on. Please try again.")
 
-    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a concise, thoughtful one or two sentence comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your comment is concise. Use verbiage of an 8th-grade reading level in your comment, and remember that you are a 22 year old college student."
+    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a concise, thoughtful one or two sentence comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your comment is concise. Use verbiage of an 8th-grade reading level in your comment, and remember that you are 22 years old"
 
     try:
         response = client.chat.completions.create(
