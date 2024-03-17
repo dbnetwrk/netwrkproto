@@ -357,7 +357,7 @@ def generate_and_post():
             ]
         )
         
-        generated_text = str(response.choices[0].message['content'])
+        generated_text = str(response.choices[0].message.content)
         # Display generated text directly on the page
         return render_template('generated_post.html', generated_text=generated_text, community=community, user=user)
     except Exception as e:
