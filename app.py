@@ -21,15 +21,18 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = '1'
 client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
 
-user_community_association = db.Table('user_community',
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
-    db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True)
-)
 
 
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+
+user_community_association = db.Table('user_community',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True)
+)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
