@@ -33,6 +33,7 @@ class User(db.Model):
     password = db.Column(db.String(50), nullable=False)
     profile_pic_url = db.Column(db.String(255), default='/static/images/default_profile.png')
     burner_username = db.Column(db.String(50), nullable=True)
+    communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -422,6 +423,26 @@ def generate_and_comment():
         )
     except Exception as e:
         return render_template('generate_comment_page.html', error=f'Failed to generate comment: {str(e)}')
+
+
+@app.route('/join_community/<int:community_id>', methods=['POST'])
+def join_community(community_id):
+    if 'user_id' not in session:
+        flash("You must be logged in to join a community.", "danger")
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    community = Community.query.get(community_id)
+    
+    if community not in user.communities:
+        user.communities.append(community)
+        db.session.commit()
+        flash(f"You have successfully joined {community.name}.", "success")
+    else:
+        flash(f"You are already a member of {community.name}.", "info")
+
+    return redirect(url_for('communities'))
 
 
 
