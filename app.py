@@ -345,9 +345,55 @@ def generate_and_post():
     user = User.query.order_by(db.func.random()).first()
     
     if not community or not user:
-        return render_template('generated_post.html', error='No communities or users available.')
+        error_message = 'No communities or users available.'
+        return render_template('generate_post_page.html', title=None, content=None, error=error_message)
     
     prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 9th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "system", "content": prompt}]
+        )
+        generated_text = response.choices[0].message.content
+        parts = generated_text.split('\n\n', 1)
+        title = parts[0].strip() if parts else "Untitled"
+        content = parts[1].strip() if len(parts) > 1 else "No content"
+        
+        # Optionally, create and save the new post to the database as before
+        new_post = Post(title=title, content=content, user_id=user.id, community_id=community.id, posted_time=datetime.utcnow())
+        db.session.add(new_post)
+        db.session.commit()
+        
+        # Render the template with the generated post information
+        return render_template('generate_post_page.html', title=title, content=content)
+    except Exception as e:
+        error_message = f'Failed to generate post: {str(e)}'
+        return render_template('generate_post_page.html', title=None, content=None, error=error_message)
+
+
+
+@app.route('/generate_and_comment', methods=['GET'])
+def generate_and_comment():
+    # Select a random post
+    post = Post.query.order_by(db.func.random()).first()
+
+    # Ensure a post is available
+    if not post:
+        flash('No posts available to comment on.', 'error')
+        return redirect(url_for('show_feed'))
+
+    # Select a random user who is not the post creator
+    users = User.query.filter(User.id != post.user_id).order_by(db.func.random()).all()
+
+    if not users:
+        flash('No users available to comment.', 'error')
+        return redirect(url_for('show_feed'))
+
+    user = users[0]  # Select the first user that is not the post's author
+
+    # Prepare the prompt for the OpenAI API to generate a comment based on the post's content
+    prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a thoughtful and engaging comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your response is concise and fosters a positive discussion."
 
     try:
         response = client.chat.completions.create(
@@ -356,29 +402,26 @@ def generate_and_post():
                 {"role": "system", "content": prompt}
             ]
         )
-        
-        generated_text = response.choices[0].message.content
-        parts = generated_text.split('\n\n', 1)
-        title = parts[0].strip() if parts else "Untitled"
-        content = parts[1].strip() if len(parts) > 1 else "No content"
-        
-        # Create and save the new post to the selected community with the selected user
-        new_post = Post(
-            title=title.strip(), 
-            content=content.strip(), 
-            user_id=user.id,  # Now using the randomly selected user's ID
-            community_id=community.id, 
-            posted_time=datetime.utcnow()
-        )
-        db.session.add(new_post)
-        db.session.commit()
-        
-        flash('Generated and posted successfully!', 'success')
-    except Exception as e:
-        flash(f'Failed to generate post: {str(e)}', 'error')
-    
-    return redirect(url_for('show_feed'))
 
+        # Extract the generated comment from the response
+        generated_comment = response.choices[0].message.content.strip()
+
+        # Create and save the new comment
+        new_comment = Comment(
+            content=generated_comment, 
+            user_id=user.id,
+            post_id=post.id, 
+            posted_time=datetime.utcnow(),
+            is_burner=False  # Adjust this based on your requirements
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+
+        flash('Comment generated and posted successfully!', 'success')
+    except Exception as e:
+        flash(f'Failed to generate comment: {str(e)}', 'error')
+
+    return redirect(url_for('show_feed'))
 
 
 
