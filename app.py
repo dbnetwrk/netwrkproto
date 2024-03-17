@@ -380,15 +380,24 @@ def generate_and_post():
     # Select a random user
     user = User.query.order_by(db.func.random()).first()
     
-    if not user or not user.communities:
-        return render_template('generate_post_page.html', error='You have not joined any communities or user does not exist')
+    if not user:
+        return render_template('generate_post_page.html', error='User does not exist')
 
-    # Select a random community from the ones the user has joined
-    community = choice(user.communities)
-    
+    # Assuming each user has a many-to-many relationship with interests
+    user_interest_ids = {interest.id for interest in user.interests}
+
+    # Finding communities where the creator's interests overlap with the user's interests
+    communities = Community.query.join(User, Community.created_by == User.id).join(User.interests).filter(Interest.id.in_(user_interest_ids)).distinct()
+
+    if communities.count() == 0:
+        return render_template('generate_post_page.html', error='No communities found with matching interests')
+
+    community = choice(communities.all())
+
     prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 8th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
 
     try:
+        # Assuming the OpenAI API usage
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
@@ -401,7 +410,7 @@ def generate_and_post():
         new_post = Post(title=title, content=content, user_id=user.id, community_id=community.id, posted_time=datetime.utcnow())
         db.session.add(new_post)
         db.session.commit()
-        
+
         return render_template('generate_post_page.html', title=title, content=content, success='Generated and posted successfully!')
     except Exception as e:
         return render_template('generate_post_page.html', error=f'Failed to generate post: {str(e)}')
