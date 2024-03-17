@@ -349,7 +349,7 @@ def generate_and_post():
     prompt = f"Generate a meaningful post title and content for the community '{community.name}' which focuses on '{community.description}'."
 
     try:
-        response = client.chat.completions(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": prompt}
