@@ -176,7 +176,8 @@ def show_post(post_id):
 def show_feed():
     user_id = session.get('user_id')
     if not user_id:
-        flash("You must be logged in to view the feed.", "danger")
+        # Redirect to login if the user is not logged in
+        flash("Please log in to view the feed.", "warning")
         return redirect(url_for('login'))
 
     user = User.query.get(user_id)
@@ -184,11 +185,16 @@ def show_feed():
         flash("User not found.", "danger")
         return redirect(url_for('login'))
 
-    # Assuming each user has a 'interests' relationship
     user_interest_ids = {interest.id for interest in user.interests}
+    user_industry = user.industry
 
-    # Fetch posts from communities created by users with at least one matching interest
-    posts = Post.query.join(Community).join(User, Community.created_by == User.id).join(User.interests).filter(Interest.id.in_(user_interest_ids)).order_by(Post.posted_time.desc()).distinct()
+    # Query for posts in communities created by users with matching industry and at least one overlapping interest
+    posts = Post.query.join(Community, Post.community_id == Community.id)\
+                      .join(User, Community.created_by == User.id)\
+                      .filter(User.industry == user_industry)\
+                      .filter(exists().where(User.interests.any(Interest.id.in_(user_interest_ids))))\
+                      .order_by(Post.posted_time.desc())\
+                      .all()
 
     return render_template("feed.html", posts=posts, active_page='feed')
 
