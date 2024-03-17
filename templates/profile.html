@@ -29,17 +29,17 @@
 
         
 
-        <!-- Display the burner username if it exists -->
-        {% if user.burner_username %}
-            <p>Your Burner Username: {{ user.burner_username }}</p>
-        {% else %}
-            <!-- Form for creating a burner username -->
-            <form action="{{ url_for('create_burner_username') }}" method="post">
-                <label for="burner_username">Create Burner Username:</label>
-                <input type="text" id="burner_username" name="burner_username" required>
-                <button type="submit">Create</button>
-            </form>
-        {% endif %}
+        {# {% if user.burner_username %} #}
+    {# <p>Your Burner Username: {{ user.burner_username }}</p> #}
+{# {% else %} #}
+    {# <!-- Form for creating a burner username --> #}
+    {# <form action="{{ url_for('create_burner_username') }}" method="post"> #}
+        {# <label for="burner_username">Create Burner Username:</label> #}
+        {# <input type="text" id="burner_username" name="burner_username" required> #}
+        {# <button type="submit">Create</button> #}
+    {# </form> #}
+{# {% endif %} #}
+
         
 
         <!-- Logout form -->
