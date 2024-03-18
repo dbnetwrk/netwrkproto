@@ -148,7 +148,7 @@ def signup_final():
     first_name = session.pop('first_name', None)
     last_name = session.pop('last_name', None)
     password = session.pop('password', None)
-    session['industry_id'] = request.form.get('industry_id')
+    industry_id = request.form.get('industry_id')
     selected_interests_ids = request.form.getlist('interests')
     
     # Proceed with creating the user as before
