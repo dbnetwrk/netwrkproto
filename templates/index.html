@@ -20,10 +20,14 @@ body, html {
 }
 
 .container {
+    display: flex; /* Enables Flexbox layout */
+    flex-direction: column; /* Stacks children vertically */
+    align-items: center; /* Centers children horizontally in the container */
     max-width: 600px;
     margin: auto;
     padding: 20px;
 }
+
 
 .info {
     text-align: center;
@@ -89,6 +93,9 @@ button:hover {
 }
 
 
+.info, .signup-form {
+    width: 100%; /* Ensures both sections fill the container width */
+}
 
 
 
