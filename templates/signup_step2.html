@@ -28,16 +28,6 @@
                 </select>
             </div>
             
-            <fieldset class="interests-fieldset">
-    <legend>Select up to 3 interests:</legend>
-    <select name="interests" class="select-interests" multiple="multiple">
-        {% for interest in interests %}
-            <option value="{{ interest.id }}">{{ interest.name }}</option>
-        {% endfor %}
-    </select>
-
-
-</fieldset>
 
 		<div class="form-group">
     <label for="interest-search">Choose Interests:</label>
