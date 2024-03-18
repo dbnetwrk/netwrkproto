@@ -8,7 +8,8 @@
 }
 
 body {
-    background-color: #000; /* Dark gray background as the fallback */
+    background-color: #EAF3F9; /* A lighter blue for the background, complementary to LinkedIn blue */
+    background: linear-gradient(to right, #EAF3F9, #D3EAF8);
     display: flex;
     align-items: center;
     justify-content: center;
