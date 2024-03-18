@@ -237,7 +237,7 @@ def show_feed():
         .filter(~Post.id.in_([post.id for post in posts_in_industry_with_shared_interests])) \
         .filter(~Post.id.in_([post.id for post in posts_based_on_interests])) \
         .filter(~Post.id.in_([post.id for post in posts_in_industry])) \
-        .order_by(func.random()) \
+        .order_by(Post.posted_time.desc()) \
         .all()
 
     return render_template("feed.html", 
