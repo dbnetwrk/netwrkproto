@@ -48,7 +48,7 @@ body {
 }
 
 .container button{
-    background-color: #29B6F6; /* Material Design Light Blue 400 */
+    background-color: #0077B5; /* Material Design Light Blue 400 */
     color: #fff;
     font-size: 12px;
     padding: 10px 45px;
@@ -162,8 +162,8 @@ body {
 }
 
 .toggle{
-    background-color: #E0F7FA; /* Lighter blue background */
-    background: linear-gradient(to right, #E0F7FA, #B2EBF2); /* Gradient from Material Design's light blue colors */
+    background-color: #0077B5;; /* Lighter blue background */
+    background: linear-gradient(to right, #009FDA, #0077B5);
     height: 100%;
     color: #fff;
     position: relative;
