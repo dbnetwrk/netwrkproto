@@ -2,45 +2,29 @@
 
 {% block title %}Communities{% endblock %}
 
+{% block content %}
+<div class="feed-container">
     
-    {% block content %}
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-
-<div class="container">
-    
-    <!-- Communities in Your Industry and Shared Interests -->
     <h2>Communities in Your Industry and Shared Interests</h2>
-    <div id="carouselIndustrySharedInterests" class="carousel slide" data-ride="carousel">
-        <div class="carousel-inner">
-            {% for community in communities_in_industry_with_shared_interests %}
-            <div class="carousel-item {% if loop.first %}active{% endif %}">
-                <img src="{{ url_for('static', filename=community.profile_pic_url) }}" class="d-block w-100" alt="{{ community.name }}">
-                <div class="carousel-caption d-none d-md-block">
-                    <h5>{{ community.name }}</h5>
-                    <p>{{ community.description }}</p>
-                    {% if community.id not in user_communities %}
-                    <form action="{{ url_for('join_community', community_id=community.id) }}" method="post">
-                        <button type="submit" class="btn btn-primary">Join Community</button>
-                    </form>
-                    {% else %}
-                    <span>Joined</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
+    {% for community in communities_in_industry_with_shared_interests %}
+    <div class="card">
+        <div class="card-header">
+            <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class='user-profile-pic'>
+            <div>{{ community.name }}</div>
         </div>
-        <a class="carousel-control-prev" href="#carouselIndustrySharedInterests" role="button" data-slide="prev">
-            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-            <span class="sr-only">Previous</span>
-        </a>
-        <a class="carousel-control-next" href="#carouselIndustrySharedInterests" role="button" data-slide="next">
-            <span class="carousel-control-next-icon" aria-hidden="true"></span>
-            <span class="sr-only">Next</span>
-        </a>
+        <div class="card-content">{{ community.description }}</div>
+        <div class="card-actions">
+            {% if community.id not in user_communities %}
+            <form action="{{ url_for('join_community', community_id=community.id) }}" method="post">
+                <button type="submit" class="card-action">Join Community</button>
+            </form>
+            {% else %}
+            <span>Joined</span>
+            {% endif %}
+        </div>
     </div>
+    {% endfor %}
+
 
     <!-- New Section: Communities Within Your Industry -->
     <h2>Communities Within Your Industry</h2>
