@@ -10,6 +10,16 @@ from sqlalchemy.sql import exists
 
 
 
+
+
+
+
+
+
+
+
+
+
 UPLOAD_FOLDER = 'C:\\flasker\\static\\uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -112,6 +122,44 @@ class Interest(db.Model):
 class Industry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
+
+
+
+
+
+interest_image_map = {
+    1: 'football.png',
+    2: 'reading.png',
+    3: 'startups.png',
+    4: 'gym.png',
+    5: 'music.png',
+    6: 'walking.png',
+    7: 'sports.png',
+    8: 'movies.png',
+    9: 'skincare.png',
+    10: 'coffee.png',
+}
+
+def update_community_profile_pics():
+    communities = Community.query.all()
+    for community in communities:
+        for interest in community.interests:
+            if interest.id in interest_image_map:
+                # Construct the path to the image file
+                image_filename = interest_image_map[interest.id]
+                community.profile_pic_url = f'/images/{image_filename}'
+                break  # Remove this break if you want to iterate through all interests
+        
+        db.session.add(community)
+    db.session.commit()
+
+
+
+
+
+
+
+
 
 
 
@@ -599,4 +647,7 @@ def join_community(community_id):
 
 
 if __name__ == '__main__':
+    with app.app_context():
+        update_community_profile_pics()
+        print("Community profile pictures updated based on interests.")
 	app.run(debug=True)
