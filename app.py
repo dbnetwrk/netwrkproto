@@ -209,12 +209,13 @@ def show_feed():
     # and then fetches posts from these communities
     posts = Post.query \
         .join(Community, Post.community_id == Community.id) \
-        .join(community_interest, Community.id == community_interest.c.community_id) \
-        .filter(community_interest.c.interest_id.in_(user_interest_ids)) \
+        .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
+        .filter(community_interest_association.c.interest_id.in_(user_interest_ids)) \
         .order_by(Post.posted_time.desc()) \
         .all()
 
     return render_template("feed.html", posts=posts, active_page='feed')
+
 
 
 
