@@ -180,3 +180,34 @@ span a:hover{
 }
 
 
+.wrapper.signup-step2 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #ececec;
+}
+
+.signup-form {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.input-field, .interests-fieldset {
+    margin-bottom: 15px;
+}
+
+.btn-complete-signup {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.btn-complete-signup:hover {
+    background-color: #0056b3;
+}
