@@ -279,3 +279,16 @@ select {
         min-height: auto; /* Adjust height based on content */
     }
 }
+
+.toggle-panel ul {
+    list-style-type: disc; /* or "circle", "square", etc., depending on the desired bullet point style */
+    padding-left: 20px; /* Adjust based on desired indentation */
+    margin-top: 0; /* Removes the default top margin */
+    margin-bottom: 1em; /* Adds some space below the list, adjust as needed */
+}
+
+.toggle-panel li {
+    margin-bottom: 0.5em; /* Adjusts spacing between list items */
+    line-height: 1.6; /* Adjusts line height to match your paragraph text if needed */
+}
+
