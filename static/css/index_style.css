@@ -162,6 +162,8 @@ span a:hover{
     justify-content: center;
     padding: 20px;
     text-align: center; /* Center the text */
+    border-radius: 10px 0 0 10px;
+    position: relative;
 }
 
 .text-content h1 {
