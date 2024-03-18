@@ -153,3 +153,28 @@ span a:hover{
         width: 100%;
     }
 }
+
+.side-content {
+    background-color: #007bff; /* Adjust the color to the blue shade you prefer */
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center; /* Center the text */
+}
+
+.text-content h1 {
+    margin-bottom: 20px;
+}
+
+.text-content ul {
+    list-style: none; /* Remove bullet points */
+    padding: 0;
+}
+
+.text-content ul li {
+    margin-bottom: 10px;
+}
+
+
