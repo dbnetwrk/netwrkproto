@@ -193,28 +193,29 @@ def show_post(post_id):
 def show_feed():
     user_id = session.get('user_id')
     if not user_id:
-        return redirect(url_for('login'))  # User is not logged in
-    
+        # User is not logged in, redirect to login page
+        return redirect(url_for('login'))
+
     user = User.query.get(user_id)
     if not user:
-        return redirect(url_for('logout'))  # User not found, clear session
-    
-    # Get the user's industry and interests
-    user_industry_id = user.industry_id
-    user_interest_ids = {interest.id for interest in user.interests}
+        # User not found, redirect to login to clear potentially invalid session
+        return redirect(url_for('login'))
 
-    # Find communities where the creator is in the same industry and shares at least one interest
-    communities = Community.query \
-        .join(User, Community.created_by == User.id) \
-        .join(User.interests) \
-        .filter(User.industry_id == user_industry_id, Interest.id.in_(user_interest_ids)) \
-        .distinct()
+    # Get the IDs of interests the user has
+    user_interest_ids = [interest.id for interest in user.interests]
 
-    # Assuming you want posts from these communities
-    post_ids = [post.id for community in communities for post in community.posts]
-    posts = Post.query.filter(Post.id.in_(post_ids)).order_by(Post.posted_time.desc()).all()
+    # Find posts from communities that have at least one matching interest with the user
+    # This query fetches communities that are associated with the user's interests
+    # and then fetches posts from these communities
+    posts = Post.query \
+        .join(Community, Post.community_id == Community.id) \
+        .join(community_interest_table, Community.id == community_interest_table.c.community_id) \
+        .filter(community_interest_table.c.interest_id.in_(user_interest_ids)) \
+        .order_by(Post.posted_time.desc()) \
+        .all()
 
     return render_template("feed.html", posts=posts, active_page='feed')
+
 
 
 
