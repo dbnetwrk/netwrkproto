@@ -15,13 +15,13 @@ def generate_post_core():
             return 'User does not exist', None
 
         user_interest_ids = {interest.id for interest in user.interests}
-        communities = Community.query \
-            .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
-            .filter(community_interest_association.c.interest_id.in_(user_interest_ids)).distinct()
+        # Find communities where the creator is in the same industry as the user
+        communities = Community.query.join(User, Community.created_by == User.id) \
+            .filter(User.industry_id == user.industry_id).distinct()
 
         if communities.count() == 0:
-            print('No communities found with matching interests')
-            return 'No communities found with matching interests', None
+            print('No communities found with matching industry')
+            return 'No communities found with matching industry', None
 
         community = choice(communities.all())
         prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 8th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
@@ -61,9 +61,8 @@ def generate_comment_core():
 
         # Find posts within communities where the user shares at least one interest
         # First, get communities matching user's interests
-        matching_communities = Community.query \
-            .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
-            .filter(community_interest_association.c.interest_id.in_(user_interest_ids)).distinct()
+        matching_communities = Community.query.join(User, Community.created_by == User.id) \
+            .filter(User.industry_id == user.industry_id).distinct()
 
         # Then, find posts from these communities that the user hasn't commented on yet
         commented_post_ids = db.session.query(Comment.post_id).filter_by(user_id=user.id).subquery()
