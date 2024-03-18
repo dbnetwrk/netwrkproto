@@ -5,14 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - Netwrk</title>
 
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
 <style>
 
 body, html {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
+    object-fit: fill;
+  background-color: #000d14;
+  background-image: url("https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655b0f1c8fbbaaf6dd0be0ad_Frame%206.png");
+  background-position: 50%;
+  background-size: cover;
+  padding-bottom: 0;
+ font-family: 'Roboto', Arial, sans-serif;
 }
 
 .container {
@@ -24,6 +28,7 @@ body, html {
 .info {
     text-align: center;
     margin-bottom: 20px;
+    color: #fff;
 }
 
 .signup-form {
@@ -76,6 +81,14 @@ button:hover {
     }
 }
 
+.logo {
+    display: block;
+    max-width: 100%; /* Ensure the logo is not wider than the container */
+    height: auto; /* Maintain aspect ratio */
+    margin: 0 auto 20px; /* Center the logo and add some space below it */
+}
+
+
 
 </style>
 
@@ -83,7 +96,7 @@ button:hover {
 <body>
     <div class="container">
         <section class="info">
-            <h1>Welcome to Netwrk</h1>
+            <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
             <p>
 Join a professional networking platform exclusively for Gen Z. Discover fresh ideas, forge genuine connections through shared interests, and engage in deeper discussions within vibrant communities.</p>
         </section>
