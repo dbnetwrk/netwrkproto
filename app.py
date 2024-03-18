@@ -131,19 +131,17 @@ def index():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    industries = Industry.query.all()  # Fetch industries here to be available for both GET and POST
     if request.method == 'POST':
         first_name = request.form.get('first_name')
         last_name = request.form.get('last_name')
         password = request.form.get('password')
-        industry = request.form.get('industry')  # Assuming you've already added this
-        selected_interests_ids = request.form.getlist('interests')  # 'interests' is the name attribute in your select tag
-        industry_id = request.form.get('industry_id')
-        user.industry_id = industry_id
+        industry_id = request.form.get('industry_id')  # Corrected to use 'industry_id' based on your form
+        selected_interests_ids = request.form.getlist('interests')
 
-        # Create a new user with the provided info
-        user = User(first_name=first_name, last_name=last_name, password=password, industry=industry)
+        # Assuming the Industry relation is correctly set up in your User model
+        user = User(first_name=first_name, last_name=last_name, password=password, industry_id=industry_id)
 
-        industries = Industry.query.all()
         # Add selected interests to the user
         for interest_id in selected_interests_ids:
             interest = Interest.query.get(interest_id)
@@ -155,10 +153,10 @@ def signup():
 
         session['user_id'] = user.id
         return redirect(url_for('show_feed'))
-    else:
-        # Fetch all available interests to display in the form
-        interests = Interest.query.all()
-        return render_template("signup.html", interests=interests, industries=industries)
+
+    interests = Interest.query.all()  # Fetch all available interests to display in the form
+    return render_template("signup.html", interests=interests, industries=industries)
+
 
 
 
