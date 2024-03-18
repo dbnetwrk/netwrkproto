@@ -411,6 +411,10 @@ def communities():
         return redirect(url_for('login'))
 
     user = User.query.get(user_id)
+    if not user:
+        return redirect(url_for('logout'))
+
+    user_industry_id = user.industry_id
     user_interest_ids = [interest.id for interest in user.interests]
 
     communities_in_industry_with_shared_interests = Community.query \
