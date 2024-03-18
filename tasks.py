@@ -3,6 +3,7 @@ from app import app, db, User, Post, Community, client
 from app import community_interest_association  # Assuming this is defined in app.py
 from sqlalchemy.sql.expression import func
 from random import choice
+from datetime import datetime
 
 def generate_post_core():
     # Create and use the application context
