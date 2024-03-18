@@ -231,25 +231,32 @@ select {
     outline: none; /* Remove the default focus outline */
 }
 
-/* Styling the fieldset for interests */
+/* Adjusting the interests-fieldset to display checkboxes in a grid */
 .interests-fieldset {
     border-radius: 8px;
     border: 1px solid #ccc;
     padding: 20px;
     margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Adjust minmax for your preferred minimum width */
+    gap: 10px; /* Space between grid items */
 }
 
 /* Checkbox label styling for better appearance */
 .checkbox label {
-    display: block; /* Each checkbox on its own line */
-    margin: 5px 0; /* Space out the checkboxes */
-    font-size: 14px;
+    display: flex;
+    align-items: center;
     cursor: pointer;
 }
 
 /* Custom checkbox appearance */
 .checkbox input[type="checkbox"] {
     margin-right: 10px; /* Space between checkbox and label text */
+}
+
+/* Ensuring the form group and fieldset take full width */
+.form-group, .interests-fieldset {
+    width: 100%;
 }
 
 /* Adjusting button styling for consistency */
