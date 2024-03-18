@@ -49,14 +49,31 @@ def generate_post_core():
 
 def generate_comment_core():
     with app.app_context():
+        # Select a random user
         user = User.query.order_by(func.random()).first()
         
         if not user:
             print("No users available.")
             return "No users available.", None
 
+        # Fetch user's interest IDs
+        user_interest_ids = {interest.id for interest in user.interests}
+
+        # Find posts within communities where the user shares at least one interest
+        # First, get communities matching user's interests
+        matching_communities = Community.query \
+            .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
+            .filter(community_interest_association.c.interest_id.in_(user_interest_ids)).distinct()
+
+        # Then, find posts from these communities that the user hasn't commented on yet
         commented_post_ids = db.session.query(Comment.post_id).filter_by(user_id=user.id).subquery()
-        post = Post.query.filter(Post.user_id != user.id, ~Post.id.in_(commented_post_ids)).order_by(func.random()).first()
+        posts = Post.query \
+            .filter(Post.community_id.in_([community.id for community in matching_communities])) \
+            .filter(Post.user_id != user.id, ~Post.id.in_(commented_post_ids)) \
+            .order_by(func.random())
+
+        # Select a random post from the filtered posts
+        post = posts.first()
 
         if not post:
             print("No posts available for this user to comment on. Please try again.")
@@ -76,7 +93,7 @@ def generate_comment_core():
                 user_id=user.id,
                 post_id=post.id,
                 posted_time=datetime.utcnow(),
-                is_burner=False  # Adjust according to your needs
+                is_burner=False
             )
             db.session.add(new_comment)
             db.session.commit()
