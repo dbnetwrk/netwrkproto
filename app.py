@@ -188,7 +188,6 @@ def show_post(post_id):
     comments = Comment.query.filter_by(post_id=post.id).order_by(Comment.posted_time.desc()).all()
     return render_template('post_detail.html', post=post, comments=comments)
 
-
 @app.route('/feed')
 def show_feed():
     user_id = session.get('user_id')
@@ -248,9 +247,6 @@ def show_feed():
                            posts_based_on_interests=posts_based_on_interests, 
                            rest_of_posts=rest_of_posts, 
                            active_page='feed')
-
-
-
 
 
 
