@@ -125,7 +125,7 @@ def create_tables():
 def index():
     industries = Industry.query.all()  # Fetch industries to be available for the template
     interests = Interest.query.all()  # Fetch interests to be available for the template
-    return render_template("index2.html", industries=industries, interests=interests)
+    return render_template("index.html", industries=industries, interests=interests)
 
 
 
@@ -184,7 +184,7 @@ def login():
             # Provide feedback that login was unsuccessful
             flash('Invalid first name, last name, or password')
             return redirect(url_for('login'))
-    return render_template('index2.html')
+    return render_template('index.html')
 
 @app.route('/post/<int:post_id>')
 def show_post(post_id):

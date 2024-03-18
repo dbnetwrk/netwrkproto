@@ -3,57 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Community Prototype</title>
-    <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #f0f2f5;
-            font-family: 'Arial', sans-serif;
-        }
-        .content {
-            text-align: center;
-        }
-        h1 {
-            color: #333;
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-        a.button, a.login-link {
-            display: inline-block;
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-            margin: 5px; /* Adds a little space between buttons if you have more than one */
-        }
-        a.button:hover {
-            background-color: #0056b3;
-        }
-        a.login-link {
-            background-color: transparent;
-            color: #007bff;
-        }
-        a.login-link:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index_style.css') }}">
+    <title>Community Platform</title>
 </head>
 <body>
 
-    <div class="content">
-        <h1>A Gen-Z only community where you can network, discover opportunities, and freely express your thoughts.</h1>
-        <a href="/signup" class="button">Sign Up</a>
-        <a href="/login" class="login-link">Login</a>
+<div class="container" id="container">
+    <div class="form-container sign-up">
+        <form action="/signup_step1" method="post" enctype="multipart/form-data">
+            <h1>Create Account</h1>
+            <span>or use your email for registration</span>
+            <input type="text" placeholder="First Name" name="first_name" required>
+            <input type="text" placeholder="Last Name" name="last_name" required>
+            <input type="password" placeholder="Password" name="password" required>
+            </fieldset>
+            <button type="submit">Sign Up</button>
+        </form>
     </div>
+    <div class="form-container sign-in">
+        <form action="/login" method="post">
+            <h1>Sign In</h1>
+            <span>or use your email password</span>
+            <input type="text" placeholder="First Name" name="first_name" required>
+            <input type="text" placeholder="Last Name" name="last_name" required>
+            <input type="password" placeholder="Password" name="password" required>
+            <a href="#">Forget Your Password?</a>
+            <button type="submit">Sign In</button>
+        </form>
+    </div>
+    <div class="toggle-container">
+        <div class="toggle">
+            <div class="toggle-panel toggle-left">
+                <h1>Welcome Back!</h1>
+                <p>To keep connected with us please login with your personal info</p>
+                <button class="hidden" id="login">Sign In</button>
+            </div>
+            <div class="toggle-panel toggle-right">
+                <h1>Hello, Friend!</h1>
+                <p>Enter your personal details and start journey with us</p>
+                <button class="hidden" id="register">Sign Up</button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<script>
+    
+
+const container = document.getElementById('container');
+const registerBtn = document.getElementById('register');
+const loginBtn = document.getElementById('login');
+
+registerBtn.addEventListener('click', () => {
+    container.classList.add("active");
+});
+
+loginBtn.addEventListener('click', () => {
+    container.classList.remove("active");
+});
+
+
+
+</script>
 </body>
 </html>
-
-    
