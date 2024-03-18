@@ -240,12 +240,10 @@ def show_feed():
         .order_by(Post.posted_time.desc()) \
         .all()
 
-    return render_template("feed.html", 
-                           posts_in_industry_with_shared_interests=posts_in_industry_with_shared_interests, 
-                           posts_in_industry=posts_in_industry,
-                           posts_based_on_interests=posts_based_on_interests, 
-                           rest_of_posts=rest_of_posts, 
-                           active_page='feed')
+    # Concatenating the post lists into a single list for display
+    all_posts = posts_in_industry_with_shared_interests.all() + posts_in_industry.all() + posts_based_on_interests.all() + rest_of_posts
+
+    return render_template("feed.html", posts=all_posts, active_page='feed')
 
 
 
