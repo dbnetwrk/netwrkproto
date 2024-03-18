@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index_style.css') }}">
-    <title>Community Platform</title>
+    <title>Netwrk</title>
 </head>
 <body>
 
@@ -13,7 +13,7 @@
     <div class="form-container sign-up">
         <form action="/signup_step1" method="post" enctype="multipart/form-data">
             <h1>Create Account</h1>
-            <span>or use your email for registration</span>
+            <span></span>
             <input type="text" placeholder="First Name" name="first_name" required>
             <input type="text" placeholder="Last Name" name="last_name" required>
             <input type="password" placeholder="Password" name="password" required>
@@ -24,7 +24,7 @@
     <div class="form-container sign-in">
         <form action="/login" method="post">
             <h1>Sign In</h1>
-            <span>or use your email password</span>
+            <span></span>
             <input type="text" placeholder="First Name" name="first_name" required>
             <input type="text" placeholder="Last Name" name="last_name" required>
             <input type="password" placeholder="Password" name="password" required>
@@ -35,12 +35,12 @@
     <div class="toggle-container">
         <div class="toggle">
             <div class="toggle-panel toggle-left">
-                <h1>Welcome Back!</h1>
+                <h1>Join Netwrk</h1>
                 <p>To keep connected with us please login with your personal info</p>
                 <button class="hidden" id="login">Sign In</button>
             </div>
             <div class="toggle-panel toggle-right">
-                <h1>Hello, Friend!</h1>
+                <h1>Login to Netwrk</h1>
                 <p>Enter your personal details and start journey with us</p>
                 <button class="hidden" id="register">Sign Up</button>
             </div>
