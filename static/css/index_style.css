@@ -295,3 +295,41 @@ select {
     text-align:left;
 }
 
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+    .container {
+        width: 90%; /* Adjust the container width on smaller screens */
+        padding: 20px; /* Add padding to avoid elements touching the edges */
+    }
+    .form-container {
+        width: 100%; /* Use full container width */
+        padding: 20px; /* Adjust padding for form-container for smaller screens */
+    }
+    .container input, .container select {
+        padding: 8px; /* Reduce padding for input and select fields */
+        font-size: 14px; /* Adjust font size for better readability */
+    }
+    .toggle-panel {
+        padding: 10px; /* Reduce padding in toggle panels */
+    }
+    .interests-fieldset {
+        grid-template-columns: repeat(2, 1fr); /* Adjust grid to two columns for interests */
+    }
+}
+
+/* Ensuring elements are not too wide on very small screens */
+@media (max-width: 480px) {
+    .form-group, .interests-fieldset {
+        padding: 10px; /* Further reduce padding */
+    }
+    .interests-fieldset {
+        grid-template-columns: 1fr; /* Stack interests vertically on very small screens */
+    }
+}
+
+/* Correcting container height issue */
+.container, .form-container {
+    min-height: auto; /* Allow container height to grow with content */
+    max-height: 100vh; /* Ensure it doesn't grow beyond viewport height */
+    overflow-y: auto; /* Enable scrolling within the container if needed */
+}
