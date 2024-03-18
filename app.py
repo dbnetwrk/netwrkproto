@@ -123,8 +123,10 @@ def create_tables():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    industries = Industry.query.all()  # Fetch industries to be available for the template
+    interests = Interest.query.all()  # Fetch interests to be available for the template
+    return render_template("index2.html", industries=industries, interests=interests)
 
-	return render_template("index2.html")
 
 
 
