@@ -1,5 +1,5 @@
 # Import the Flask application instance
-from app import app, db, User, Post, Community, client
+from app import app, db, User, Post, Community, client, Comment
 from app import community_interest_association  # Assuming this is defined in app.py
 from sqlalchemy.sql.expression import func
 from random import choice
@@ -46,8 +46,55 @@ def generate_post_core():
             print(f'Failed to generate post: {str(e)}')
             return f'Failed to generate post: {str(e)}', None
 
+
+def generate_comment_core():
+    with app.app_context():
+        user = User.query.order_by(func.random()).first()
+        
+        if not user:
+            print("No users available.")
+            return "No users available.", None
+
+        commented_post_ids = db.session.query(Comment.post_id).filter_by(user_id=user.id).subquery()
+        post = Post.query.filter(Post.user_id != user.id, ~Post.id.in_(commented_post_ids)).order_by(func.random()).first()
+
+        if not post:
+            print("No posts available for this user to comment on. Please try again.")
+            return "No posts available for this user to comment on. Please try again.", None
+
+        prompt = f"Read the following post titled '{post.title}' and its content: '{post.content}'. Now, craft a concise, thoughtful one or two sentence comment that either provides support, asks a clarifying question, or shares a related personal experience. Ensure your comment is concise. Use verbiage of an 8th-grade reading level in your comment, and remember that you are 22 years old."
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "system", "content": prompt}]
+            )
+            generated_comment = response.choices[0].message.content.strip()
+
+            new_comment = Comment(
+                content=generated_comment,
+                user_id=user.id,
+                post_id=post.id,
+                posted_time=datetime.utcnow(),
+                is_burner=False  # Adjust according to your needs
+            )
+            db.session.add(new_comment)
+            db.session.commit()
+
+            print("Generated and posted comment successfully!")
+            return "Generated and posted comment successfully!", None
+        except Exception as e:
+            print(f"Failed to generate comment: {str(e)}")
+            return f"Failed to generate comment: {str(e)}", None
+
 if __name__ == "__main__":
     message, error = generate_post_core()
+    if error:
+        print(error)
+    else:
+        print(message)
+
+    message, error = generate_comment_core()
     if error:
         print(error)
     else:
