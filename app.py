@@ -606,5 +606,12 @@ def join_community(community_id):
 
 
 
+@app.route('/api/interests')
+def api_interests():
+    interests_query = Interest.query.all()
+    interests = [{'id': interest.id, 'name': interest.name} for interest in interests_query]
+    return {'interests': interests}
+
+
 if __name__ == '__main__':
 	app.run(debug=True)

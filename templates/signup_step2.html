@@ -33,6 +33,14 @@
             <option value="{{ interest.id }}">{{ interest.name }}</option>
         {% endfor %}
     </select>
+
+    <div class="form-group">
+    <label for="interest-search">Choose Interests:</label>
+    <input type="text" id="interest-search" placeholder="Search interests...">
+    <div id="interests-list">
+        <!-- Initially empty; will be populated by script -->
+    </div>
+</div>
 </fieldset>
 
             
@@ -42,12 +50,41 @@
 </div>
 
 <script>
-$(document).ready(function() {
-    $('.select-interests').select2({
-        placeholder: "Select interests",
-        maximumSelectionLength: 3
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('interest-search');
+    let interests = [];
+
+    // Fetch the initial list of interests
+    fetch('/api/interests')
+        .then(response => response.json())
+        .then(data => {
+            interests = data.interests;
+            displayInterests(interests.slice(0, 30)); // Display first 30 interests initially
+        });
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredInterests = interests.filter(interest => 
+            interest.name.toLowerCase().includes(searchTerm)
+        );
+        displayInterests(filteredInterests);
     });
+
+    function displayInterests(interests) {
+        const container = document.getElementById('interests-list');
+        container.innerHTML = ''; // Clear existing interests
+        interests.forEach(interest => {
+            const label = document.createElement('label');
+            label.innerHTML = `
+                <input type="checkbox" name="interests" value="${interest.id}"> ${interest.name}
+            `;
+            container.appendChild(label);
+        });
+    }
 });
+</script>
+
 </script>
 
 
