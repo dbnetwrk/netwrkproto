@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Your Sign Up</title>
+    <!-- Add your stylesheet links here -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index_style.css') }}">
+</head>
+<body>
+
+<div class="signup-step2-container">
+    <form action="/signup_final" method="post">
+        <h2>Select Your Industry and Interests</h2>
+
+        <div class="form-group">
+            <label for="industry_id">Select your industry:</label>
+            <select name="industry_id" id="industry_id" required>
+                <option value="">--Please choose an option--</option>
+                {% for industry in industries %}
+                <option value="{{ industry.id }}">{{ industry.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <fieldset class="interests-fieldset">
+            <legend>Select up to 3 interests:</legend>
+            {% for interest in interests %}
+            <div class="checkbox">
+                <label>
+                    <input type="checkbox" name="interests" value="{{ interest.id }}"> {{ interest.name }}
+                </label>
+            </div>
+            {% endfor %}
+        </fieldset>
+
+        <button type="submit" class="btn-complete-signup">Complete Sign Up</button>
+    </form>
+</div>
+
+<script>
+    // Optional: Add any JavaScript here for handling form behavior, like limiting checkbox selections
+</script>
+
+</body>
+</html>

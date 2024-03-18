@@ -129,36 +129,41 @@ def index():
 
 
 
+@app.route('/signup_step1', methods=['GET','POST'])
+def signup_step1():
+    # Save step 1 data temporarily (e.g., in session)
+    session['first_name'] = request.form.get('first_name')
+    session['last_name'] = request.form.get('last_name')
+    session['password'] = request.form.get('password')
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    industries = Industry.query.all()  # Fetch industries here to be available for both GET and POST
-    if request.method == 'POST':
-        first_name = request.form.get('first_name')
-        last_name = request.form.get('last_name')
-        password = request.form.get('password')
-        industry_id = request.form.get('industry_id')  # Corrected to use 'industry_id' based on your form
-        selected_interests_ids = request.form.getlist('interests')
-
-        # Assuming the Industry relation is correctly set up in your User model
-        user = User(first_name=first_name, last_name=last_name, password=password, industry_id=industry_id)
-
-        # Add selected interests to the user
-        for interest_id in selected_interests_ids:
-            interest = Interest.query.get(interest_id)
-            if interest:
-                user.interests.append(interest)
-        
-        db.session.add(user)
-        db.session.commit()
-
-        session['user_id'] = user.id
-        return redirect(url_for('show_feed'))
-
-    interests = Interest.query.all()  # Fetch all available interests to display in the form
-    return render_template("index2.html", interests=interests, industries=industries)
+    # Redirect to step 2
+    interests = Interest.query.all()
+    industries = Industry.query.all()  # Fetch industries to be available for the template
+    return render_template('signup_step2.html', interests=interests, industries=industries)
 
 
+@app.route('/signup_final', methods=['GET','POST'])
+def signup_final():
+    # Retrieve data saved from step 1
+    first_name = session.pop('first_name', None)
+    last_name = session.pop('last_name', None)
+    password = session.pop('password', None)
+    session['industry_id'] = request.form.get('industry_id')
+    selected_interests_ids = request.form.getlist('interests')
+    
+    # Proceed with creating the user as before
+    user = User(first_name=first_name, last_name=last_name, password=password, industry_id=industry_id)
+    
+    for interest_id in selected_interests_ids:
+        interest = Interest.query.get(interest_id)
+        if interest:
+            user.interests.append(interest)
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    session['user_id'] = user.id
+    return redirect(url_for('show_feed'))
 
 
 
