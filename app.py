@@ -154,7 +154,7 @@ def signup():
         return redirect(url_for('show_feed'))
 
     interests = Interest.query.all()  # Fetch all available interests to display in the form
-    return render_template("signup.html", interests=interests, industries=industries)
+    return render_template("index2.html", interests=interests, industries=industries)
 
 
 
@@ -177,7 +177,7 @@ def login():
             # Provide feedback that login was unsuccessful
             flash('Invalid first name, last name, or password')
             return redirect(url_for('login'))
-    return render_template('login.html')
+    return render_template('index2.html')
 
 @app.route('/post/<int:post_id>')
 def show_post(post_id):
