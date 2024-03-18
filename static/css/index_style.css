@@ -8,8 +8,7 @@
 }
 
 body {
-    background-color: #333; /* Dark gray background as the fallback */
-    background: linear-gradient(to right, #4b4b4b, #333);
+    background-color: #000; /* Dark gray background as the fallback */
     display: flex;
     align-items: center;
     justify-content: center;
