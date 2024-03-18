@@ -413,6 +413,12 @@ def communities():
     user = User.query.get(user_id)
     user_interest_ids = [interest.id for interest in user.interests]
 
+    communities_in_industry_with_shared_interests = Community.query \
+        .join(User, Community.created_by == User.id) \
+        .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
+        .filter(User.industry_id == user_industry_id, community_interest_association.c.interest_id.in_(user_interest_ids)) \
+        .distinct()
+
     # Fetching communities based on shared interests
     communities_based_on_interests = Community.query \
         .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
@@ -426,10 +432,7 @@ def communities():
 
     user_communities = set(community.id for community in user.communities)
 
-    return render_template('communities.html',
-                           communities_based_on_interests=communities_based_on_interests,
-                           rest_of_communities=rest_of_communities,
-                           user_communities=user_communities)
+    return render_template('communities.html', communities_in_industry_with_shared_interests=communities_in_industry_with_shared_interests, communities_based_on_interests=communities_based_on_interests, rest_of_communities=rest_of_communities, user_communities=user_communities)
 
 
 
