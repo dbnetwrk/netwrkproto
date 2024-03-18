@@ -8,8 +8,8 @@
 }
 
 body {
-    background-color: #E0F7FA; /* Lighter blue background */
-    background: linear-gradient(to right, #E0F7FA, #B2EBF2); /* Gradient from Material Design's light blue colors */
+    background-color: #EAF3F9; /* Lighter blue background */
+    background: linear-gradient(to right, #EAF3F9, #D3EAF8);
     display: flex;
     align-items: center;
     justify-content: center;
