@@ -417,26 +417,44 @@ def communities():
     user_industry_id = user.industry_id
     user_interest_ids = [interest.id for interest in user.interests]
 
+    # Communities in user's industry with shared interests
     communities_in_industry_with_shared_interests = Community.query \
         .join(User, Community.created_by == User.id) \
         .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
         .filter(User.industry_id == user_industry_id, community_interest_association.c.interest_id.in_(user_interest_ids)) \
         .distinct()
 
-    # Fetching communities based on shared interests
+    # Communities just within the same industry, excluding those already selected
+    communities_in_industry = Community.query \
+        .join(User, Community.created_by == User.id) \
+        .filter(User.industry_id == user_industry_id) \
+        .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
+        .distinct()
+
+    # Fetching communities based on shared interests (excluding those already displayed)
     communities_based_on_interests = Community.query \
         .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
         .filter(community_interest_association.c.interest_id.in_(user_interest_ids)) \
+        .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
+        .filter(~Community.id.in_([community.id for community in communities_in_industry])) \
         .distinct()
 
-    # Fetching the rest of the communities not based on shared interests
+    # Fetching the rest of the communities not based on shared interests or industry
     rest_of_communities = Community.query \
+        .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
         .filter(~Community.id.in_([community.id for community in communities_based_on_interests])) \
+        .filter(~Community.id.in_([community.id for community in communities_in_industry])) \
         .all()
 
     user_communities = set(community.id for community in user.communities)
 
-    return render_template('communities.html', communities_in_industry_with_shared_interests=communities_in_industry_with_shared_interests, communities_based_on_interests=communities_based_on_interests, rest_of_communities=rest_of_communities, user_communities=user_communities)
+    return render_template('communities.html', 
+                           communities_in_industry_with_shared_interests=communities_in_industry_with_shared_interests, 
+                           communities_in_industry=communities_in_industry,
+                           communities_based_on_interests=communities_based_on_interests, 
+                           rest_of_communities=rest_of_communities, 
+                           user_communities=user_communities)
+
 
 
 
