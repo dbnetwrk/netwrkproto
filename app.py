@@ -405,16 +405,32 @@ def create_community():
 
 @app.route('/communities')
 def communities():
-    all_communities = Community.query.all()
     user_id = session.get('user_id')
+    if not user_id:
+        # If the user is not logged in, redirect them to the login page
+        return redirect(url_for('login'))
 
-    # Fetching user's communities
-    if user_id:
-        user_communities = set(community.id for community in User.query.get(user_id).communities)
-    else:
-        user_communities = set()
+    user = User.query.get(user_id)
+    user_interest_ids = [interest.id for interest in user.interests]
 
-    return render_template('communities.html', communities=all_communities, user_communities=user_communities)
+    # Fetching communities based on shared interests
+    communities_based_on_interests = Community.query \
+        .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
+        .filter(community_interest_association.c.interest_id.in_(user_interest_ids)) \
+        .distinct()
+
+    # Fetching the rest of the communities not based on shared interests
+    rest_of_communities = Community.query \
+        .filter(~Community.id.in_([community.id for community in communities_based_on_interests])) \
+        .all()
+
+    user_communities = set(community.id for community in user.communities)
+
+    return render_template('communities.html',
+                           communities_based_on_interests=communities_based_on_interests,
+                           rest_of_communities=rest_of_communities,
+                           user_communities=user_communities)
+
 
 
 
