@@ -198,23 +198,57 @@ def show_feed():
 
     user = User.query.get(user_id)
     if not user:
-        # User not found, redirect to login to clear potentially invalid session
+        # User not found, clear session and redirect to login
         return redirect(url_for('login'))
 
-    # Get the IDs of interests the user has
+    user_industry_id = user.industry_id
     user_interest_ids = [interest.id for interest in user.interests]
 
-    # Find posts from communities that have at least one matching interest with the user
-    # This query fetches communities that are associated with the user's interests
-    # and then fetches posts from these communities
-    posts = Post.query \
+    # Posts from communities in user's industry with shared interests
+    posts_in_industry_with_shared_interests = Post.query \
+        .join(Community, Post.community_id == Community.id) \
+        .join(User, Community.created_by == User.id) \
+        .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
+        .filter(User.industry_id == user_industry_id, community_interest_association.c.interest_id.in_(user_interest_ids)) \
+        .order_by(Post.posted_time.desc()) \
+        .distinct()
+
+    # Posts from communities just within the same industry
+    posts_in_industry = Post.query \
+        .join(Community, Post.community_id == Community.id) \
+        .join(User, Community.created_by == User.id) \
+        .filter(User.industry_id == user_industry_id) \
+        .filter(~Post.id.in_([post.id for post in posts_in_industry_with_shared_interests])) \
+        .order_by(Post.posted_time.desc()) \
+        .distinct()
+
+    # Posts from communities based on shared interests
+    posts_based_on_interests = Post.query \
         .join(Community, Post.community_id == Community.id) \
         .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
         .filter(community_interest_association.c.interest_id.in_(user_interest_ids)) \
+        .filter(~Post.id.in_([post.id for post in posts_in_industry_with_shared_interests])) \
+        .filter(~Post.id.in_([post.id for post in posts_in_industry])) \
         .order_by(Post.posted_time.desc()) \
+        .distinct()
+
+    # Random community posts that don't relate necessarily
+    rest_of_posts = Post.query \
+        .join(Community, Post.community_id == Community.id) \
+        .filter(~Post.id.in_([post.id for post in posts_in_industry_with_shared_interests])) \
+        .filter(~Post.id.in_([post.id for post in posts_based_on_interests])) \
+        .filter(~Post.id.in_([post.id for post in posts_in_industry])) \
+        .order_by(func.random()) \
+        .limit(10)  # Example limit to avoid overwhelming the user
         .all()
 
-    return render_template("feed.html", posts=posts, active_page='feed')
+    return render_template("feed.html", 
+                           posts_in_industry_with_shared_interests=posts_in_industry_with_shared_interests, 
+                           posts_in_industry=posts_in_industry,
+                           posts_based_on_interests=posts_based_on_interests, 
+                           rest_of_posts=rest_of_posts, 
+                           active_page='feed')
+
 
 
 
