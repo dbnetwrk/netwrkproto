@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complete Your Sign Up</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index_style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
 </head>
 <body>
 
@@ -24,15 +27,14 @@
             </div>
             
             <fieldset class="interests-fieldset">
-                <legend>Select up to 3 interests:</legend>
-                {% for interest in interests %}
-                <div class="checkbox">
-                    <label>
-                        <input type="checkbox" name="interests" value="{{ interest.id }}"> {{ interest.name }}
-                    </label>
-                </div>
-                {% endfor %}
-            </fieldset>
+    <legend>Select up to 3 interests:</legend>
+    <select name="interests" class="select-interests" multiple="multiple">
+        {% for interest in interests %}
+            <option value="{{ interest.id }}">{{ interest.name }}</option>
+        {% endfor %}
+    </select>
+</fieldset>
+
             
             <button type="submit" class="btn-complete-signup">Complete Sign Up</button>
         </form>
@@ -40,8 +42,14 @@
 </div>
 
 <script>
-    // Optional: JavaScript for limiting checkbox selections, etc.
+$(document).ready(function() {
+    $('.select-interests').select2({
+        placeholder: "Select interests",
+        maximumSelectionLength: 3
+    });
+});
 </script>
+
 
 </body>
 </html>
