@@ -650,4 +650,4 @@ if __name__ == '__main__':
     with app.app_context():
         update_community_profile_pics()
         print("Community profile pictures updated based on interests.")
-	app.run(debug=True)
+	#app.run(debug=True)
