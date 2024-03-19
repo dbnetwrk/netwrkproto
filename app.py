@@ -196,7 +196,6 @@ def signup_final():
                 description=community_description,
                 profile_pic_url='/static/images/default_community.png',  # Assuming a default image
                 created_by=user.id,
-                created_at=datetime.utcnow()
             )
             db.session.add(new_community)
             db.session.commit()
