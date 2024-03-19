@@ -60,6 +60,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fetch and populate categories (you would need to provide the endpoint to fetch categories)
     // fetch('/api/categories').then(...)
 
+
+    // Fetch and populate categories on page load
+    fetch('/api/categories').then(response => response.json()).then(categories => {
+        categories.forEach(category => {
+            const option = new Option(category.name, category.id);
+            categorySelect.appendChild(option);
+        });
+        // Fetch industries for the first category by default
+        if (categories.length > 0) {
+            fetchAndDisplayIndustries(categories[0].id);
+        }
+    });
+
+    // Event handler for category selection
+    categorySelect.addEventListener('change', function() {
+        fetchAndDisplayIndustries(this.value);
+    });
+
     // Handler for when a category is selected
     categorySelect.addEventListener('change', function() {
         const categoryId = this.value;
@@ -91,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-	
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('interest-search');
     let interests = [];

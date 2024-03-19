@@ -633,6 +633,13 @@ def search_industries():
     industry_list = [{'id': industry.id, 'name': industry.name} for industry in industries]
     return jsonify(industry_list)
 
+@app.route('/api/categories')
+def get_categories():
+    categories = IndustryCategory.query.all()
+    category_list = [{'id': category.id, 'name': category.name} for category in categories]
+    return jsonify(category_list)
+
+
 
 if __name__ == '__main__':
 	app.run(debug=True)
