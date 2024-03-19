@@ -317,7 +317,7 @@ def show_feed():
         .join(User, Community.created_by == User.id) \
         .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
         .filter(User.industry_id == user_industry_id, community_interest_association.c.interest_id.in_(user_interest_ids)) \
-        .filter(~Post.id.in_([post.id for post in posts_from_joined_communities]))
+        .filter(~Post.id.in_([post.id for post in posts_from_joined_communities])) \
         .order_by(Post.posted_time.desc()) \
         .distinct()
 
