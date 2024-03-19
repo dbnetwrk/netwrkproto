@@ -240,26 +240,22 @@ def signup_final():
     if user.industry and user.interests:
         # Assuming you have the industry name directly accessible
         industry_name = user.industry.name
-        # Choose one of the user's interests at random
-        interest = choice(user.interests)
-        interest_name = interest.name
-        
-        # Create a community name and description blending industry and interest
-        community_name = f"{industry_name} & {interest_name}"
-        community_description = f"A community for those in {industry_name.lower()} interested in {interest_name.lower()}. We share daily struggles, support, meetups, and other knowledge."
-        
-        # Check if a community with this name already exists
-        if not Community.query.filter_by(name=community_name).first():
-            new_community = Community(
-                name=community_name, 
-                description=community_description,
-                profile_pic_url=default_image_url,  # Assuming a default image
-                created_by=user.id,
-            )
-            new_community.interests.append(interest)
-            db.session.add(new_community)
-            db.session.commit()
-            # Assuming you want the user to join the newly created community automatically
+        for interest in user.interests:
+            interest_name = interest.name
+            community_name = f"{industry_name} & {interest_name}"
+            community_description = f"A community for those in {industry_name.lower()} interested in {interest_name.lower()}. Sharing daily struggles, support, meetups, and knowledge."
+            
+            # Check if a community with this name already exists
+            if not Community.query.filter_by(name=community_name).first():
+                new_community = Community(
+                    name=community_name,
+                    description=community_description,
+                    profile_pic_url=default_image_url,
+                    created_by=user.id,
+                )
+                new_community.interests.append(interest)
+                db.session.add(new_community)
+                db.session.commit()
 
     flash('Join at least 3 communities and then go to the feed', 'info')
     return redirect(url_for('communities'))
