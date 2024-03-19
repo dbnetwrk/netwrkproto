@@ -177,9 +177,35 @@ def signup_final():
     db.session.add(user)
     db.session.commit()
     
-    session['user_id'] = user.id
-    flash('Join at least 3 communities and then go to the feed', 'info')  # Add a flash message
-    return redirect(url_for('communities'))  # Redirect to the communities page
+    # Now, create a community based on the user's industry and one of their interests
+    if user.industry and user.interests:
+        # Assuming you have the industry name directly accessible
+        industry_name = user.industry.name
+        # Choose one of the user's interests at random
+        interest = choice(user.interests)
+        interest_name = interest.name
+        
+        # Create a community name and description blending industry and interest
+        community_name = f"{industry_name} & {interest_name}"
+        community_description = f"A community for those in the {industry_name} industry interested in {interest_name}."
+        
+        # Check if a community with this name already exists
+        if not Community.query.filter_by(name=community_name).first():
+            new_community = Community(
+                name=community_name, 
+                description=community_description,
+                profile_pic_url='/static/images/default_community.png',  # Assuming a default image
+                created_by=user.id,
+                created_at=datetime.utcnow()
+            )
+            db.session.add(new_community)
+            db.session.commit()
+            # Assuming you want the user to join the newly created community automatically
+            user.communities.append(new_community)
+            db.session.commit()
+
+    flash('Join at least 3 communities and then go to the feed', 'info')
+    return redirect(url_for('communities'))
 
 
 
