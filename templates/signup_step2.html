@@ -101,6 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
         industriesContainer.innerHTML = ''; // Clear previous industries
         industries.forEach(industry => {
             const industryElement = document.createElement('div');
+            div.innerHTML = `
+                <input type="checkbox" name="industries" value="${industry.id}"> ${industry.name}
+            `;
             industryElement.textContent = industry.name;
             industriesContainer.appendChild(industryElement);
         });
