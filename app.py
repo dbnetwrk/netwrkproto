@@ -204,8 +204,6 @@ def signup_final():
             db.session.add(new_community)
             db.session.commit()
             # Assuming you want the user to join the newly created community automatically
-            user.communities.append(new_community)
-            db.session.commit()
 
     flash('Join at least 3 communities and then go to the feed', 'info')
     return redirect(url_for('communities'))
