@@ -493,7 +493,7 @@ def communities():
     # Fetching the rest of the communities not based on shared interests or industry
     rest_of_communities = Community.query \
         .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
-        .filter(~Community.id.in_([community.id for community in communities_based_on_interests])) \
+        .filter(~Community.id.in_([community.id for community in communities_in_industry_category])) \
         .filter(~Community.id.in_([community.id for community in communities_in_industry])) \
         .all()
 
