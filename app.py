@@ -621,13 +621,28 @@ def join_community(community_id):
 
 
 
-@app.route('/api/interests')
-def api_interests():
-    interests_query = Interest.query.all()
-    interests = [{'id': interest.id, 'name': interest.name} for interest in interests_query]
-    return {'interests': interests}
+#for interests
+@app.route('/api/interests/<int:category_id>')
+def get_interests_by_category(category_id):
+    interests = Interest.query.filter_by(interest_category_id=category_id).all()
+    interest_list = [{'id': interest.id, 'name': interest.name} for interest in interests]
+    return jsonify(interest_list)
+
+@app.route('/api/search_interests')
+def search_interests():
+    search_term = request.args.get('term', '').lower()
+    interests = Interest.query.filter(Interest.name.ilike(f'%{search_term}%')).all()
+    interest_list = [{'id': interest.id, 'name': interest.name} for interest in interests]
+    return jsonify(interest_list)
+
+@app.route('/api/interest_categories')
+def get_interest_categories():
+    categories = InterestCategory.query.all()
+    category_list = [{'id': category.id, 'name': category.name} for category in categories]
+    return jsonify(category_list)
 
 
+#for industries
 @app.route('/api/industries/<int:category_id>')
 def get_industries_by_category(category_id):
     industries = Industry.query.filter_by(industry_category_id=category_id).all()
