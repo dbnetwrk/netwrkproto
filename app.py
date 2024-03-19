@@ -187,7 +187,7 @@ def signup_final():
         
         # Create a community name and description blending industry and interest
         community_name = f"{industry_name} & {interest_name}"
-        community_description = f"A community for those in the {industry_name} industry interested in {interest_name}."
+        community_description = f"A community for those in {industry_name.lower()} interested in {interest_name.lower()}. We share daily struggles, support, meetups, and other knowledge."
         
         # Check if a community with this name already exists
         if not Community.query.filter_by(name=community_name).first():
@@ -197,6 +197,7 @@ def signup_final():
                 profile_pic_url='/static/images/default_community.png',  # Assuming a default image
                 created_by=user.id,
             )
+            new_community.interests.append(interest)
             db.session.add(new_community)
             db.session.commit()
             # Assuming you want the user to join the newly created community automatically
