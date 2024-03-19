@@ -101,6 +101,7 @@ class Community(db.Model):
 
     creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
     interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
+    icon = db.Column(db.String(255), nullable=True) 
 
 class Interest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
