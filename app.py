@@ -176,6 +176,9 @@ def signup_final():
     
     db.session.add(user)
     db.session.commit()
+
+    session.clear()
+    session['user_id'] = user.id
     
     # Now, create a community based on the user's industry and one of their interests
     if user.industry and user.interests:
