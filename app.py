@@ -500,14 +500,13 @@ def communities():
 
     user_communities = set(community.id for community in user.communities)
 
-    messages = get_flashed_messages(with_categories = True)
 
     return render_template('communities.html', 
                            communities_in_industry_with_shared_interests=communities_in_industry_with_shared_interests, 
                            communities_in_industry=communities_in_industry,
                            communities_in_industry_category=communities_in_industry_category, 
                            rest_of_communities=rest_of_communities, 
-                           user_communities=user_communities, messages = messages)
+                           user_communities=user_communities)
 
 
 
