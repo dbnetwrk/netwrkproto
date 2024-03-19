@@ -134,6 +134,34 @@ class InterestCategory(db.Model):
 def create_tables():
     db.create_all()
 
+industry_icons = {
+    1: 'fa-chalkboard-teacher',  # Education
+    2: 'fa-hard-hat',  # Construction
+    3: 'fa-pencil-ruler',  # Design
+    4: 'fa-briefcase',  # Corporate Services
+    5: 'fa-store',  # Retail
+    6: 'fa-oil-can',  # Energy & Mining
+    7: 'fa-industry',  # Manufacturing
+    8: 'fa-chart-line',  # Finance
+    9: 'fa-umbrella-beach',  # Recreation & Travel
+    10: 'fa-paint-brush',  # Arts
+    11: 'fa-baby-carriage',  # Parents & Family
+    12: 'fa-dog',  # Pets & Animals
+    13: 'fa-praying-hands',  # Religion & Spirituality
+    14: 'fa-flask',  # Science & Education
+    15: 'fa-users',  # Social Activities
+    16: 'fa-futbol',  # Sports & Fitness
+    17: 'fa-heartbeat',  # Support & Coaching
+    18: 'fa-laptop-code',  # Technology
+    19: 'fa-route',  # Travel & Outdoor
+    20: 'fa-feather-alt',  # Writing
+    21: 'fa-tools',  # Hardware & Networking
+    22: 'fa-building',  # Real Estate
+    23: 'fa-gavel',  # Legal
+    24: 'fa-landmark',  # Public Administration
+}
+
+
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -187,6 +215,9 @@ def signup_final():
         # Choose one of the user's interests at random
         interest = choice(user.interests)
         interest_name = interest.name
+        industry_category_id = user.industry.industry_category_id
+        icon_class = industry_icons.get(industry_category_id, 'fa-users')  # Default icon
+        community_icon = icon_class
         
         # Create a community name and description blending industry and interest
         community_name = f"{industry_name} & {interest_name}"
@@ -199,6 +230,7 @@ def signup_final():
                 description=community_description,
                 profile_pic_url='images/default_community.png',  # Assuming a default image
                 created_by=user.id,
+                icon=community_icon,
             )
             new_community.interests.append(interest)
             db.session.add(new_community)

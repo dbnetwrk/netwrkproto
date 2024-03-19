@@ -16,6 +16,7 @@
     {% for community in communities_in_industry_with_shared_interests %}
     <div class="card">
         <div class="card-header">
+            <i class="fas {{ community.icon }}"></i>
             <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class='user-profile-pic'>
             <div>{{ community.name }}</div>
         </div>
