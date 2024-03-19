@@ -105,6 +105,7 @@ class Community(db.Model):
 class Interest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
+    interest_category_id = db.Column(db.Integer, db.ForeignKey('interest_category.id'))  # New foreign key column
 
 
 
@@ -118,6 +119,13 @@ class IndustryCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     industries = db.relationship('Industry', backref='industry_category', lazy=True)
+
+class InterestCategory(db.Model):
+    __tablename__ = 'interest_category'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    interests = db.relationship('Interest', backref='interest_category', lazy='dynamic')
+
 
 
 
