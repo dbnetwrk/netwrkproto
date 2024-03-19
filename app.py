@@ -226,7 +226,7 @@ def login():
             # Provide feedback that login was unsuccessful
             flash('Invalid first name, last name, or password')
             return redirect(url_for('login'))
-    return render_template('index.html')
+    return render_template('login.html')
 
 @app.route('/post/<int:post_id>')
 def show_post(post_id):
