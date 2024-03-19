@@ -216,6 +216,26 @@ def signup_final():
     # Select the default image based on the industry category
     default_image_url = industry_images.get(industry_category_id, 'images/default_community.png')
     
+
+    # Create a community based on the user's industry
+    if user.industry:
+        industry_name = user.industry.name
+        industry_community_name = f"{industry_name} Club"
+        industry_community_description = f"A community for all things related to {industry_name.lower()}, where professionals can share insights, news, and discussions."
+
+        # Check if a community with this industry name already exists
+        existing_industry_community = Community.query.filter_by(name=industry_community_name).first()
+        if not existing_industry_community:
+            new_industry_community = Community(
+                name=industry_community_name,
+                description=industry_community_description,
+                profile_pic_url=default_image_url,  # Assuming a default image
+                created_by=user.id,
+            )
+            db.session.add(new_industry_community)
+            db.session.commit()
+
+    
     # Now, create a community based on the user's industry and one of their interests
     if user.industry and user.interests:
         # Assuming you have the industry name directly accessible
