@@ -68,141 +68,53 @@
 </div>
 
 
+
+
+
 <script>
-
-
-
-
-
-
 document.addEventListener('DOMContentLoaded', function() {
-    const categorySelect = document.getElementById('category-select');
-    const searchInput = document.getElementById('industry-search');
-    const industriesContainer = document.getElementById('industries-container');
-
-    // Fetch and populate categories (you would need to provide the endpoint to fetch categories)
-    // fetch('/api/categories').then(...)
-
-
-    // Fetch and populate categories on page load
-    fetch('/api/categories').then(response => response.json()).then(categories => {
-        categories.forEach(category => {
-            const option = new Option(category.name, category.id);
-            categorySelect.appendChild(option);
-        });
-        // Fetch industries for the first category by default
-        if (categories.length > 0) {
-            fetchAndDisplayIndustries(categories[0].id);
-        }
-    });
-
-    // Event handler for category selection
-    categorySelect.addEventListener('change', function() {
-        fetchAndDisplayIndustries(this.value);
-    });
-
-    // Handler for when a category is selected
-    categorySelect.addEventListener('change', function() {
-        const categoryId = this.value;
-        fetch(`/api/industries/${categoryId}`).then(response => response.json()).then(industries => {
-            displayIndustries(industries);
-        });
-    });
-
-    // Handler for the search bar input
-    searchInput.addEventListener('input', function() {
-        const searchTerm = this.value;
-        if(searchTerm.length > 2) { // Only search when at least 3 characters are typed
-            fetch(`/api/search_industries?term=${searchTerm}`).then(response => response.json()).then(industries => {
-                displayIndustries(industries);
-            });
-        }
-    });
-
-    // Function to display industries
-    function displayIndustries(industries) {
-        industriesContainer.innerHTML = ''; // Clear previous industries
-        industries.forEach(industry => {
-            const industryElement = document.createElement('div');
-            industryElement.innerHTML = `
-                <label><input type="radio" name="industry_id" value="${industry.id}"> ${industry.name}</label>
-            `;
-            industriesContainer.appendChild(industryElement);
-        });
-    }
-});
-
-
-//Functions to display interests
-
-
-document.addEventListener('DOMContentLoaded', function() {
-    const categorySelect = document.getElementById('category-select-interests');
-    const searchInput = document.getElementById('interest-search');
+    const industryCategorySelect = document.getElementById('category-select');
+    const interestCategorySelect = document.getElementById('category-select-interests');
+    const interestSearchInput = document.getElementById('interest-search');
     const interestsContainer = document.getElementById('interests-container');
-    let selectedInterests = {};
     const interestsForm = document.getElementById('interests-form');
-    // Fetch and populate categories (you would need to provide the endpoint to fetch categories)
-    // fetch('/api/categories').then(...)
+    let selectedInterests = {};
 
-
-
-
-    function fetchAndDisplayInterests(categoryId) {
-        fetch(`/api/interests/${categoryId}`).then(response => response.json()).then(interests => {
-            displayInterests(interests);
-        });
-    }
-
-    // Fetch and populate categories on page load
+    // Initialize categories for interests on page load
     fetch('/api/interest_categories').then(response => response.json()).then(categories => {
         categories.forEach(category => {
             const option = new Option(category.name, category.id);
-            categorySelect.appendChild(option);
+            interestCategorySelect.appendChild(option);
         });
-        // Fetch interests for the first category by default
-        if (categories.length > 0) {
-            fetchAndDisplayInterests(categories[0].id);
-        }
+        // Optionally fetch and display interests for the first category by default
     });
 
-    // Event handler for category selection
-    categorySelect.addEventListener('change', function() {
-        fetchAndDisplayInterests(this.value);
+    // Event handler for interest category selection
+    interestCategorySelect.addEventListener('change', function() {
+        fetch(`/api/interests/${this.value}`).then(response => response.json()).then(displayInterests);
     });
 
-    // Handler for when a category is selected
-    categorySelect.addEventListener('change', function() {
-        const categoryId = this.value;
-        fetch(`/api/interests/${categoryId}`).then(response => response.json()).then(interests => {
-            displayInterests(interests);
-        });
-    });
-
-    // Handler for the search bar input
-    searchInput.addEventListener('input', function() {
+    // Handler for the search bar input for interests
+    interestSearchInput.addEventListener('input', function() {
         const searchTerm = this.value;
         if(searchTerm.length > 2) { // Only search when at least 3 characters are typed
-            fetch(`/api/search_interests?term=${searchTerm}`).then(response => response.json()).then(interests => {
-                displayInterests(interests);
-            });
+            fetch(`/api/search_interests?term=${searchTerm}`).then(response => response.json()).then(displayInterests);
         }
     });
 
+    // Function to display interests
     function displayInterests(interests) {
-        // Do not clear interestsContainer here to preserve existing checkboxes
-        interestsContainer.innerHTML = ''; // Modified to clear only when necessary
+        interestsContainer.innerHTML = ''; // Clear previous interests
         interests.forEach(interest => {
             const isChecked = selectedInterests[interest.id] ? 'checked' : '';
             const interestElement = document.createElement('div');
-            interestElement.innerHTML = `
-                <label><input type="checkbox" name="interests" value="${interest.id}" ${isChecked}> ${interest.name}</label>
-            `;
+            interestElement.innerHTML = `<label><input type="checkbox" name="interests" value="${interest.id}" ${isChecked}> ${interest.name}</label>`;
             interestsContainer.appendChild(interestElement);
         });
 
         // Listen for changes to checkboxes and update selectedInterests accordingly
         interestsContainer.querySelectorAll('input[type="checkbox"][name="interests"]').forEach(checkbox => {
+
             checkbox.addEventListener('change', function() {
                 if (this.checked) {
                     selectedInterests[this.value] = true;
@@ -213,38 +125,30 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-
-
-interestsForm.addEventListener('submit', function(e) {
-        // Prevent the default form submission to manually handle it
-        e.preventDefault();
+    // Handle form submission for interests
+    interestsForm.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevent the default form submission
 
         // Clear previously dynamically added inputs
         document.querySelectorAll('.dynamic-interest-input').forEach(input => input.remove());
 
         // For each selected interest, add a hidden input to the form
         Object.keys(selectedInterests).forEach(interestId => {
-            if(selectedInterests[interestId]) { // Check if interest is selected
+            if(selectedInterests[interestId]) {
                 const hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'interests'; // Must match the name expected by your backend
-                hiddenInput.value = interestId;
-                hiddenInput.classList.add('dynamic-interest-input'); // Add a class for easy removal later
+                hiddenInput.setAttribute('type', 'hidden');
+                hiddenInput.setAttribute('name', 'interests');
+                hiddenInput.setAttribute('value', interestId);
+                hiddenInput.classList.add('dynamic-interest-input');
                 interestsForm.appendChild(hiddenInput);
             }
         });
 
-        // Now submit the form
-        interestsForm.submit();
+        interestsForm.submit(); // Now submit the form
     });
-
-
-
 });
-
-
-
 </script>
+
 
 
 
