@@ -125,10 +125,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const categorySelect = document.getElementById('category-select-interests');
     const searchInput = document.getElementById('interest-search');
     const interestsContainer = document.getElementById('interests-container');
-
+    let selectedInterests = {};
     // Fetch and populate categories (you would need to provide the endpoint to fetch categories)
     // fetch('/api/categories').then(...)
 
+
+
+
+    function fetchAndDisplayInterests(categoryId) {
+        fetch(`/api/interests/${categoryId}`).then(response => response.json()).then(interests => {
+            displayInterests(interests);
+        });
+    }
 
     // Fetch and populate categories on page load
     fetch('/api/interest_categories').then(response => response.json()).then(categories => {
@@ -136,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const option = new Option(category.name, category.id);
             categorySelect.appendChild(option);
         });
-        // Fetch industries for the first category by default
+        // Fetch interests for the first category by default
         if (categories.length > 0) {
             fetchAndDisplayInterests(categories[0].id);
         }
@@ -165,15 +173,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Function to display industries
     function displayInterests(interests) {
-        interestsContainer.innerHTML = ''; // Clear previous industries
+        // Do not clear interestsContainer here to preserve existing checkboxes
+        interestsContainer.innerHTML = ''; // Modified to clear only when necessary
         interests.forEach(interest => {
+            const isChecked = selectedInterests[interest.id] ? 'checked' : '';
             const interestElement = document.createElement('div');
             interestElement.innerHTML = `
-                <label><input type="checkbox" name="interests" value="${interest.id}"> ${interest.name}</label>
+                <label><input type="checkbox" name="interests" value="${interest.id}" ${isChecked}> ${interest.name}</label>
             `;
             interestsContainer.appendChild(interestElement);
+        });
+
+        // Listen for changes to checkboxes and update selectedInterests accordingly
+        interestsContainer.querySelectorAll('input[type="checkbox"][name="interests"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    selectedInterests[this.value] = true;
+                } else {
+                    delete selectedInterests[this.value];
+                }
+            });
         });
     }
 });
