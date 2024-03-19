@@ -463,7 +463,7 @@ def communities():
     user_industry_id = user.industry_id
     user_interest_ids = [interest.id for interest in user.interests]
 
-    current_user_industry = Industry.query.get(current_user.industry_id)
+    current_user_industry = Industry.query.get(user.industry_id)
     if current_user_industry:
         user_industry_category_id = current_user_industry.industry_category_id
 
