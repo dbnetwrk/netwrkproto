@@ -17,52 +17,43 @@
 </head>
 <body>
 
-<div class="wrapper signup-step2 mt-5">
-    <div class="signup-form container">
-        <form id="interests-form" action="/signup_final" method="post" class="needs-validation" novalidate>
-            <h1 class="mb-4">Select Personal Interests and Industry</h1>
+<div class="wrapper signup-step2">
+    <div class="signup-form">
+        <form id = "interests-form" form action="/signup_final" method="post">
+            <h1>Select personal interests</h1>
             
-            <!-- Category selection for industries -->
-            <div class="mb-3">
-                <label for="category-select" class="form-label">Industry Categories</label>
-                <select id="category-select" class="form-select">
-                    <option value="">Select Category</option>
-                    <!-- Dynamically populate industry categories here -->
-                </select>
-            </div>
             
-            <!-- Search bar for industries 
-            <div class="mb-3">
-                <label for="industry-search" class="form-label">Search for an Industry</label>
-                <input type="text" id="industry-search" class="form-control" placeholder="Search for an industry...">
-            </div> -->
-            
-            <!-- Container for listing industries -->
-            <div id="industries-container" class="mb-3">
-                <!-- Industries will be populated here based on the category or search -->
-            </div>
-            
-            <!-- Category selection for interests -->
-            <div class="mb-3">
-                <label for="category-select-interests" class="form-label">Interest Categories</label>
-                <select id="category-select-interests" class="form-select">
-                    <option value="">Select Category</option>
-                    <!-- Dynamically populate interest categories here -->
-                </select>
-            </div>
+            <select id="category-select">
+        <option value="">Select Category</option>
+        <!-- Dynamically populate categories here -->
+            </select>
     
-            <!-- Search bar for interests -->
-            <div class="mb-3">
-                <label for="interest-search" class="form-label">Search for an Interest</label>
-                <input type="text" id="interest-search" class="form-control" placeholder="Search for an interest...">
-            </div>
+    <!-- Search bar for industries -->
+    <input type="text" id="industry-search" placeholder="Search for an industry...">
     
-            <!-- Container for listing interests -->
-            <div id="interests-container" class="mb-4">
-                <!-- Interests will be populated here based on the category or search -->
-            </div>
+    <!-- Container for listing industries -->
+    <div id="industries-container">
+        <!-- Industries will be populated here based on the category or search -->
+    </div>
 
-            <button type="submit" class="btn btn-primary btn-lg btn-complete-signup">Complete Sign Up</button>
+
+
+    <select id="category-select-interests">
+        <option value="">Select Category</option>
+        <!-- Dynamically populate categories here -->
+            </select>
+    
+    <!-- Search bar for interests -->
+    <input type="text" id="interest-search" placeholder="Search for an interest...">
+    
+    <!-- Container for listing interests -->
+    <div id="interests-container">
+        <!-- Interests will be populated here based on the category or search -->
+    </div>
+
+            
+            
+            <button type="submit" class="btn-complete-signup">Complete Sign Up</button>
         </form>
     </div>
 </div>
