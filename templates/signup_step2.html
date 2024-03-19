@@ -15,7 +15,7 @@
 
 <div class="wrapper signup-step2">
     <div class="signup-form">
-        <form action="/signup_final" method="post">
+        <form id = "interests-form" form action="/signup_final" method="post">
             <h1>Select personal interests</h1>
             
             
@@ -31,6 +31,7 @@
     <div id="industries-container">
         <!-- Industries will be populated here based on the category or search -->
     </div>
+
 
 
     <select id="category-select-interests">
@@ -126,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('interest-search');
     const interestsContainer = document.getElementById('interests-container');
     let selectedInterests = {};
+    const interestsForm = document.getElementById('interests-form');
     // Fetch and populate categories (you would need to provide the endpoint to fetch categories)
     // fetch('/api/categories').then(...)
 
@@ -196,6 +198,34 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+
+
+interestsForm.addEventListener('submit', function(e) {
+        // Prevent the default form submission to manually handle it
+        e.preventDefault();
+
+        // Clear previously dynamically added inputs
+        document.querySelectorAll('.dynamic-interest-input').forEach(input => input.remove());
+
+        // For each selected interest, add a hidden input to the form
+        Object.keys(selectedInterests).forEach(interestId => {
+            if(selectedInterests[interestId]) { // Check if interest is selected
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'interests'; // Must match the name expected by your backend
+                hiddenInput.value = interestId;
+                hiddenInput.classList.add('dynamic-interest-input'); // Add a class for easy removal later
+                interestsForm.appendChild(hiddenInput);
+            }
+        });
+
+        // Now submit the form
+        interestsForm.submit();
+    });
+
+
+    
 });
 
 
