@@ -111,6 +111,13 @@ class Interest(db.Model):
 class Industry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
+    industry_category_id = db.Column(db.Integer, db.ForeignKey('industry_category.id'), nullable=False)  # Reference to IndustryCategory model
+
+
+class IndustryCategory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    industries = db.relationship('Industry', backref='industry_category', lazy=True)
 
 
 
