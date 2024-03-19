@@ -17,7 +17,7 @@
 
 <div class="feed-container">
     
-    <h2>Communities That Relate to You the Most</h2>
+    <h2>Just For You</h2>
     {% for community in communities_in_industry_with_shared_interests %}
     <div class="card">
         <div class="card-header">
@@ -39,7 +39,7 @@
 
 
     <!-- New Section: Communities Within Your Industry -->
-    <h2>Communities Within Your Industry</h2>
+    <h2>Your Industry</h2>
     {% for community in communities_in_industry %}
     <div class="card">
         <div class="card-header">
@@ -60,7 +60,7 @@
     {% endfor %}
 
 
-    <h2>Communities Related to Your Industry</h2>
+    <h2>Similar to Your Industry</h2>
     {% for community in communities_in_industry_category %}
     <div class="card">
         <div class="card-header">
@@ -80,7 +80,7 @@
     </div>
     {% endfor %}
     
-    <h2>Other Communities</h2>
+    <h2>Other</h2>
     {% for community in rest_of_communities %}
     <div class="card">
         <div class="card-header">
