@@ -477,13 +477,14 @@ def communities():
         .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
         .distinct()
 
-    # Fetching communities based on shared interests (excluding those already displayed)
-    communities_based_on_interests = Community.query \
-        .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
-        .filter(community_interest_association.c.interest_id.in_(user_interest_ids)) \
+    # Communities within the same industry category, excluding those already selected
+    communities_in_industry_category = Community.query \
+        .join(User, Community.created_by == User.id) \
+        .join(Industry, User.industry_id == Industry.id) \
+        .filter(Industry.industry_category_id == user_industry_category_id) \
         .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
-        .filter(~Community.id.in_([community.id for community in communities_in_industry])) \
         .distinct()
+
 
     # Fetching the rest of the communities not based on shared interests or industry
     rest_of_communities = Community.query \
@@ -497,7 +498,7 @@ def communities():
     return render_template('communities.html', 
                            communities_in_industry_with_shared_interests=communities_in_industry_with_shared_interests, 
                            communities_in_industry=communities_in_industry,
-                           communities_based_on_interests=communities_based_on_interests, 
+                           communities_in_industry_category=communities_in_industry_category, 
                            rest_of_communities=rest_of_communities, 
                            user_communities=user_communities)
 
