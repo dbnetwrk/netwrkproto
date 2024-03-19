@@ -620,5 +620,19 @@ def api_interests():
     return {'interests': interests}
 
 
+@app.route('/api/industries/<int:category_id>')
+def get_industries_by_category(category_id):
+    industries = Industry.query.filter_by(industry_category_id=category_id).all()
+    industry_list = [{'id': industry.id, 'name': industry.name} for industry in industries]
+    return jsonify(industry_list)
+
+@app.route('/api/search_industries')
+def search_industries():
+    search_term = request.args.get('term', '').lower()
+    industries = Industry.query.filter(Industry.name.ilike(f'%{search_term}%')).all()
+    industry_list = [{'id': industry.id, 'name': industry.name} for industry in industries]
+    return jsonify(industry_list)
+
+
 if __name__ == '__main__':
 	app.run(debug=True)
