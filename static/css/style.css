@@ -335,7 +335,7 @@ button:hover {
 }
 
 .navbar a.active {
-    color: ##0077B5; /* Example: change the text color for the active link */
+    color: ##0072B1; /* Example: change the text color for the active link */
     font-weight: bold;
 }
 

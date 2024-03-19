@@ -236,7 +236,7 @@ def signup_final():
             db.session.add(new_industry_community)
             db.session.commit()
 
-    
+
     # Now, create a community based on the user's industry and one of their interests
     if user.industry and user.interests:
         # Assuming you have the industry name directly accessible
@@ -303,12 +303,21 @@ def show_feed():
     user_industry_id = user.industry_id
     user_interest_ids = [interest.id for interest in user.interests]
 
+
+    posts_from_joined_communities = Post.query \
+        .join(Community, Post.community_id == Community.id) \
+        .join(user_community_association, Community.id == user_community_association.c.community_id) \
+        .filter(user_community_association.c.user_id == user_id) \
+        .order_by(Post.posted_time.desc()) \
+        .distinct()
+
     # Posts from communities in user's industry with shared interests
     posts_in_industry_with_shared_interests = Post.query \
         .join(Community, Post.community_id == Community.id) \
         .join(User, Community.created_by == User.id) \
         .join(community_interest_association, Community.id == community_interest_association.c.community_id) \
         .filter(User.industry_id == user_industry_id, community_interest_association.c.interest_id.in_(user_interest_ids)) \
+        .filter(~Post.id.in_([post.id for post in posts_from_joined_communities]))
         .order_by(Post.posted_time.desc()) \
         .distinct()
 
@@ -341,7 +350,11 @@ def show_feed():
         .all()
 
     # Concatenating the post lists into a single list for display
-    all_posts = posts_in_industry_with_shared_interests.all() + posts_in_industry.all() + posts_based_on_interests.all() + rest_of_posts
+    all_posts = posts_from_joined_communities.all() + \
+                posts_in_industry_with_shared_interests.all() + \
+                posts_in_industry.all() + \
+                posts_based_on_interests.all() + \
+                rest_of_posts
 
     return render_template("feed.html", posts=all_posts, active_page='feed')
 
