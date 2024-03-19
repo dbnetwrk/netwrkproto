@@ -197,7 +197,7 @@ def signup_final():
             new_community = Community(
                 name=community_name, 
                 description=community_description,
-                profile_pic_url='/static/images/default_community.png',  # Assuming a default image
+                profile_pic_url='images/default_community.png',  # Assuming a default image
                 created_by=user.id,
             )
             new_community.interests.append(interest)
