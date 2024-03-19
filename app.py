@@ -463,6 +463,10 @@ def communities():
     user_industry_id = user.industry_id
     user_interest_ids = [interest.id for interest in user.interests]
 
+    current_user_industry = Industry.query.get(current_user.industry_id)
+    if current_user_industry:
+        user_industry_category_id = current_user_industry.industry_category_id
+
     # Communities in user's industry with shared interests
     communities_in_industry_with_shared_interests = Community.query \
         .join(User, Community.created_by == User.id) \
@@ -483,7 +487,7 @@ def communities():
         .join(Industry, User.industry_id == Industry.id) \
         .filter(Industry.industry_category_id == user_industry_category_id) \
         .filter(~Community.id.in_([community.id for community in communities_in_industry_with_shared_interests])) \
-        .distinct()
+        .distinct().all()
 
 
     # Fetching the rest of the communities not based on shared interests or industry
