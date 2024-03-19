@@ -18,7 +18,7 @@
         <form action="/signup_final" method="post">
             <h1>Select personal interests</h1>
             
-            <div class = "form-group"
+            
             <select id="category-select">
         <option value="">Select Category</option>
         <!-- Dynamically populate categories here -->
@@ -32,7 +32,6 @@
         <!-- Industries will be populated here based on the category or search -->
     </div>
 
-</div>
             
 
 		<div class="form-group">
@@ -105,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         industries.forEach(industry => {
             const industryElement = document.createElement('div');
             industryElement.innerHTML = `
-                <label><input type="checkbox" name="industries" value="${industry.id}"> ${industry.name}</label>
+                <label><input type="radio" name="industry_id" value="${industry.id}"> ${industry.name}</label>
             `;
             industriesContainer.appendChild(industryElement);
         });
