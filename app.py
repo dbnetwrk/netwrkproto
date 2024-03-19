@@ -256,7 +256,17 @@ def signup_final():
                 )
                 new_community.interests.append(interest)
                 db.session.add(new_community)
-                db.session.commit()
+                try:
+                    db.session.commit()
+                    success, message = generate_post_for_community(new_community)
+                    if success:
+                        # Handle success (maybe log it or inform the user somehow)
+                        pass
+                    else:
+                        # Handle failure (log the error or take corrective action)
+                        pass
+                except Exception as e:
+                    db.session.rollback()
 
     flash('Join at least 3 communities and then go to the feed', 'info')
     return redirect(url_for('communities'))
@@ -762,6 +772,33 @@ def get_categories():
     category_list = [{'id': category.id, 'name': category.name} for category in categories]
     return jsonify(category_list)
 
+
+def generate_post_for_community(community):
+    # Select a random user for now; consider specifying user or criteria
+    user = User.query.order_by(db.func.random()).first()
+    if not user:
+        return False, "User does not exist"
+
+    prompt = f"Craft a post for the '{community.name}' forum, where people gather around '{community.description}'. Begin your response with a single sentence title with no quotation marks, followed by a blank line, then a 5 sentence paragraph that either celebrates a triumph, delves into a challenge, or seeks guidance and support from the community. Whether you're recounting a personal achievement, sharing a valuable lesson from a hardship, or asking for advice on a dilemma, your narrative should aim to connect, uplift, or rally the community for support. Use verbiage that is on a 8th grade reading level, and keep in mind you are 22 years old. Do not begin your content with a greeting to the audience."
+
+    try:
+        # Assuming the OpenAI API usage
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "system", "content": prompt}]
+        )
+        generated_text = response.choices[0].message.content
+        parts = generated_text.split('\n\n', 1)
+        title = parts[0].strip() if parts else "Untitled"
+        content = parts[1].strip() if len(parts) > 1 else "No content"
+        
+        new_post = Post(title=title, content=content, user_id=user.id, community_id=community.id, posted_time=datetime.utcnow())
+        db.session.add(new_post)
+        db.session.commit()
+
+        return True, "Generated and posted successfully!"
+    except Exception as e:
+        return False, f'Failed to generate post: {str(e)}'
 
 
 if __name__ == '__main__':
