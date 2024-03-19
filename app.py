@@ -193,7 +193,8 @@ def signup_final():
     last_name = session.pop('last_name', None)
     password = session.pop('password', None)
     industry_id = request.form.get('industry_id')
-    selected_interests_ids = request.form.getlist('interests')
+    selected_interests_ids = list(set(request.form.getlist('interests')))
+
     
 
 
