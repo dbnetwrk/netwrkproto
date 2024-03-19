@@ -101,7 +101,6 @@ class Community(db.Model):
 
     creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
     interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
-    icon = db.Column(db.String(255), nullable=True) 
 
 class Interest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -129,38 +128,39 @@ class InterestCategory(db.Model):
 
 
 
+industry_images = {
+    1: '/images/education.png',
+    2: '/images/construction.png',
+    3: '/images/design.png',
+    4: '/images/corporate_services.png',
+    5: '/images/retail.png',
+    6: '/images/energy_mining.png',
+    7: '/images/manufacturing.png',
+    8: '/images/finance.png',
+    9: '/images/recreation_travel.png',
+    10: '/images/arts.png',
+    11: '/images/health_care.png',
+    12: '/images/hardware_networking.png',
+    13: '/images/real_estate.png',
+    14: '/images/legal.png',
+    15: '/images/consumer_goods.png',
+    16: '/images/agriculture.png',
+    17: '/images/media_communications.png',
+    18: '/images/nonprofit.png',
+    19: '/images/software_it_services.png',
+    20: '/images/transportation_logistics.png',
+    21: '/images/entertainment.png',
+    22: '/images/wellness_fitness.png',
+    23: '/images/public_safety.png',
+    24: '/images/public_administration.png',
+}
+
+
 
 # Initialize the database
 @app.before_first_request
 def create_tables():
     db.create_all()
-
-industry_icons = {
-    1: 'fa-chalkboard-teacher',  # Education
-    2: 'fa-hard-hat',  # Construction
-    3: 'fa-pencil-ruler',  # Design
-    4: 'fa-briefcase',  # Corporate Services
-    5: 'fa-store',  # Retail
-    6: 'fa-oil-can',  # Energy & Mining
-    7: 'fa-industry',  # Manufacturing
-    8: 'fa-chart-line',  # Finance
-    9: 'fa-umbrella-beach',  # Recreation & Travel
-    10: 'fa-paint-brush',  # Arts
-    11: 'fa-baby-carriage',  # Parents & Family
-    12: 'fa-dog',  # Pets & Animals
-    13: 'fa-praying-hands',  # Religion & Spirituality
-    14: 'fa-flask',  # Science & Education
-    15: 'fa-users',  # Social Activities
-    16: 'fa-futbol',  # Sports & Fitness
-    17: 'fa-heartbeat',  # Support & Coaching
-    18: 'fa-laptop-code',  # Technology
-    19: 'fa-route',  # Travel & Outdoor
-    20: 'fa-feather-alt',  # Writing
-    21: 'fa-tools',  # Hardware & Networking
-    22: 'fa-building',  # Real Estate
-    23: 'fa-gavel',  # Legal
-    24: 'fa-landmark',  # Public Administration
-}
 
 
 
@@ -195,6 +195,8 @@ def signup_final():
     industry_id = request.form.get('industry_id')
     selected_interests_ids = request.form.getlist('interests')
     
+
+
     # Proceed with creating the user as before
     user = User(first_name=first_name, last_name=last_name, password=password, industry_id=industry_id)
     
@@ -208,6 +210,11 @@ def signup_final():
 
     session.clear()
     session['user_id'] = user.id
+
+    industry_category_id = user.industry.industry_category_id
+
+    # Select the default image based on the industry category
+    default_image_url = industry_images.get(industry_category_id, 'images/default_community.png')
     
     # Now, create a community based on the user's industry and one of their interests
     if user.industry and user.interests:
@@ -216,9 +223,6 @@ def signup_final():
         # Choose one of the user's interests at random
         interest = choice(user.interests)
         interest_name = interest.name
-        industry_category_id = user.industry.industry_category_id
-        icon_class = industry_icons.get(industry_category_id, 'fa-users')  # Default icon
-        community_icon = icon_class
         
         # Create a community name and description blending industry and interest
         community_name = f"{industry_name} & {interest_name}"
@@ -229,9 +233,8 @@ def signup_final():
             new_community = Community(
                 name=community_name, 
                 description=community_description,
-                profile_pic_url='images/default_community.png',  # Assuming a default image
+                profile_pic_url=default_image_url,  # Assuming a default image
                 created_by=user.id,
-                icon=community_icon,
             )
             new_community.interests.append(interest)
             db.session.add(new_community)
