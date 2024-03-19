@@ -3,9 +3,19 @@
 {% block title %}Communities{% endblock %}
 
 {% block content %}
+<!-- Inside communities.html at the top -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+
 <div class="feed-container">
     
-    <h2>Communities in Your Industry and Shared Interests</h2>
+    <h2>Communities That Relate to You the Most</h2>
     {% for community in communities_in_industry_with_shared_interests %}
     <div class="card">
         <div class="card-header">
