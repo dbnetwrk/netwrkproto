@@ -5,7 +5,12 @@
 {% block content %}
 <!-- Inside communities.html at the top -->
 {% for message in get_flashed_messages(category_filter=["info"]) %}
-    <div class="alert alert-info">{{ message }}</div>
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <strong><i class="fas fa-info-circle"></i> Info!</strong> {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
 {% endfor %}
 
 
