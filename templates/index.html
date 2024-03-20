@@ -150,24 +150,42 @@ button:hover {
     </div>
 
     <script>
-        let currentStep = 1;
-        const totalSteps = 3;
+    let currentStep = 1;
+    const totalSteps = 3;
 
-        function nextStep() {
-            if (currentStep < totalSteps) {
-                document.getElementById(`step${currentStep}`).classList.remove('active');
-                currentStep++;
-                document.getElementById(`step${currentStep}`).classList.add('active');
-            }
+    function nextStep() {
+        if (currentStep < totalSteps) {
+            changeStep(1);
         }
+    }
 
-        function prevStep() {
-            if (currentStep > 1) {
-                document.getElementById(`step${currentStep}`).classList.remove('active');
-                currentStep--;
-                document.getElementById(`step${currentStep}`).classList.add('active');
-            }
+    function prevStep() {
+        if (currentStep > 1) {
+            changeStep(-1);
         }
-    </script>
+    }
+
+    function changeStep(step) {
+        // Hide current step
+        const currentElement = document.getElementById(`step${currentStep}`);
+        currentElement.classList.remove('active');
+        currentElement.style.display = 'none'; // Hide the current step
+
+        // Show next or previous step
+        currentStep += step;
+        const nextElement = document.getElementById(`step${currentStep}`);
+        nextElement.classList.add('active');
+        nextElement.style.display = 'block'; // Show the next step
+    }
+
+    // Initial setup
+    document.addEventListener('DOMContentLoaded', function() {
+        // Hide all steps except the first one
+        for (let step = 2; step <= totalSteps; step++) {
+            document.getElementById(`step${step}`).style.display = 'none';
+        }
+    });
+</script>
+
 </body>
 </html>
