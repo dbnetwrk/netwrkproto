@@ -98,7 +98,15 @@ button:hover {
     width: 90%; /* Ensures both sections fill the container width */
 }
 
-
+.step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .container {
+            margin-top: 20px;
+        }
 
 </style>
 
@@ -111,51 +119,7 @@ button:hover {
 
 
         </section>
-        <section class="signup-form">
-            <h2>Sign Up</h2>
-            <form action="/signup_step1" method="POST">
-                <div class="input-group">
-                    <label for="firstName">First Name</label>
-                    <input type="text" id="first_name" name="first_name" required>
-                </div>
-                <div class="input-group">
-                    <label for="lastName">Last Name</label>
-                    <input type="text" id="last_name" name="last_name" required>
-                </div>
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit">Sign Up</button>
-            </form>
-        </section>
-    </div>
-</body>
-</html>
-
-
-
-
-
-
-<style>
-        .step {
-            display: none;
-        }
-        .step.active {
-            display: block;
-        }
-        .container {
-            margin-top: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <section class="info">
-            <!-- Your info section remains the same -->
-        </section>
-        <section class="signup-form">
+         <section class="signup-form">
             <h2>Sign Up</h2>
             <form id="signupForm" action="/signup_final" method="POST">
                 <div class="step active" id="step1">
