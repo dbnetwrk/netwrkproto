@@ -6,6 +6,7 @@
     <title>Sign Up - Netwrk</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 
 <style>
 
@@ -106,7 +107,7 @@ button:hover {
     <div class="container">
         <section class="info">
             <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
-            <p>An authentic professional networking platform for Gen Z</p>
+            <p>The authentic professional networking platform for Gen Z</p>
 
 
         </section>
@@ -129,5 +130,80 @@ button:hover {
             </form>
         </section>
     </div>
+</body>
+</html>
+
+
+
+
+
+
+<style>
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <section class="info">
+            <!-- Your info section remains the same -->
+        </section>
+        <section class="signup-form">
+            <h2>Sign Up</h2>
+            <form id="signupForm" action="/signup_final" method="POST">
+                <div class="step active" id="step1">
+                    <div class="input-group">
+                        <label for="firstName">First Name</label>
+                        <input type="text" id="first_name" name="first_name" required>
+                    </div>
+                    <button type="button" onclick="nextStep()">Next</button>
+                </div>
+                <div class="step" id="step2">
+                    <div class="input-group">
+                        <label for="lastName">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" required>
+                    </div>
+                    <button type="button" onclick="prevStep()">Back</button>
+                    <button type="button" onclick="nextStep()">Next</button>
+                </div>
+                <div class="step" id="step3">
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="button" onclick="prevStep()">Back</button>
+                    <button type="submit">Sign Up</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        const totalSteps = 3;
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                currentStep++;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                currentStep--;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+            }
+        }
+    </script>
 </body>
 </html>
