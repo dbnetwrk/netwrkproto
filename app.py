@@ -256,17 +256,19 @@ def signup_final():
                 )
                 new_community.interests.append(interest)
                 db.session.add(new_community)
-                try:
-                    db.session.commit()
-                    success, message = generate_post_for_community(new_community)
-                    if success:
+                db.session.commit()
+
+                #try:
+                    #db.session.commit()
+                    #success, message = generate_post_for_community(new_community)
+                    #if success:
                         # Handle success (maybe log it or inform the user somehow)
-                        pass
-                    else:
+                        #pass
+                    #else:
                         # Handle failure (log the error or take corrective action)
-                        pass
-                except Exception as e:
-                    db.session.rollback()
+                        #pass
+                #except Exception as e:
+                    #db.session.rollback()
 
     flash('Join at least 3 communities and then go to the feed', 'info')
     return redirect(url_for('communities'))
