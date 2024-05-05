@@ -1,0 +1,33 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Manage Community Job for ID: {{ community_id }}</h2>
+    {% if job %}
+    <p>Current Status: {{ 'Paused' if job.paused else 'Active' }}</p>
+    <!-- Divide interval_length by 60 to convert seconds to minutes -->
+    <p>Current Interval: Every {{ (job.trigger.interval_length // 60) }} minutes</p>
+
+    <form action="" method="POST">
+        <div class="mb-3">
+            <label for="interval" class="form-label">Update Interval (minutes):</label>
+            <input type="number" name="interval" id="interval" class="form-control" required>
+            <button type="submit" name="update_interval" class="btn btn-primary mt-2">Update Interval</button>
+        </div>
+        <button type="submit" name="pause" class="btn btn-warning" {{ 'disabled' if job.paused }}>Pause</button>
+        <button type="submit" name="resume" class="btn btn-success" {{ 'disabled' if not job.paused }}>Resume</button>
+        <button type="submit" name="cancel" class="btn btn-danger">Cancel Job</button>
+    </form>
+    {% else %}
+    <p>No job found for this community. Would you like to start one?</p>
+    <form action="" method="POST">
+        <div class="mb-3">
+            <label for="start_interval" class="form-label">Set Interval (minutes) to Start Job:</label>
+            <input type="number" name="start_interval" id="start_interval" class="form-control" required>
+            <button type="submit" name="start_job" class="btn btn-primary mt-2">Start Job</button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
