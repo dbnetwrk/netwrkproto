@@ -57,21 +57,19 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('job_manager') }}">Automated Job Manager</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('reddit_scraper_proto') }}">Prototype Tool: Image Populator</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Prototype Tool: Upvote Randomizer</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Prototype Tool: Post Randomizer</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Prototype Tool: Comment Generator</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Prototype Tool: Delete All</a>
-                        </li>
+                        <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Prototype Tools
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+        <li><a class="dropdown-item" href="{{ url_for('reddit_scraper_proto') }}">Image Populator</a></li>
+        <li><a class="dropdown-item" href="#">Upvote Randomizer</a></li>
+        <li><a class="dropdown-item" href="#">Post Randomizer</a></li>
+        <li><a class="dropdown-item" href="#">Comment Generator</a></li>
+        <li><a class="dropdown-item" href="#">Delete All</a></li>
+    </ul>
+</li>
+
                     </ul>
                 </div>
             </nav>

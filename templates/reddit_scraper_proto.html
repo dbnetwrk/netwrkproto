@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container">
-    <h2>Reddit Content Scraper</h2>
+    <h2>Reddit Content Scraper for Quick Prototyping</h2>
 <form method="POST" action="{{ url_for('reddit_scraper_proto') }}">
     <div class="mb-3">
         <label for="subreddit" class="form-label">Subreddit Name</label>
@@ -33,6 +33,11 @@
 
     {% if results %}
     <form method="POST" action="{{ url_for('reddit_scraper_proto') }}">
+        <div class="mb-3">
+    <input type="checkbox" id="select-all" class="form-check-input">
+    <label for="select-all" class="form-check-label">Select All</label>
+</div>
+
         <div class="row mt-4">
             {% for result in results %}
             <div class="col-md-4 mb-3">
@@ -64,4 +69,16 @@
 {% endif %}
 
 </div>
+
+
+<script>
+document.getElementById('select-all').addEventListener('click', function(event) {
+    var allCheckboxes = document.querySelectorAll('input[type="checkbox"][name="selected_posts"]');
+    for (var checkbox of allCheckboxes) {
+        checkbox.checked = this.checked;
+    }
+});
+</script>
+
+
 {% endblock %}
