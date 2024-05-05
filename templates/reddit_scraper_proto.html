@@ -1,0 +1,67 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Reddit Content Scraper</h2>
+<form method="POST" action="{{ url_for('reddit_scraper_proto') }}">
+    <div class="mb-3">
+        <label for="subreddit" class="form-label">Subreddit Name</label>
+        <input type="text" class="form-control" id="subreddit" name="subreddit" value="{{ subreddit_name | default('') }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="content_type" class="form-label">Content Type</label>
+        <select class="form-select" id="content_type" name="content_type">
+            <option value="images" {% if content_type == 'images' %}selected{% endif %}>Images Only</option>
+            <option value="text" {% if content_type == 'text' %}selected{% endif %}>Text Only</option>
+            <option value="both" {% if content_type == 'both' %}selected{% endif %}>Both Images and Text</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="number_of_posts" class="form-label">Number of Posts</label>
+        <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ number_of_posts | default(5) }}">
+    </div>
+    <div class="mb-3">
+        <label for="sort_option" class="form-label">Sort Option</label>
+        <select class="form-select" id="sort_option" name="sort_option">
+            <option value="hot" {% if sort_option == 'hot' %}selected{% endif %}>Hot</option>
+            <option value="top" {% if sort_option == 'top' %}selected{% endif %}>Top</option>
+            <option value="new" {% if sort_option == 'new' %}selected{% endif %}>New</option>
+        </select>
+    </div>
+    <button type="submit" name ="scrape" class="btn btn-primary">Scrape</button>
+</form>
+
+    {% if results %}
+    <form method="POST" action="{{ url_for('reddit_scraper_proto') }}">
+        <div class="row mt-4">
+            {% for result in results %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <!-- Check if result is an image -->
+                    {% if result.endswith('.jpg') %}
+                        <img src="{{ url_for('static', filename=result) }}" class="card-img-top img-fluid">
+                    {% elif result is mapping %}
+                        <!-- Display result title and content if available -->
+                        <div class="card-body">
+                            <h5 class="card-title">{{ result.title }}</h5>
+                            <p class="card-text">{{ result.content }}</p>
+                        </div>
+                    {% endif %}
+                    <input type="checkbox" name="selected_posts" value="{{ result.id if result is mapping else result }}">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <select name="community_id" class="form-select" required>
+                {% for community in communities %}
+                <option value="{{ community.id }}">{{ community.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" name="publish" class="btn btn-success">Publish Selected</button>
+    </form>
+{% endif %}
+
+</div>
+{% endblock %}
