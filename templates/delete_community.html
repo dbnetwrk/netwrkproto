@@ -1,0 +1,26 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Delete All Posts and Comments in a Community</h2>
+    <form method="POST" action="{{ url_for('delete_community_posts') }}">
+        <div class="mb-3">
+            <label for="community_id" class="form-label">Select Community:</label>
+            <select name="community_id" id="community_id" class="form-select" required>
+                {% for community in communities %}
+                <option value="{{ community.id }}">{{ community.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="button" class="btn btn-danger" onclick="confirmDeletion()">Delete All Posts</button>
+    </form>
+</div>
+
+<script>
+function confirmDeletion() {
+    if (confirm('Are you sure you want to delete all posts and comments in this community? This action cannot be undone.')) {
+        document.forms[0].submit();
+    }
+}
+</script>
+{% endblock %}
