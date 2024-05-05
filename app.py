@@ -3018,15 +3018,16 @@ def start_seed_job():
         flash('Please enter a valid number of comments per post.')
         return redirect(url_for('ai_comment_prompts'))
 
-    # Schedule the job with APScheduler
-    job_id = "generate_comments_job"
-    scheduler.add_job(id=job_id, func=generate_comments_for_all_posts, args=[num_comments_per_post], trigger='date')
-    flash(f'Job scheduled to generate {num_comments_per_post} comments per post.')
+    # Assuming generate_comments_for_all_posts is adapted to take num_comments_per_post as an argument
+    results = generate_comments_for_all_posts(num_comments_per_post)
+    if results:
+        for result in results:
+            flash(result)
 
     return redirect(url_for('ai_comment_prompts'))
 
 def generate_comments_for_all_posts(num_comments_per_post):
-    with app.app_context():  # Ensure Flask context for DB access
+    with app.app_context():
         prompts = AICommentPrompt.query.all()
         posts = Post.query.all()
 
@@ -3037,19 +3038,25 @@ def generate_comments_for_all_posts(num_comments_per_post):
 
         results = []
         for post in posts:
+            
             for _ in range(num_comments_per_post):
                 user = User.query.order_by(func.random()).first()
                 if not user:
+                    results.append("No users available for commenting.")
                     continue
 
                 prompt = choice(prompts).prompt
                 try:
+                    # Call OpenAI's API to generate the comment
                     response = client.chat.completions.create(
                         model="gpt-3.5-turbo",
                         messages=[{"role": "system", "content": prompt}]
                     )
                     generated_comment = response.choices[0].message.content.strip()
 
+                    print(generated_comment)
+
+                    # Create a new comment object and save it to the database
                     new_comment = Comment(
                         content=generated_comment,
                         user_id=user.id,
@@ -3062,7 +3069,8 @@ def generate_comments_for_all_posts(num_comments_per_post):
 
                     results.append(f"Generated and posted comment successfully for post {post.id} in community {post.community.name}")
                 except Exception as e:
-                    results.append(f"Failed to generate comment for post {post.id}: {str(e)}")
+                    results.append(f"Failed to generate comment for post {post.id} in community {post.community.name}: {str(e)}")
+
         return results
 
 
