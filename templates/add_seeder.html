@@ -1,0 +1,45 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h2>Add New Seeder</h2>
+        <form action="{{ url_for('add_seeder') }}" method="post" enctype="multipart/form-data" class="p-3">
+            <div class="mb-3">
+                <label for="first_name" class="form-label">First Name</label>
+                <input type="text" class="form-control" id="first_name" name="first_name" required>
+            </div>
+            <div class="mb-3">
+                <label for="last_name" class="form-label">Last Name</label>
+                <input type="text" class="form-control" id="last_name" name="last_name" required>
+            </div>
+            <div class="mb-3">
+                <label for="burner_username" class="form-label">Burner Username</label>
+                <input type="text" class="form-control" id="burner_username" name="burner_username">
+            </div>
+            <div class="mb-3">
+                <label for="community_ids" class="form-label">Communities</label>
+                <select multiple class="form-select" id="community_ids" name="community_ids">
+                    {% for community in communities %}
+                        <option value="{{ community.id }}">{{ community.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="profile_pic" class="form-label">Profile Picture</label>
+                <input type="file" class="form-control" id="profile_pic" name="profile_pic" accept="image/*">
+            </div>
+            <button type="submit" class="btn btn-primary">Add Seeder</button>
+        </form>
+    </div>
+    
+    <script>
+        $(document).ready(function() {
+            $('#community_ids').select2({
+                placeholder: "Select communities",
+                allowClear: true
+            });
+        });
+    </script>
+{% endblock %}
+
+

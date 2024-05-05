@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Generate a Comment</h1>
+    {% if error %}
+        <p>{{ error }}</p>
+    {% else %}
+        <div>
+            <h2>Post Title: "{{ post_title }}"</h2>
+            <p>Post Content: "{{ post_content }}"</p>
+            <h3>Generated Comment by {{ commenter_name }}:</h3>
+            <p>{{ generated_comment }}</p>
+        </div>
+    {% endif %}
+    <button onclick="window.location.href='{{ url_for('generate_and_comment') }}'">Generate Another Comment</button>
+</div>
+{% endblock %}

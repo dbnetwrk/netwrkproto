@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Cards</title>
+
+
+   <style>
+  body, html {
+    object-fit: fill;
+  background-color: #000d14;
+  background-image: url("https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655b0f1c8fbbaaf6dd0be0ad_Frame%206.png");
+  background-position: 50%;
+  background-size: cover;
+  padding-bottom: 0;
+ font-family: 'Roboto', Arial, sans-serif;
+ color: white;
+}
+
+
+.community-cards-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 20px;
+  margin-bottom: 10px;
+  margin-left: 15px;
+  margin-right: 15px;
+}
+
+.community-card {
+  display: inline-flex;
+  flex-direction: column;
+  background-color: white;
+  color: black;
+  min-width: 250px;
+  max-width: 250px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* White glow */
+  padding: 15px;
+  margin-right: 20px; /* space between cards */
+ 
+}
+
+.community-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.community-pic {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.community-card-content {
+  font-size: 14px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.community-card-actions {
+  margin-top: auto;
+}
+
+/* If your container is scrollable, you might not need .community-card:last-child */
+.community-card:last-child {
+  margin-right: 0;
+}
+
+.centered-header {
+    text-align: center; /* Centers the text inside the container */
+    width: 100%; /* Ensures the container takes full width of its parent */
+    display: flex;
+    flex-direction: column; /* Stacks the h2 and h3 vertically */
+    align-items: center; /* Centers the items (h2 and h3) horizontally */
+    justify-content: center; /* Adjusts the distribution of the items inside the container (if needed) */
+}
+
+.proceed-action {
+    display: none; /* Initially hidden */
+    position: fixed; /* Stay in place */
+    left: 0;
+    bottom: 0;
+    width: 100%; /* Full width */
+    background-color: rgba(255, 255, 255, 0.5); /* Translucent white */
+    color: #000; /* Text color */
+    padding: 20px; /* Some padding */
+    text-align: center; /* Centered text */
+    font-size: 24px; /* Large font size */
+    border: none; /* No border */
+    cursor: pointer; /* Pointer cursor on hover */
+}
+
+.proceed-action:hover {
+    background-color: rgba(255, 255, 255, 0.7); /* Slightly less translucent on hover for visual feedback */
+}
+
+
+   </style> 
+</head>
+<body>
+
+	<div class ="centered-header">
+
+	<h2>Find your tribe</h2>
+            <p>Join 3 communities and follow 3 people that share similar interests and industry with you</p>
+    </div>
+
+    <h2>Picked just for you</h2>
+    <div class="community-cards-container">
+        {% for community in communities_in_industry_with_shared_interests %}
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class='community-pic'>
+                <h3>{{ community.name }}</h3>
+            </div>
+            <p class="community-card-content">{{ community.description }}</p>
+            <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action" onclick="toggleFollow()">Join</button>
+            </div>
+        </div>
+        {% endfor %}
+        {% for community in communities_in_industry %}
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class='community-pic'>
+                <h3>{{ community.name }}</h3>
+            </div>
+            <p class="community-card-content">{{ community.description }}</p>
+            <div class="community-card-actions">
+                <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action" onclick="toggleFollow()">Join</button>
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% for community in communities_in_industry_category %}
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Profile Picture" class='community-pic'>
+                <h3>{{ community.name }}</h3>
+            </div>
+            <p class="community-card-content">{{ community.description }}</p>
+            <div class="community-card-actions">
+                <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action" onclick="toggleFollow()">Join</button>
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+
+<h2>People just like you</h2>
+    <div class="community-cards-container">
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename='images/drew.png') }}" alt="Profile Picture" class='community-pic'>
+                <h3>Drew Jadeson</h3>
+            </div>
+            <p class="community-card-content">{% if user.industry %}
+            <p>Industry: {{ user.industry.name }}</p>
+        {% endif %}
+
+
+        {% if user.interests %}
+            <p>Interests:</p>
+            <ul>
+                {% for interest in user.interests %}
+                    <li>{{ interest.name }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>hasn't added any interests yet.</p>
+        {% endif %}</p>
+            <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action1" onclick="toggleFollow()">Follow</button>
+
+            </div>
+        </div>
+
+
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename='images/sarah.png') }}" alt="Profile Picture" class='community-pic'>
+                <h3>Alexandria Anderson</h3>
+            </div>
+            <p class="community-card-content">{% if user.industry %}
+            <p>Industry: {{ user.industry.name }}</p>
+        {% endif %}
+
+
+        {% if user.interests %}
+            <p>Interests:</p>
+            <ul>
+                {% for interest in user.interests %}
+                    <li>{{ interest.name }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>hasn't added any interests yet.</p>
+        {% endif %}</p>
+            <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action1" onclick="toggleFollow()">Follow</button>
+
+            </div>
+        </div>
+
+
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename='images/taylor.png') }}" alt="Profile Picture" class='community-pic'>
+                <h3>Taylor Wilson</h3>
+            </div>
+            <p class="community-card-content">{% if user.industry %}
+            <p>Industry: {{ user.industry.name }}</p>
+        {% endif %}
+
+
+        {% if user.interests %}
+            <p>Interests:</p>
+            <ul>
+                {% for interest in user.interests %}
+                    <li>{{ interest.name }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>hasn't added any interests yet.</p>
+        {% endif %}</p>
+            <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action1" onclick="toggleFollow()">Follow</button>
+
+            </div>
+        </div>
+
+        <div class="community-card">
+            <div class="community-card-header">
+                <img src="{{ url_for('static', filename='images/quinn.png') }}" alt="Profile Picture" class='community-pic'>
+                <h3>Quinn Madison</h3>
+            </div>
+            <p class="community-card-content">{% if user.industry %}
+            <p>Industry: {{ user.industry.name }}</p>
+        {% endif %}
+
+
+        {% if user.interests %}
+            <p>Interests:</p>
+            <ul>
+                {% for interest in user.interests %}
+                    <li>{{ interest.name }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>hasn't added any interests yet.</p>
+        {% endif %}</p>
+            <div class="community-card-actions">
+                <button type="button" id="followButton" class="card-action1" onclick="toggleFollow()">Follow</button>
+
+            </div>
+        </div>
+
+
+
+    </div>
+
+<button id="proceedButton" class="proceed-action" onclick="window.location.href='/feed';">Proceed to Next Step</button>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let followCount = 0; // Initialize follow count
+    let joinedCommunityCount = 0;
+
+    document.querySelectorAll('.card-action1').forEach(function(button) {
+        button.addEventListener('click', function() {
+            this.textContent = 'Followed'; // Change the button text
+            this.disabled = true; // Optional: disable the button after clicking
+
+            followCount++; // Increment the follow count
+            checkFollowCount(); // Check if the required number of follows has been reached
+        });
+    });
+
+    document.querySelectorAll('.card-action').forEach(function(button) {
+        button.addEventListener('click', function() {
+            this.textContent = 'Joined'; // Change the button text
+            this.disabled = true; // Optional: disable the button after clicking
+
+            joinedCommunityCount++; // Increment the follow count
+            checkFollowCount(); // Check if the required number of follows has been reached
+        });
+    });
+
+    function checkFollowCount() {
+        if ((followCount >= 3) && (joinedCommunityCount >= 3)){
+            // If 3 or more people have been followed, show the proceed button
+            document.getElementById('proceedButton').style.display = 'block';
+            // You can also redirect the user automatically or enable any other navigation mechanism here
+        }
+    }
+});
+</script>
+
+
+
+
+    
+</body>
+</html>

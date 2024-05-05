@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Netwrk</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="static/css/style.css">
+
+
+<style>
+
+body, html {
+    object-fit: fill;
+  background-color: #000d14;
+  background-image: url("https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655b0f1c8fbbaaf6dd0be0ad_Frame%206.png");
+  background-position: 50%;
+  background-size: cover;
+  padding-bottom: 0;
+ font-family: 'Roboto', Arial, sans-serif;
+ 
+}
+
+
+*, ::after, ::before {
+    box-sizing: border-box;
+}
+
+.container {
+    display: flex; /* Enables Flexbox layout */
+    flex-direction: column; /* Stacks children vertically */
+    align-items: center; /* Centers children horizontally in the container */
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+}
+
+
+.info {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+.signup-form {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* White glow */
+}
+
+.signup-form h2 {
+    color: #333;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+
+
+
+
+
+.input-group input {
+    width: calc(100% - 22px); /* Adjust the width to account for padding and border */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    width: calc(100% - 20px); /* Adjust button width to ensure it fits within the form */
+    padding: 10px;
+    border: none;
+    background-color: #0A66C2;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 10px;
+    }
+    .input-group input, button {
+        width: 100%; /* On mobile, input and button should expand to full container width */
+    }
+}
+
+.logo {
+    display: block;
+    max-width: 70%; /* Ensure the logo is not wider than the container */
+    height: auto; /* Maintain aspect ratio */
+    margin: 0 auto 20px; /* Center the logo and add some space below it */
+}
+
+
+.info, .signup-form {
+    width: 90%; /* Ensures both sections fill the container width */
+}
+
+.step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .container {
+            margin-top: 20px;
+        }
+
+#industries-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* Space between each radio button */
+}
+
+#industries-container label {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 15px; /* Adjust padding to control the size of the oval */
+  border: 2px solid #d1d3d4; /* Border color */
+  border-radius: 20px; /* Creates the oval shape */
+  background-color: #f8f9fa; /* Background color of the label */
+  margin-bottom: .25rem; /* Margin bottom, you can adjust it based on .mb-1 or any class you're using */
+  font-size: 16px; /* Adjust the font size as needed */
+  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for background and text color */
+}
+
+/*Hide the actual radio button input */
+#industries-container input[type="radio"] {
+  display: none;
+}
+
+#industries-container label.active{
+
+cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 15px; /* Adjust padding to control the size of the oval */
+  border: 2px solid #000000; /* Border color */
+  border-radius: 20px; /* Creates the oval shape */
+  background-color: #f8f9fa; /* Background color of the label */
+  margin-bottom: .25rem; /* Margin bottom, you can adjust it based on .mb-1 or any class you're using */
+  font-size: 16px; /* Adjust the font size as needed */
+  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for background and text color */
+
+}
+
+
+/* Base styles for form elements */
+input, textarea {
+    width: 100%; /* Make input and textarea span the full width of their container */
+    padding: 8px 12px; /* Add some padding inside the input fields */
+    margin: 8px 0; /* Add some margin for spacing */
+    display: inline-block; /* Ensure elements don't break onto new lines */
+    border: 1px solid #ccc; /* A light grey border */
+    border-radius: 4px; /* Slightly rounded corners */
+    box-sizing: border-box; /* Include padding and border in element's total width and height */
+}
+
+/* Specific styles to make textarea visually similar to input */
+textarea {
+    height: auto; /* Override the height if needed, or let it grow with content */
+    resize: vertical; /* Allow vertical resize only */
+}
+
+/* Style adjustments for small helper text */
+.form-text.text-muted {
+    display: block; /* Ensure it displays as a block to appear below the input/textarea */
+    margin-top: 5px; /* Space between input/textarea and text */
+    font-size: 0.875em; /* Slightly smaller font size */
+    color: #6c757d; /* A default muted text color, adjust as needed */
+}
+
+
+
+.topics-list {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr); /* Creates three columns */
+    gap: 10px; /* Space between grid items */
+    max-height: 300px; /* Adjust this value based on your design needs */
+    overflow-y: auto; /* Enables vertical scrolling */
+    padding: 10px;
+    list-style-type:none;
+    margin-top: 20px; /* Spacing from previous content */
+    
+}
+
+
+.topic-label {
+    display: block;
+    cursor: pointer;
+    padding: 10px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.topic-checkbox {
+    display: none; /* Hide the actual checkbox but use it for form submission */
+}
+
+.topic-label img {
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+.checkmark {
+    padding: 10px;
+    display: flex;
+    align-items: center; /* Aligns the text and image vertically */
+    min-height: 50px; /* Ensures each item has enough vertical space */
+    border-radius: 5px;
+}
+.topic-icon {
+    width: 40px; /* Adjust size of the image */
+    height: 40px;
+    margin-right: 10px; /* Space between the image and the text */
+}
+
+.topic-checkbox:checked + .checkmark {
+    border-color: #4CAF50; /* Green border for selected items */
+    background-color: rgba(76, 175, 80, 0.2); /* Light green background */
+}
+
+.topic-checkbox:checked + .checkmark .topic-icon {
+    opacity: 0.6; /* Slightly fade the icon to indicate selection */
+}
+
+.status-icon {
+    display: none; /* Initially hidden */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+    color: #4CAF50; /* Green check mark */
+}
+
+.topic-checkbox:checked + .checkmark .status-icon {
+    display: block; /* Show check mark on selection */
+    content: '✔'; /* Unicode check mark */
+}
+
+.age-group-container {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 0;
+}
+
+.age-group {
+    padding: 20px 40px;
+    border: 2px solid #ccc; /* Light grey border */
+    border-radius: 10px; /* Rounded corners */
+    background-color: #f8f8f8; /* Light grey background */
+    color: #333; /* Dark text color */
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.age-group.active {
+    border-color: #4CAF50; /* Change border color when active */
+    background-color: #fff; /* White background when active */
+    color: #333; /* Dark text color when active */
+}
+
+
+
+
+</style>
+
+</head>
+<body>
+    <div class="container">
+        <section class="info">
+            <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
+            <p>An invite-only forum for Gen Z entrepreneurs</p>
+        </section>
+        <section class="signup-form">
+            <form id="multiStepForm" action="/signup_step1" method="POST">
+    <div class="step step-1 active">
+        <div class="input-group">
+            <label for="firstName">First Name</label>
+            <input type="text" id="first_name" name="first_name" required>
+            
+
+            
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
+    <div class="step step-2">
+        <div class="input-group">
+            <label for="lastName">Last Name</label>
+            <input type="text" id="last_name" name="last_name" required>
+            
+            
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
+
+    <div class="step step-3">
+    <div class="input-group">
+        <h1>Select your age group</h1>
+        <small>This helps us personalize your Netwrk experience.</small>
+        <div class="age-group-container">
+            <button type="button" class="age-group" data-value="2005-2012">
+                Born after 2004
+            </button>
+            <button type="button" class="age-group" data-value="1997-2004">
+                Born 1996-2004
+            </button>
+        </div>
+    </div>
+    <button type="button" onclick="nextStep()" class="next-button" disabled>Next</button>
+
+</div>
+
+    
+    <div class="step step-4">
+        <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
+
+    <!-- Replacing About You with Burner Username -->
+    <div class="step step-5">
+        <div class="input-group">
+            <label for="burnerUsername">Set your Anonymous Username</label>
+            <input type="text" id="burner_username" name="burner_username" required>
+            <small>To speak freely in anonymous communities.</small>
+        </div>
+        <button type="submit">Next</button>
+    </div>
+
+
+    <!--
+
+
+
+    <div class="step step-6">
+    <div class="input-group">
+        <h1>What do you want to see on Netwrk?</h1>
+        <small>Select at least one industry to personalize your Netwrk experience.</small>
+        <ul class="topics-list">
+            {% for topic in topics if topic.interest_category_id == 1 %}
+            <li>
+                <label class="topic-label" style="border: 2px solid {{ topic.color }}; color: black; background-color: white;">
+                    <input type="checkbox" name="industry_topics[]" value="{{ topic.id }}" class="topic-checkbox" onchange="toggleTopicStyle(this)">
+                    <span class="checkmark">
+                        <span class="status-icon"></span>
+                        {% if topic.image_url %}
+                            <img src="{{ url_for('static', filename=topic.image_url) }}" alt="{{ topic.name }}" class="topic-icon">
+                        {% endif %}
+                        {{ topic.name }}
+                    </span>
+                </label>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <button type="button" onclick="nextStep()">Next</button>
+</div>
+
+
+
+<div class="step step-7">
+    <div class="input-group">
+        <h1>What do you want to see on Netwrk?</h1>
+        <small>Select at least 2 interests to personalize your Netwrk experience.</small>
+        <ul class="topics-list">
+            {% for topic in topics if topic.interest_category_id == 2 %}
+            <li>
+                <label class="topic-label" style="border: 2px solid {{ topic.color }}; color: black; background-color: white;">
+                    <input type="checkbox" name="general_topics[]" value="{{ topic.id }}" class="topic-checkbox" onchange="toggleTopicStyle(this)">
+                    <span class="checkmark">
+                        <span class="status-icon"></span>
+                        {% if topic.image_url %}
+                            <img src="{{ url_for('static', filename=topic.image_url) }}" alt="{{ topic.name }}" class="topic-icon">
+                        {% endif %}
+                        {{ topic.name }}
+                    </span>
+                </label>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <button type="submit">Next</button>
+</div>
+
+-->
+
+
+    </div>
+    
+</div>
+
+
+
+</form>
+
+
+        </section>
+    </div>
+
+    <script>
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    const ageGroups = document.querySelectorAll('.age-group');
+
+    const nextButton = document.querySelector('.next-button'); // Ensure this selector matches your button
+    nextButton.disabled = true; // Disable the button initially
+    ageGroups.forEach(button => {
+        button.addEventListener('click', function() {
+            // Remove active class from all buttons
+            ageGroups.forEach(btn => btn.classList.remove('active'));
+
+            // Add active class to the clicked button
+            this.classList.add('active');
+
+            // Enable the "Next" button upon selection
+            nextButton.disabled = false;
+        });
+    });
+});
+
+
+
+
+
+
+    
+
+
+        let currentStep = 1;
+        function nextStep() {
+    // Perform validation check for the current step
+    if (!validateCurrentStep(currentStep)) {
+        alert("Please fill out all required fields before proceeding.");
+        return; // Stop the function from proceeding to the next step
+    }
+    
+    // If validation passes, proceed to the next step
+    document.querySelector(`.step-${currentStep}`).classList.remove('active');
+    currentStep++;
+    document.querySelector(`.step-${currentStep}`).classList.add('active');
+}
+
+// Example validation function for a step
+function validateCurrentStep(stepNumber) {
+    let isValid = true;
+    const stepElement = document.querySelector(`.step-${stepNumber}`);
+    const inputs = stepElement.querySelectorAll('input[required], textarea[required], select[required]');
+
+    inputs.forEach(input => {
+        if (!input.value) {
+            // Optionally, add some class to input to indicate error
+            input.classList.add('error'); // Make sure you define this 'error' class in your CSS
+            isValid = false;
+        } else {
+            input.classList.remove('error');
+        }
+    });
+
+     if (stepNumber === 8) {
+        // Check if a category has been selected
+        const categorySelect = document.getElementById('category-select');
+        if (!categorySelect.value) {
+            categorySelect.classList.add('error');
+            isValid = false;
+        } else {
+            categorySelect.classList.remove('error');
+        }
+
+        // Check if any industry radio button is selected
+        const industrySelected = stepElement.querySelector('input[type="radio"]:checked');
+        if (!industrySelected) {
+            // Since radio buttons don't have a visible border to turn red, consider adding a visual cue elsewhere
+            // For example, change the text color of an error message or the border of the industries container
+            document.getElementById('industries-container').classList.add('error');
+            isValid = false;
+        } else {
+            document.getElementById('industries-container').classList.remove('error');
+        }
+    }
+
+    return isValid;
+}
+
+    </script>
+</body>
+</html>

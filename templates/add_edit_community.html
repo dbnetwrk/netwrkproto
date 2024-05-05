@@ -1,0 +1,25 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>{{ 'Edit' if community else 'Add' }} Community</h2>
+    <form action="" method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="name" class="form-label">Name:</label>
+            <input type="text" class="form-control" id="name" name="name" required value="{{ community.name if community }}">
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description:</label>
+            <textarea class="form-control" id="description" name="description" required>{{ community.description if community }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="profile_pic" class="form-label">Profile Picture:</label>
+            <input type="file" class="form-control" id="profile_pic" name="profile_pic">
+            {% if community and community.profile_pic_url %}
+            <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Current Image" class="img-fluid mt-2">
+            {% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">{{ 'Update' if community else 'Add' }}</button>
+    </form>
+</div>
+{% endblock %}

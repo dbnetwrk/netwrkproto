@@ -1,0 +1,31 @@
+<!-- admin_create_post.html -->
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Create Post as Admin</h2>
+    <form method="POST" action="{{ url_for('admin_create_post') }}" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea class="form-control" id="content" name="content" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="community_id" class="form-label">Select Community</label>
+            <select class="form-select" id="community_id" name="community_id">
+                {% for community in communities %}
+                <option value="{{ community.id }}">{{ community.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="image" class="form-label">Upload Image</label>
+            <input type="file" class="form-control" id="image" name="image">
+        </div>
+        <button type="submit" class="btn btn-primary">Create Post</button>
+    </form>
+</div>
+{% endblock %}

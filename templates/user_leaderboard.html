@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Top Users Leaderboard{% endblock %}
+
+{% block content %}
+
+<style>
+    a { color: black; }
+</style>
+
+<div class="feed-container">
+    <h2>Top Users by Karma</h2>
+    {% for user in top_users %}
+    <div class="card">
+        <div class="card-header">
+            <!-- Display the rank next to the user's name -->
+            <h1>{{ loop.index }} <img src="{{ user.profile_pic_url }}" alt="User Profile Picture" class="community-pic"> <a href="{{ url_for('profile', user_id=user.id) }}">{{ user.first_name }} {{ user.last_name }}</a></h1>
+        </div>
+        <div class="card-content">
+            <p>Karma: {{ user.karma }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

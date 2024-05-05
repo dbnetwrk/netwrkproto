@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ community.name }}{% endblock %}
+
+{% block content %}
+
+
+
+
+
+{% if community.color %}
+
+
+
+
+{% endif %}
+
+
+
+
+    <div class="feed-container">
+
+    <div class="card">
+        {% if community.header_pic_url %}
+                <div class="card-header-img">
+                    <img src="{{ url_for('static', filename=community.header_pic_url) }}" alt="Community Header Picture" class="community-header-pic">
+                </div>
+            {% endif %}
+
+        <div class="card-header">
+
+
+            <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic">
+            <h1>{{ community.name }}</h1>
+        </div>
+        <div class="card-content">
+            <p>Created by: {{ community.creator.display_name(community.is_anonymous) }}
+            {% if creator_owns_top_community %}
+                <span class="card-action">Top Community Owner</span>
+            {% endif %}
+            </p>
+            <p>{{ community.description }}</p>
+            <!-- Display the number of members -->
+            <p>Members: {{ member_count }}</p>
+        </div>
+        <div class="d-flex justify-content-start">
+    <a href="{{ url_for('create_post', community_id=community.id) }}" class="card-action">Create Post</a>
+
+    {% if session['user_id'] == community.created_by %}
+        <a href="{{ url_for('edit_community', community_id=community.id) }}" class="card-action">Manage</a>
+    {% else %}
+        {% set is_member = community in current_user.communities %}
+        {% if is_member %}
+            <span class="card-action">Joined</span>
+        {% else %}
+            <!-- Use a form to submit a POST request for joining -->
+            <form action="{{ url_for('join_community', community_id=community.id) }}" method="post" style="display: inline;">
+                <button type="submit" class="card-action">Join</button>
+            </form>
+        {% endif %}
+    {% endif %}
+</div>
+
+    </div>
+    
+         {% if posts|length == 0 and session['user_id'] == community.created_by %}
+    <!-- Welcome message card, shown only if there are no posts and the viewer is the community creator -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Welcome to your community, {{ community.creator.first_name | default('Member') }}</div>
+        </div>
+        <div class="card-content">
+            <p>This is your personal space to boost your career by sharing what makes you special and valuable. Show off your passions and uniqueness here. To grow your community:</p>
+            <ol>
+                <li>Share your community link on LinkedIn or invite friends.</li>
+                <li>Explore popular Netwrk communities for ideas.</li>
+                <li>Create your first post</li>
+            </ol>
+            <p>Grow your membership, engage your community, and increase your visibility. This welcome message will vanish after your first real post.</p>
+        </div>
+    </div>
+{% endif %}
+
+    
+        {% for post in posts %}
+<div class="card">
+    <div class="card-header">
+        <small>
+            {% if not community.is_anonymous %}
+                <img src="{{ post.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic">
+            {% endif %}
+            {% if post.community.is_anonymous %}
+        <!-- In anonymous communities, clicking the name initiates an anonymous message -->
+        <small><a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+    {% else %}
+        <!-- In regular communities, clicking the name goes to the user's profile -->
+        <small><a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+    {% endif %} · {{post.posted_time|time_ago }}
+            {% if post.user.id == community.created_by %}
+                <span class="card-action">Creator</span>
+            {% endif %}
+        </small>
+    </div>
+    <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-title">{{ post.title }}</a>
+    <div class="card-content"><p class="content-preview">{{ post.content|strip_html }}</p>
+
+
+            {% if post.image_filename %}
+            <p></p>
+    <img src="{{ url_for('static', filename='images/posts/' + post.image_filename) }}" alt="Post Image">
+{% endif %}
+
+    </div>
+    <div class="card-meta"></div>
+    <div class="card-actions">
+            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ post.id }}">
+    <i class="fas fa-arrow-up"></i>
+</button>
+<span id="vote-count-{{ post.id }}" class="vote-count">{{ post.upvotes - post.downvotes }}</span>
+<button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ post.id }}">
+    <i class="fas fa-arrow-down"></i>
+</button>
+
+            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">Comments</a>
+            <span class="card-action">Share</span>
+        </div>
+</div>
+{% endfor %}
+
+</div>
+
+
+<script>
+
+function startAnonymousConversation(userId) {
+    if (confirm("Do you want to message this user anonymously?")) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", `/start_anonymous_conversation/${userId}`, true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        // Include CSRF token if needed, for example:
+        // xhr.setRequestHeader('X-CSRFToken', csrf_token); 
+        xhr.onload = function() {
+            if (this.status === 200) {
+                var response = JSON.parse(this.responseText);
+                alert(response.message);  // Notify user
+                window.location.href = `/messages/${response.conversation_id}`; // Redirect to the new conversation
+            } else {
+                alert('Error starting anonymous conversation.');
+            }
+        };
+        xhr.send();
+    }
+}
+
+</script>
+
+
+{% endblock %}

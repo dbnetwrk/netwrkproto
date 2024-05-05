@@ -1,0 +1,808 @@
+body, html {
+
+  background-color: #f9f9fb;
+  padding-bottom: 0;
+ font-family: SnowflakeSans, Arial,sans-serif;
+ color: #222222;
+    letter-spacing: .5px;
+    margin: 0 0 1.6rem 0;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased; /* for Chrome and Safari */
+    -moz-osx-font-smoothing: grayscale; 
+}
+
+
+
+
+
+.search-form {
+    display: flex;
+    align-items: center;
+    background-color: #f0f0f0; /* Light background for the search form */
+    border-radius: 25px; /* Rounded borders for the search form */
+    padding: 0 10px; /* Padding inside the search form */
+    border: none;
+    margin-top:5px;
+    margin-bottom: 5px;
+}
+
+.search-input {
+    border: none;
+    padding: 10px;
+    height: 30px; /* Adjust the height to match the navbar height */
+    width: 200px; /* You can adjust the width as needed */
+    font-size: 14px; /* Sizing to match the navbar's aesthetic */
+    background-color: transparent; /* Keeps the inherited search form's background */
+    margin-right: 10px; /* Space between input field and search button */
+    outline: none; /* Remove focus outline */
+
+}
+
+.search-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    color: #333; /* Color of the search icon */
+}
+
+.search-button i {
+    font-size: 20px; /* Larger icon size for visibility */
+}
+
+/* Adjustments for the responsive design */
+@media (max-width: 768px) {
+    .search-input {
+        width: 150px; /* Smaller width for smaller screens */
+        height: 25px; /* Smaller height for the input */
+        padding: 5px; /* Smaller padding for the input */
+    }
+
+    .search-button i {
+        font-size: 18px; /* Smaller icon for smaller screens */
+    }
+}
+
+/* Smaller devices */
+@media (max-width: 480px) {
+    .search-form {
+        display: none; /* Optional: hide search form on very small screens */
+    }
+}
+
+
+.navbar-profile-pic {
+    height: 30px;  /* Or whatever size you prefer */
+    width: 30px;
+    border-radius: 50%;  /* Makes the image circular */
+    object-fit: cover;  /* Ensures the image covers the space without stretching */
+}
+
+/* New specific style for the search input in the navbar */
+.navbar-search-input {
+    border: none !important;/* Removes the border */
+    margin-bottom: 0px !important;
+    box-shadow: none; /* Removes box shadow if there was any */
+    outline: none; /* Removes focus outline */
+}
+
+/* Ensure that the search input does not get a border when it is focused */
+.navbar-search-input:focus {
+    border: none;
+    box-shadow: none;
+    outline: none;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    color: white;
+    position: fixed;
+    top: 0; /* Align to the top */
+    left: 0; /* Align to the left */
+    width: 100%; /* Ensure it spans the full width */
+    z-index: 1000; /* Ensure it stays on top of other content */
+}
+
+.navbar a {
+    color: #7d7d82;
+
+    text-decoration: none;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.navbar a:hover {
+    
+    color: #32cd49;
+    border-radius: 5px;
+}
+
+.navbar-logo {
+    max-height: 20px; /* Adjust based on your navbar's height */
+    width: auto; /* Maintain aspect ratio */
+}
+
+@media (max-width: 768px) {
+    .navbar-logo {
+        max-height: 15px; /* Smaller logo for smaller screens */
+    }
+}
+
+
+@media (max-width: 768px) {
+    .navbar a span {
+        display: none; /* Hide the span elements containing text */
+    }
+    
+    .navbar a, .navbar-profile-pic {
+        height: 15px;
+        width: 15px; /* Optionally adjust padding further if needed */
+    }
+    
+    .navbar a {
+        font-size: 15px; /* Adjust if you're also styling the <i> font size for icons */
+    }
+    
+
+}
+
+/* Further adjustments for very small screens */
+@media (max-width: 480px) {
+    .navbar a {
+        padding: 5px; /* Even smaller padding */
+        font-size: 12px; /* Even smaller font size for links */
+    }
+}
+
+
+.topic-icon {
+    height: 24px; /* Adjust this value to fit your design */
+    width: auto; /* Keeps the aspect ratio of the image */
+    vertical-align: middle; /* Aligns the image vertically with the text */
+    margin-right: 8px; /* Adds some space between the image and the text */
+}
+
+
+.feed-container {
+    width: 75%;
+    margin-left: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 50px;
+}
+
+/* Mobile screen adjustments */
+@media (max-width: 768px) {
+    .feed-container {
+        margin-left: 0; /* Remove margin-left on mobile screens */
+        width: 100%; /* Optional: You might want to use the full width on mobile */
+        
+    }
+}
+
+.card {
+    background-color: #ffffff;
+    /* Define a CSS variable for border opacity within the scope of .card */
+    --tw-border-opacity: 1;
+    /* Update the border-color to use the RGB color with opacity */
+    border: 1px solid rgb(233 235 238 / var(--tw-border-opacity));
+    
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: .75rem;
+    transition: box-shadow 0.3s ease-in-out; /* Smooth transition for the box-shadow */
+}
+
+
+.card:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Apply drop shadow on hover */
+}
+
+
+.card-header-img img {
+    width: 100%; /* Make the header image full width */
+    max-height: 200px; /* Limit the header image's height */
+    object-fit: cover; /* Ensure the image covers the area nicely */
+    border-radius: 4px; /* Optional: Adds a slight rounding to the corners */
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.community-pic {
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    margin-right: 10px;
+    background-color: #ddd; /* Placeholder for profile picture */
+}
+.card-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: black;
+}
+.card-meta {
+    font-size: 14px;
+    color: black;
+    margin-bottom: 10px;
+}
+.card-actions {
+    font-size: 14px;
+}
+
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vote-button {
+  background-color: transparent; /* No fill, to match .card-action */
+  padding: 5px 15px; /* Padding to match the oval shape of .card-action */
+  border-radius: 20px; /* Oval shape to match .card-action */
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  color: #007DCD; /* Text color to match .card-action */
+}
+
+/* For hover effect, match the .card-action hover styles */
+.vote-button:hover {
+  background-color: #A0D955; /* Fill the button on hover to match .card-action */
+  color: #ffffff; /* Text color to white on hover for better contrast to match .card-action */
+  border-color: #A0D955; /* Border color to match .card-action */
+}
+
+.vote-button i {
+  color: inherit; /* Inherits the color from the .vote-button for consistency */
+  font-size: 16px; /* Adjust if needed */
+}
+
+/* Optional: You can include a focused state if you like, similar to .card-action:hover */
+.vote-button:focus {
+  background-color: #A0D955;
+  color: #ffffff;
+  border-color: #A0D955;
+}
+
+
+/* Assuming you want the same oval and hover effects for .card-action */
+.card-action {
+  text-decoration: none;
+  color: #007dcd;
+  padding: 5px 15px; /* Adjusted padding for oval shape */
+  background-color: transparent; /* No fill inside the button */
+  border: 1px solid #d3d3d3; /* Green oval outline */
+  border-radius: 20px; /* Oval shape */
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+.card-action:hover, .card-action:focus {
+  background-color: #A0D955; /* Fill the button on hover/focus */
+  color: #ffffff; /* Change text color on hover/focus for better contrast */
+  border-color: #A0D955; /* Keep the border color consistent on hover/focus */
+}
+
+
+.btn btn-primary {
+
+    /* Assuming you want the same oval and hover effects for .card-action */
+  text-decoration: none;
+  color: #7d7d82;
+  padding: 5px 15px; /* Adjusted padding for oval shape */
+  background-color: #f9f9fb; /* Oval background color */
+  border: none;
+  border-radius: 20px; /* Oval shape */
+  transition: background-color 0.3s ease;
+}
+
+
+
+}
+
+
+.upvote-button {
+  border-radius: 5px 0 0 5px;
+}
+
+.downvote-button {
+  border-radius: 0 5px 5px 0;
+}
+
+.vote-count {
+  padding: 5px 10px;
+  border-radius: 0;
+  font-size: 16px;
+  color: #7d7d82;
+}
+
+
+.card-content {
+font-size: 14px;
+color: rgb(66 66 75/var(--tw-text-opacity));
+margin-bottom: 10px;
+letter-spacing: .5px;
+    margin: 10px 0 1.6rem 0;
+    font-weight: 400;
+}
+
+.card-content img {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cover ensures the image covers the pad area, may crop */
+    border-radius: .75rem;
+}
+
+/* Add these styles to your existing style.css file */
+
+.profile-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80vh; /* Adjust height as needed */
+}
+
+.profile-card {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    text-align: center;
+    width: 300px; /* Adjust width as needed */
+}
+
+.profile-pic {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin-bottom: 20px;
+}
+
+.comments-section {
+    background-color: white;
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ccc; /* Just for visibility */
+}
+
+.comment {
+    /*background-color: #f9f9f9; /* Light grey background for contrast */
+    padding: 15px;
+    margin-bottom: 10px; /* Space between comments */
+    border-radius: 5px; /* Match the card's border radius */
+}
+
+a {
+    text-decoration: none;
+    color: #007dcd; /* This removes the underline */
+}
+
+
+
+.comment small {
+    color: #666; /* Lighter text color for meta information */
+    flex-grow: 1; /* Ensure the text takes up the remaining space */
+    display: flex;
+    align-items: center; /* Center the text with the image */
+    font-size: 0.9rem; /* Adjust the size of the text as needed */
+
+}
+
+/* Comment Form Styling */
+
+.comment-form {
+    background-color: white;
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ccc; /* Just for visibility */
+}
+
+.comment-form textarea {
+    width: 100%; /* Full width to match the form's width */
+    padding: 10px; /* Adequate padding for text input */
+    border: 1px solid #ccc; /* Subtle border */
+    border-radius: 4px; /* Rounded corners for the textarea */
+    height: 100px; /* Enough height to write a comment */
+    margin-bottom: 20px; /* Space before the submit button */
+    resize: vertical; /* Allows the user to resize the textarea vertically */
+}
+
+
+
+.post-info {
+    display: flex;
+    flex-direction: column; /* Ensures the community name and author info stack vertically */
+}
+
+
+.user-profile-pic {
+    width: 40px; /* Adjust size as needed */
+    height: 40px; /* Adjust size as needed */
+    border-radius: 50%; /* Makes the image circular */
+    margin-right: 10px; /* Adds some space between the image and text */
+}
+.comment-header {
+    display: flex;
+    align-items: center; /* Aligns the image and text vertically */
+}
+
+
+
+
+/* General form styling */
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box; /* Ensures padding doesn't increase the width */
+    margin-bottom: 10px; /* Space between the input and the next element */
+}
+
+button {
+   background: none;
+    border: none;
+    color: gray;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    color: darkgray;/* A darker shade of blue */
+}
+
+/* Style for the footer of the form */
+.form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Adjust or remove this if you want elements closer */
+    gap: 10px; /* Space between elements */
+    margin-top: 10px; /* Space above the form footer */
+}
+
+/* Styling for the switch label, including checkbox and text */
+.burner-switch {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.burner-switch input {
+    display: none; /* Hide the checkbox */
+}
+
+.burner-switch .slider {
+    margin-left: 10px; /* Space between the label text and the slider */
+    position: relative;
+    width: 60px; /* Width of the slider */
+    height: 34px; /* Height of the slider */
+    background-color: #ccc;
+    border-radius: 34px;
+}
+
+.burner-switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.burner-switch input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.burner-switch input:checked + .slider {
+    background-color: #2196F3;
+}
+
+/* Focused state for keyboard navigation */
+.burner-switch input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+}
+
+
+/* General Styles for the Invite Form Container */
+.invite-container {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #ffffff;
+    text-align: center;
+}
+
+/* Styling for Headings inside the Container */
+.invite-container h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+/* Styling for Input Fields */
+.invite-container input[type="text"] {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* General Styles for Buttons */
+.invite-container button {
+    width: calc(50%);
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    background-color: #007bff;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: block; /* Makes it possible to apply margin auto for centering */
+    margin: 10px auto 20px;
+}
+
+.invite-container button:hover {
+    background-color: #0056b3;
+}
+
+/* Style for the 'No thanks' Button for a softer look */
+.invite-container form:last-of-type button {
+    background-color: #6c757d;
+}
+
+.invite-container form:last-of-type button:hover {
+    background-color: #545b62;
+}
+
+.navbar a.active {
+    color: #32cd49; /* Example: change the text color for the active link */
+    font-weight: bold;
+}
+
+/* Community List Styles */
+.community-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.community-item {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 80%;
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.community-item img {
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    margin-right: 20px;
+}
+
+.community-item strong {
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.community-item-description {
+    font-size: 14px;
+    color: #666;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+    position: relative;
+    padding: .75rem 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+    border-radius: .25rem;
+}
+
+/* Customize further based on your needs */
+
+/* Conversation Container */
+.conversation {
+    padding-top:100px;
+  width: 100%;
+  max-width: 600px;
+  margin: auto;
+}
+
+/* Participant Styles */
+.participants {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-bottom: 2px solid #e1e1e1;
+}
+
+.participants h1 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+/* Messages Styles */
+.messages {
+  padding: 20px;
+  background-color: #fff;
+  min-height: 400px;
+  border-bottom: 2px solid #e1e1e1;
+}
+
+.messages h2 {
+  margin-top: 0;
+  color: #333;
+}
+
+.messages ul {
+  list-style: none;
+  padding: 0;
+}
+
+.messages li {
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 10px;
+}
+
+/* Sent Messages */
+.message-sent {
+  background-color: #dcf8c6;
+}
+
+/* Received Messages */
+.message-received {
+  background-color: #e5e5e5;
+}
+
+/* Message Form Styles */
+.message-form {
+  padding: 10px;
+  background-color: #f5f5f5;
+}
+
+.message-form textarea {
+  width: calc(100% - 110px);
+  height: 50px;
+  padding: 10px;
+  border: 1px solid #e1e1e1;
+  border-radius: 10px;
+  margin-right: 10px;
+}
+
+.message-form button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.message-form button:hover {
+  background-color: #0056b3;
+}
+
+.message-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.message-container {
+    background-color: #f0f0f0; /* Example background color */
+    /* Add padding, margins, and any other styles as needed */
+}
+
+.message-content {
+    /* Styles for the message content, if additional are needed */
+}
+
+.message-timestamp {
+    margin-left: 20px; /* Adjust as needed for spacing */
+    white-space: nowrap;
+}
+
+.reply-button, .show-replies-button {
+    background: none;
+    border: none;
+    color: gray;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.reply-button i, .show-replies-button i {
+    margin-right: 5px;
+}
+
+/* Optional: Change the color when hovering over the buttons */
+.reply-button:hover, .show-replies-button:hover {
+    color: darkgray;
+}
+
+
+.form-group.action-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.image-upload-container {
+    display: flex;
+    align-items: center; /* This will vertically center align the button and label */
+    justify-content: flex-start; /* Aligns items to the start of the container */
+}
+
+.image-upload-label {
+    margin-left: 10px; /* Adds some space between the submit button and the label */
+    cursor: pointer; /* Changes the cursor to indicate the label is clickable */
+}
+
+.image-preview {
+    margin-left: 10px; /* Adds some space between the label and the preview */
+    width: 100px; /* Or your desired preview size */
+    height: 100px; /* Or your desired preview size */
+    display: none; /* Initially hidden */
+}
+
+.image-preview img {
+    width: 100%;
+    height: auto;
+}
+
+.content-preview {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;  /* This will show up to 4 lines */
+    text-overflow: ellipsis;
+}
+
+.content-preview p {
+    display: inline; /* Ensure all text is in line for truncation */
+}
+
+

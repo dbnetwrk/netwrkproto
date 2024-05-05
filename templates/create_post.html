@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="feed-container">
+    <div class="comment-form">
+    <h2>Create a New Post</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <!-- Identity Status Placeholder -->
+        <div id="identityStatus" class="form-group"
+     data-anon-name="{{ current_user.display_name(true) }}"
+     data-regular-name="{{ current_user.display_name(false) }}">
+</div>
+
+        <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="content">Body</label>
+            <textarea id="content" name="content" required class="form-control"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="community">Community</label>
+            {% if selected_community_id %}
+            <!-- Display the community name and a hidden input for the community ID -->
+            {% for community in communities %}
+                {% if community.id == selected_community_id|int %}
+                    <p>Posting to: {{ community.name }}</p>
+                    <input type="hidden" name="community" value="{{ community.id }}">
+                    <!-- Add data attribute for JavaScript to use -->
+                    <script>var selectedCommunityIsAnonymous = {{ community.is_anonymous|tojson }};</script>
+                {% endif %}
+            {% endfor %}
+            {% else %}
+            <!-- Fallback to showing the dropdown if no specific community is selected -->
+            <select name="community" id="community" onchange="updateIdentityStatus()">
+                {% for community in communities %}
+                <option value="{{ community.id }}" data-is-anonymous="{{ community.is_anonymous }}">{{ community.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </div>
+        <div class="form-group action-group">
+
+    <div class="image-upload-container">
+    <button type="submit" class="card-action">Submit</button>
+    <label for="image" class="image-upload-label">
+        <i class="fas fa-image"></i> <!-- Font Awesome icon or any other icon -->
+        <input type="file" id="image" name="image" accept="image/*" style="display:none;">
+    </label>
+    <div id="imagePreview" class="image-preview"></div>
+</div>
+
+    
+    
+</div>
+
+    </form>
+</div>
+</div>
+
+<script>
+function updateIdentityStatus() {
+    var isAnonymous;
+    if (typeof selectedCommunityIsAnonymous !== 'undefined') {
+        isAnonymous = selectedCommunityIsAnonymous;
+    } else {
+        var selectedOption = document.querySelector('#community option:checked');
+        isAnonymous = selectedOption.getAttribute('data-is-anonymous') === 'true';
+    }
+
+    var identityStatusDisplay = document.getElementById('identityStatus');
+    var anonName = identityStatusDisplay.getAttribute('data-anon-name');
+    var regularName = identityStatusDisplay.getAttribute('data-regular-name');
+    
+    // Update the display based on anonymity status
+    identityStatusDisplay.innerHTML = isAnonymous ? 'Posting as ' + anonName : 'Posting as ' + regularName;
+}
+
+
+// Call updateIdentityStatus on page load to ensure correct status is shown
+document.addEventListener('DOMContentLoaded', updateIdentityStatus);
+
+
+
+
+document.getElementById('image').addEventListener('change', function(event) {
+    var imageInput = event.target;
+    var imagePreview = document.getElementById('imagePreview');
+
+    if (imageInput.files && imageInput.files[0]) {
+        var reader = new FileReader();
+
+        reader.onload = function(e) {
+            imagePreview.style.display = 'block';
+            imagePreview.innerHTML = '<img src="' + e.target.result + '" alt="Image preview">';
+        };
+
+        reader.readAsDataURL(imageInput.files[0]);
+    }
+});
+
+
+
+
+
+</script>
+
+{% endblock %}
+

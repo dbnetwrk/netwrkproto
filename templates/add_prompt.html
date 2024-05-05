@@ -1,0 +1,29 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Add New AI Prompt</h2>
+    <form action="{{ url_for('add_prompt') }}" method="POST">
+        <div class="mb-3">
+            <label for="community_id" class="form-label">Select Community:</label>
+            <select name="community_id" id="community_id" class="form-select" required>
+                {% for community in communities %}
+                <option value="{{ community.id }}" {{ 'selected' if community == community_id else '' }}>{{ community.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="prompt" class="form-label">Prompt:</label>
+            <textarea name="prompt" id="prompt" class="form-control" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="interval" class="form-label">Interval (minutes):</label>
+            <input type="number" name="interval" id="interval" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Prompt</button>
+    </form>
+</div>
+{% endblock %}
+
+
+

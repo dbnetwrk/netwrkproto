@@ -1,0 +1,350 @@
+<!-- templates/profile.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ user.first_name }} {{ user.last_name }}'s Profile{% endblock %}
+
+{% block content %}
+
+<style>
+
+
+
+
+.tab {
+    display: flex;
+    justify-content: space-around; /* This will spread the tabs evenly across the container */
+    border-bottom: 1px solid #ccc; /* Optional: adds a line under the tabs for visual separation */
+    padding: 10px;
+}
+
+.tablinks {
+    background-color: inherit; /* Use your desired color, or inherit from the parent */
+    border: none;
+    outline: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    padding: 10px 15px; /* Adjust padding as needed */
+}
+
+.tablinks:hover {
+    background-color: #ddd; /* Optional: Change background on hover for visual effect */
+}
+
+.tabcontent {
+    display: none; /* Initially hide the content */
+    padding: 20px;
+    border-top: none;
+}
+
+/* Style for active tab link */
+.tablinks.active {
+    background-color: #ccc; /* Example active state color, adjust as needed */
+}
+
+.tabs-container {
+    display: flex;
+    flex-direction: column;
+    width:100%;
+}
+
+.custom-modal {
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.custom-modal-content {
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 450px;
+}
+
+.close-button {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close-button:hover,
+.close-button:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+
+
+
+
+</style>
+
+
+<!-- Add this within your HTML head tag or include Bootstrap via CDN if not already done -->
+
+<!-- Modal HTML -->
+<div id="takePhotoModal" class="custom-modal" style="display: none;">
+  <div class="custom-modal-content">
+    <span class="close-button">&times;</span>
+    <h2>Set Profile Picture</h2>
+    <p>At Netwrk, take a photo with your phone's camera for an authentic profile pic; uploading existing photos is not permitted.</p>
+    <button id="takePhotoButton" class ="card-action">Take Photo</button>
+  </div>
+</div>
+
+
+
+<div class="feed-container">
+     
+
+
+<div class="card">
+        {% if user.header_pic_url %}
+                <div class="card-header-img">
+                    <img src="{{ url_for('static', filename=user.header_pic_url) }}" alt="Community Header Picture" class="community-header-pic">
+                </div>
+            {% endif %}
+
+        <div class="card-header">
+
+
+            <img src="{{ user.profile_pic_url }}" alt="Profile Picture" class="community-pic">
+        <h1>{{ user.first_name }} {{ user.last_name }}</h1>
+        </div>
+
+
+
+        <div class="card-content">
+            <p>{{ user.karma }} Karma · {{ user.followers.count() }} Followers</p>
+        {% if session['user_id'] == user.id %}
+            <p>Your Anon: {{ user.burner_username }} <a href="{{ url_for('burner_edit') }}">(Edit)</a></p>
+        {% endif %}
+        </div>
+
+
+
+        <div class="d-flex justify-content-start">
+    {% if session['user_id'] != user.id %}
+        <button id="start-conversation" data-recipient-id="{{ user.id }}" class="card-action">Send Message</button>
+        {% set is_following_user = current_user.is_following(user) %}
+        {% if is_following_user %}
+            <form action="{{ url_for('unfollow', user_id=user.id) }}" method="post" class="d-inline">
+                <button type="submit" class="card-action">Unfollow</button>
+            </form>
+        {% else %}
+            <form action="{{ url_for('follow', user_id=user.id) }}" method="post" class="d-inline">
+                <button type="submit" class="card-action">Follow</button>
+            </form>
+        {% endif %}
+    {% else %}
+        
+        
+        <form action="{{ url_for('edit_profile') }}" method="get" class="d-inline">
+            <button type="submit" class="card-action">Edit Profile</button>
+        </form>
+        <form action="{{ url_for('logout') }}" method="post" class="d-inline">
+            <button type="submit" class="card-action">Logout</button>
+        </form>
+    {% endif %}
+</div>
+
+
+    </div>
+
+
+<br>
+
+<div class="card">
+    <!-- New wrapper for tabs and content -->
+    <div class="tabs-container">
+        <div class="tab">
+            <button class="tablinks" onclick="openSection(event, 'posts')">Posts</button>
+            <button class="tablinks" onclick="openSection(event, 'comments')">Comments</button>
+            <button class="tablinks" onclick="openSection(event, 'aboutMe')">About Me</button>
+        </div>
+
+        <div id="posts" class="tabcontent">
+            <!-- Posts content -->
+        </div>
+        <div id="comments" class="tabcontent">
+            <!-- Comments content -->
+        </div>
+        <div id="aboutMe" class="tabcontent">
+            <p>{{ user.about_me }}</p>
+        </div>
+    </div>
+    <!-- Other content of .card if any -->
+</div>
+
+
+
+<br>
+        
+    </div>
+
+
+
+
+
+
+
+<script>
+
+
+
+
+var startConversationButton = document.getElementById('start-conversation');
+if (startConversationButton) {
+    startConversationButton.addEventListener('click', function() {
+        var recipientId = this.getAttribute('data-recipient-id');
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", `/start_direct_conversation/${recipientId}`, true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.onload = function() {
+            // Process the response here
+            var response = JSON.parse(this.responseText);
+            if (this.status === 200) {
+                // Redirect to the conversation page or notify the user
+                alert(response.message);  // Or handle more gracefully
+                window.location.href = `/messages/${response.conversation_id}`; // Redirect to the new conversation
+            } else {
+                // Handle error
+                alert('Error starting conversation.');
+            }
+        };
+        xhr.send();
+    });
+}
+
+
+function openSection(evt, sectionName) {
+
+  var i, tabcontent, tablinks;
+  tabcontent = document.getElementsByClassName("tabcontent");
+  for (i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].style.display = "none";
+  }
+  tablinks = document.getElementsByClassName("tablinks");
+  for (i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+  document.getElementById(sectionName).style.display = "block";
+  evt.currentTarget.className += " active";
+
+  // Call fetch function if Posts or Comments tab is clicked
+  if (sectionName === 'posts' || sectionName === 'comments') {
+    
+    fetchData(sectionName.toLowerCase());
+  }
+}
+
+
+
+async function fetchData(section) {
+
+
+  const userId = {{ user.id }}; // Make sure you have the user's ID available
+
+  const response = await fetch(`/user/${userId}/${section}`);
+  
+  const data = await response.json();
+
+
+  let content = '';
+  if (section === 'posts') {
+    data.forEach(post => {
+
+      content += `<div><h3>${post.title}</h3><p>${post.content}</p></div>`;
+    });
+  } else if (section === 'comments') {
+    data.forEach(comment => {
+      content += `<div><p>${comment.content}</p></div>`;
+    });
+  }
+    console.log(content)
+  document.getElementById(section.charAt(0) + section.slice(1)).innerHTML = content;
+}
+
+
+document.addEventListener("DOMContentLoaded", function() {
+  document.querySelector(".tablinks[onclick=\"openSection(event, 'posts')\"]").click();
+});
+
+
+var modal = document.getElementById("takePhotoModal");
+
+// Get the button that opens the modal
+var btn = document.getElementById("setProfilePictureButton");
+
+// Get the <span> element that closes the modal
+var span = document.getElementsByClassName("close-button")[0];
+
+// When the user clicks the button, open the modal 
+btn.onclick = function() {
+    modal.style.display = "block";
+}
+
+// When the user clicks on <span> (x), close the modal
+span.onclick = function() {
+    modal.style.display = "none";
+}
+
+// When the user clicks anywhere outside of the modal, close it
+window.onclick = function(event) {
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
+
+document.getElementById('takePhotoButton').addEventListener('click', function() {
+    // Create a new AJAX request
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/set_profile_pic", true); // Use your Flask route
+    
+    // Optional: Send the proper header information along with the request
+    xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    
+
+    // Define what happens on successful data submission
+    xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            // Handle success, such as updating the UI or reloading the page
+            alert('Profile picture updated!');
+            location.reload(); // Reload the page to see the new profile picture
+        } else {
+            // Handle errors here, if the request fails
+            alert('There was a problem updating your profile picture.');
+        }
+    };
+
+    // Define what happens in case of an error
+    xhr.onerror = function() {
+        // Handle network errors
+        alert('Network error. Please try again.');
+    };
+
+    // Send the AJAX request
+    xhr.send(); // If you need to send data to the server, you can pass it here
+
+    // Close the modal
+    modal.style.display = "none";
+});
+
+
+</script>
+
+
+
+{% endblock %}
+
+
+

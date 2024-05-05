@@ -1,0 +1,51 @@
+{% for post in posts %}
+    <div class="card">
+        <div class="card-header">
+        <!-- Conditionally display the community's profile picture -->
+        
+            <img src="{{ url_for('static', filename=post.community.profile_pic_url) }}" alt="Community Profile Picture" class='user-profile-pic'>
+        
+
+        <div class="post-info">
+            <!-- Link to the community, displaying its name -->
+            <a href="{{ url_for('view_community', community_id=post.community.id) }}" class="community-name-link">{{ post.community.name }} · {{ post.posted_time|time_ago }}</a>
+            <!-- Display user's display name, respecting anonymity -->
+            <small>{% if post.community.is_anonymous %}
+        <!-- In anonymous communities, clicking the name initiates an anonymous message -->
+        <small><a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+    {% else %}
+        <!-- In regular communities, clicking the name goes to the user's profile -->
+        <small><a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+    {% endif %}</small>
+        </div>
+    </div>
+        <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-title">{{ post.title }}</a>
+        <div class="card-content"><p class="content-preview">{{ post.content }}</p>
+
+
+
+            {% if post.image_filename %}
+            <p></p>
+    <img src="{{ url_for('static', filename='images/posts/' + post.image_filename) }}" alt="Post Image">
+{% endif %}
+
+
+        </div>
+        
+
+        <div class="card-meta">
+        </div>
+        <div class="card-actions">
+            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ post.id }}">
+    <i class="fas fa-arrow-up"></i>
+</button>
+<span id="vote-count-{{ post.id }}" class="vote-count">{{ post.upvotes - post.downvotes }}</span>
+<button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ post.id }}">
+    <i class="fas fa-arrow-down"></i>
+</button>
+
+            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">Comments</a>
+            <span class="card-action">Share</span>
+        </div>
+    </div>
+    {% endfor %}
