@@ -28,6 +28,34 @@
         </div>
     </form>
     {% endif %}
+
+    <!-- Button to add a new prompt for the currently selected community -->
+<a href="{{ url_for('add_prompt_community', community_id=community.id if community else None) }}" class="btn btn-primary">Add New Prompt</a>
+
+
+    {% for prompt in prompts %}
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <img src="{{ url_for('static', filename=prompt.community.profile_pic_url) }}" alt="{{ prompt.community.name }} Profile Picture" class="rounded-circle me-3" style="width: 60px; height: 60px;">
+                <div class="flex-grow-1">
+                    <h5 class="card-title">{{ prompt.community.name }}</h5>
+                    <p class="card-text">{{ prompt.prompt }}</p>
+                </div>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('edit_prompt', prompt_id=prompt.id) }}" class="btn btn-primary">Edit</a>
+                    <button onclick="postWithRandomSeeder({{ prompt.id }})" class="btn btn-warning">Force</button>
+                    <button onclick="deletePrompt({{ prompt.id }})" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        No prompts found.
+    </div>
+    {% endfor %}
+
 </div>
 {% endblock %}
 

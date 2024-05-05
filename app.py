@@ -1801,19 +1801,41 @@ def ai_generator_prompts():
 
 
 
-
 @app.route('/ai_generator_prompts_community')
 def ai_generator_prompts_community():
-    community_id = request.args.get('community_id', type=int)
-    if community_id:
-        community = Community.query.get_or_404(community_id)
-        prompts = AIPrompt.query.filter_by(community_id=community_id).all()
-    else:
-        community = None
-        prompts = AIPrompt.query.all()  # Depending on your design, you might adjust this query.
+    
+    # Fetch communities with prompt counts and sort by the number of prompts
+    communities = db.session.query(
+        Community.id, 
+        Community.name, 
+        Community.profile_pic_url, 
+        Community.description, 
+        db.func.count(AIPrompt.id).label('prompt_count')
+    ).outerjoin(AIPrompt, Community.id == AIPrompt.community_id
+    ).group_by(Community.id
+    ).order_by(db.desc('prompt_count')
+    ).all()
 
-    communities = Community.query.order_by(Community.name).all()
-    return render_template('ai_generator_prompts_community.html', prompts=prompts, communities=communities, community=community)
+    # Prepare job information
+    community_jobs = []
+    for community in communities:
+        job_id = f"community_{community.id}"
+        job = scheduler.get_job(job_id)
+        if job:
+            next_run_time = job.next_run_time
+        else:
+            next_run_time = "No Job Scheduled"
+        community_jobs.append({
+            'id': community.id,
+            'name': community.name,
+            'profile_pic_url': community.profile_pic_url,
+            'description': community.description,
+            'prompt_count': community.prompt_count,
+            'next_run_time': next_run_time
+        })
+
+    return render_template('ai_generator_prompts_community.html', communities=community_jobs)
+
 
 
 
@@ -2093,7 +2115,7 @@ def add_prompt_community(community_id=None):
         db.session.commit()
 
         flash("Prompt added successfully.")
-        return redirect(url_for('ai_generator_prompts_community', community_id=community_id))
+        return redirect(url_for('manage_community_job', community_id=community_id))
     
     return render_template('add_prompt_community.html', communities=communities, community=community)
 
@@ -2104,6 +2126,7 @@ from flask import request, render_template, redirect, url_for, flash
 def manage_community_job(community_id):
     job_id = f"community_{community_id}"
     job = scheduler.get_job(job_id)
+    prompts = AIPrompt.query.filter_by(community_id=community_id).all()  # Fetch prompts for the community
 
     if request.method == 'POST':
         if 'pause' in request.form:
@@ -2139,7 +2162,7 @@ def manage_community_job(community_id):
 
         return redirect(url_for('manage_community_job', community_id=community_id))
 
-    return render_template('manage_community_job.html', job=job, community_id=community_id)
+    return render_template('manage_community_job.html', job=job, community_id=community_id, prompts=prompts)
 
 
 
@@ -2753,6 +2776,101 @@ def delete_job(job_id):
     except Exception as e:
         flash(str(e), 'danger')
     return redirect(url_for('job_manager'))
+
+
+#Building the prototype tool reddit scraper:
+
+@app.route('/reddit_scraper_proto', methods=['GET', 'POST'])
+def reddit_scraper_proto():
+    communities = Community.query.all()  # Retrieve communities for every request
+
+    if request.method == 'POST':
+        if 'scrape' in request.form:  # Check if the request is for scraping
+            clear_image_directory()
+            subreddit_name = request.form.get('subreddit')
+            content_type = request.form.get('content_type', 'images')
+            number_of_posts = request.form.get('number_of_posts', 100, type=int)
+            sort_option = request.form.get('sort_option', 'hot')
+
+            # Store form data for reuse and scraping results
+            session['subreddit_name'] = subreddit_name
+            session['content_type'] = content_type
+            session['number_of_posts'] = number_of_posts
+            session['sort_option'] = sort_option
+
+            results = scrape_reddit_posts(subreddit_name, content_type, number_of_posts, sort_option)
+            session['results'] = results  # Assuming results are serializable or storing references
+
+            if results:
+                flash(f"Scraped {len(results)} posts from /r/{subreddit_name}")
+            return render_template('reddit_scraper_proto.html', results=results, communities=communities)
+
+        elif 'publish' in request.form:  # Handle submission of selected posts
+            selected_posts = request.form.getlist('selected_posts')
+            community_id = request.form.get('community_id')
+            results = session.get('results', [])
+
+            if not selected_posts:
+                flash("No posts selected for publishing.")
+            else:
+                publish_posts(selected_posts, community_id)
+                flash(f"Published {len(selected_posts)} posts to the community.")
+            
+            return redirect(url_for('reddit_scraper_proto'))
+
+    # Initialize form with session data if available
+    return render_template('reddit_scraper_proto.html', communities=communities,
+                           subreddit_name=session.get('subreddit_name'),
+                           content_type=session.get('content_type'),
+                           number_of_posts=session.get('number_of_posts'),
+                           sort_option=session.get('sort_option'))
+
+def publish_posts(selected_posts, community_id):
+    """Publish selected image posts to a specific community and move images."""
+    base_directory = 'static/images/posts/'  # Adjusted base directory for posts
+    for image_path in selected_posts:
+        # Extract the filename from the original image path
+        filename = os.path.basename(image_path)
+        
+        # Define the new full path for the image
+        new_image_full_path = os.path.join(base_directory, filename)
+        
+        # Ensure the base directory exists
+        os.makedirs(os.path.dirname(new_image_full_path), exist_ok=True)
+        
+        # Move the file to the new directory
+        try:
+            shutil.move(os.path.join('static', image_path), new_image_full_path)  # Ensure the source path is correctly specified
+        except FileNotFoundError as e:
+            print(f"Error moving file: {e}")
+            continue  # Skip this file and continue with the next
+        
+        # Create a new post with the filename only (assuming the base path is known)
+        new_post = Post(
+            title="",
+            content="",
+            image_filename=filename,  # Store only the filename
+            community_id=community_id,
+            user_id=random_seeder_id(community_id),
+            posted_time=datetime.utcnow(),
+            upvotes=0,
+            downvotes=0
+        )
+        db.session.add(new_post)
+    db.session.commit()
+
+
+
+def random_seeder_id(community_id):
+    """Select a random seeder member from the community."""
+    # Query users who are seeders and are part of the specified community
+    seeders = User.query.join(user_community_association, (user_community_association.c.user_id == User.id)).\
+        filter(user_community_association.c.community_id == community_id, User.seeder == True).all()
+
+    if seeders:
+        return random.choice(seeders).id
+    return None
+
 
 
 

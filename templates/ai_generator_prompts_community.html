@@ -2,47 +2,25 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-3">AI Prompt Generator - All Prompts</h2>
-    <form class="mb-3">
-        <select class="form-select" onchange="handleCommunityChange(this)">
-            <option value="">Select a Community</option>
-            {% for community in communities %}
-            <option value="{{ community.id }}" {{ 'selected' if community.id == community_id else '' }}>
-                {{ community.name }}
-            </option>
-            {% endfor %}
-        </select>
-    </form>
-
-    {% if community %}
-    <div class="mb-3">
-        <a href="{{ url_for('manage_community_job', community_id=community.id) }}" class="btn btn-info">Manage Community Job</a>
-        <a href="{{ url_for('add_prompt_community', community_id=community.id) }}" class="btn btn-success">Add New Prompt</a>
-    </div>
-    {% endif %}
-
-    {% for prompt in prompts %}
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-                <img src="{{ url_for('static', filename=prompt.community.profile_pic_url) }}" alt="{{ prompt.community.name }} Profile Picture" class="rounded-circle me-3" style="width: 60px; height: 60px;">
-                <div class="flex-grow-1">
-                    <h5 class="card-title">{{ prompt.community.name }}</h5>
-                    <p class="card-text">{{ prompt.prompt }}</p>
-                </div>
-                <div class="btn-group" role="group">
-                    <a href="{{ url_for('edit_prompt', prompt_id=prompt.id) }}" class="btn btn-primary">Edit</a>
-                    <button onclick="postWithRandomSeeder({{ prompt.id }})" class="btn btn-warning">Force</button>
-                    <button onclick="deletePrompt({{ prompt.id }})" class="btn btn-danger">Delete</button>
-                </div>
+    <h2 class="mb-3">AI Prompt Generator - Communities</h2>
+    <div class="list-group">
+        {% for community in communities %}
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="{{ community.name }} Profile Picture" class="rounded-circle me-3" style="width: 60px; height: 60px;">
+                <strong>{{ community.name }}</strong>
+                <p>{{ community.description }}</p>
+                <span class="badge bg-primary">{{ community.prompt_count }} Prompts</span>
+                <span class="badge bg-secondary">Next Run: {{ community.next_run_time }}</span>
             </div>
+            <a href="{{ url_for('manage_community_job', community_id=community.id) }}" class="btn btn-info">Manage Prompts</a>
         </div>
+        {% else %}
+        <div class="alert alert-info" role="alert">
+            No communities found.
+        </div>
+        {% endfor %}
     </div>
-    {% else %}
-    <div class="alert alert-info" role="alert">
-        No prompts found.
-    </div>
-    {% endfor %}
 </div>
 <script>
     function postWithRandomSeeder(promptId) {
