@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard for {{ interest.name }}{% endblock %}
+
+{% block content %}
+
+
+
+<style>
+
+a {
+
+    color: black;
+
+}
+
+</style>
+
+
+<div class="feed-container">
+
+    <h2> Top {{interest.name}} Communities </h2>
+    {% for community in top_communities %}
+    <a href="{{ url_for('view_community', community_id=community.id) }}" class="community-card-link">
+        <div class="card">
+            <div class="card-header">
+                <!-- Include the number (rank) next to the community name -->
+                <h1>{{ loop.index }} <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic"> {{ community.name }}</h1>
+                
+            </div>
+            <div class="card-content">
+                <p>{{ community.description }}</p>
+                <!-- Display the number of members -->
+                <p>Members: {{ community.members_count }}</p>
+            </div>
+             </a>
+        </div>
+   
+    {% endfor %}
+</div>
+{% endblock %}

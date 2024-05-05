@@ -1,0 +1,28 @@
+<!-- templates/invite_decision.html -->
+{% extends "base.html" %}
+
+{% block title %}Before you go{% endblock %}
+
+{% block content %}
+<div class="invite-container">
+    <h2>On a scale of 1 to 10, how likely are you to invite a trusted coworker or friend to Netwrk?</h2>
+    <small>An honest response helps us build a better product.</small>
+    <form action="{{ url_for('invite_decision') }}" method="post">
+        <label for="invite_scale">Likelihood of Invite:</label>
+        <input type="range" id="invite_scale" name="invite_scale" min="1" max="10">
+        <span id="scale_value">5</span>/10
+        <button type="submit" name="action" value="submit_scale">Submit</button>
+    </form>
+</div>
+<script>
+    const slider = document.getElementById('invite_scale');
+    const output = document.getElementById('scale_value');
+    output.textContent = slider.value; // Display the default slider value
+
+    // Update the current slider value (each time you drag the slider handle)
+    slider.oninput = function() {
+        output.textContent = this.value;
+    }
+</script>
+{% endblock %}
+

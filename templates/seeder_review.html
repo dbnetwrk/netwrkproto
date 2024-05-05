@@ -1,0 +1,24 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-body text-center"> <!-- Added text-center for better alignment -->
+            <h4 class="card-title">{{ seeder.first_name }} {{ seeder.last_name }}</h4>
+            <p><strong>Burner Username:</strong> {{ seeder.burner_username }}</p>
+            <p><strong>About Me:</strong> {{ seeder.about_me }}</p>
+            <!-- Adjust image size using Bootstrap's image styles and custom width -->
+            <img src="{{ seeder.profile_pic_url or url_for('static', filename='images/default_profile.png') }}" 
+                 alt="Profile Picture" 
+                 class="img-thumbnail" 
+                 style="max-width: 500px; height: auto;"> <!-- Limit width to 200px -->
+            <hr>
+            <a href="{{ url_for('edit_seeder', id=seeder.id) }}" class="btn btn-primary">Edit</a>
+        </div>
+    </div>
+    <div class="mt-3 d-flex justify-content-between"> <!-- Added flexbox for better button alignment -->
+        <a href="{{ url_for('seeder_review', index=prev_index) }}" class="btn btn-info">Back</a>
+        <a href="{{ url_for('seeder_review', index=next_index) }}" class="btn btn-info">Next</a>
+    </div>
+</div>
+{% endblock %}

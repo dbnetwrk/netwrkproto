@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Generate a Post</h1>
+    {% if title and content %}
+    <div class="generated-post">
+        <h2>Generated Post Title</h2>
+        <p>{{ title }}</p>
+        <h3>Generated Post Content</h3>
+        <p>{{ content }}</p>
+    </div>
+    {% endif %}
+    <button onclick="window.location.href='{{ url_for('generate_and_post') }}'">Generate Another Post</button>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% macro render_comment(comment, margin_left=0) %}
+<div class="comment" {% if margin_left > 0 %}style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: {{ margin_left }}px; position: relative;"{% endif %}>
+    <small>
+        {% if not comment.post.community.is_anonymous %}
+            <img src="{{ comment.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic">
+        {% endif %}
+        {{ comment.user.display_name(comment.post.community.is_anonymous) }} · {{ comment.posted_time|time_ago }}
+    </small>
+    <p>{{ comment.content }}</p>
+    <button class="reply-button" data-comment-id="{{ comment.id }}">Reply</button>
+
+    {% if comment.replies.count() > 0 %}
+    <br><br>
+    <div class="reply-toggle" data-comment-id="{{ comment.id }}">
+        <button class="show-replies-button">Show Replies ({{ comment.replies.count() }})</button>
+    </div>
+    <div class="replies" style="display: none;" data-comment-id="{{ comment.id }}">
+        {% for reply in comment.replies %}
+            <div class ="reply">
+
+            {{ render_comment(reply, margin_left + 20) }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+
+

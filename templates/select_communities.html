@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Netwrk</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="static/css/style.css">
+
+
+<style>
+
+body, html {
+    object-fit: fill;
+  background-color: #000d14;
+  background-image: url("https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655b0f1c8fbbaaf6dd0be0ad_Frame%206.png");
+  background-position: 50%;
+  background-size: cover;
+  padding-bottom: 0;
+ font-family: 'Roboto', Arial, sans-serif;
+ 
+}
+
+
+*, ::after, ::before {
+    box-sizing: border-box;
+}
+
+.container {
+    display: flex; /* Enables Flexbox layout */
+    flex-direction: column; /* Stacks children vertically */
+    align-items: center; /* Centers children horizontally in the container */
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+}
+
+
+.info {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+.signup-form {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* White glow */
+}
+
+.signup-form h2 {
+    color: #333;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+
+
+.input-group input {
+    width: calc(100% - 22px); /* Adjust the width to account for padding and border */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    width: calc(100% - 20px); /* Adjust button width to ensure it fits within the form */
+    padding: 10px;
+    border: none;
+    background-color: #0A66C2;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 10px;
+    }
+    .input-group input, button {
+        width: 100%; /* On mobile, input and button should expand to full container width */
+    }
+}
+
+.logo {
+    display: block;
+    max-width: 70%; /* Ensure the logo is not wider than the container */
+    height: auto; /* Maintain aspect ratio */
+    margin: 0 auto 20px; /* Center the logo and add some space below it */
+}
+
+
+.info, .signup-form {
+    width: 90%; /* Ensures both sections fill the container width */
+}
+
+.step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .container {
+            margin-top: 20px;
+        }
+
+#industries-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* Space between each radio button */
+}
+
+#industries-container label {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 15px; /* Adjust padding to control the size of the oval */
+  border: 2px solid #d1d3d4; /* Border color */
+  border-radius: 20px; /* Creates the oval shape */
+  background-color: #f8f9fa; /* Background color of the label */
+  margin-bottom: .25rem; /* Margin bottom, you can adjust it based on .mb-1 or any class you're using */
+  font-size: 16px; /* Adjust the font size as needed */
+  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for background and text color */
+}
+
+/*Hide the actual radio button input */
+#industries-container input[type="radio"] {
+  display: none;
+}
+
+#industries-container label.active{
+
+cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 15px; /* Adjust padding to control the size of the oval */
+  border: 2px solid #000000; /* Border color */
+  border-radius: 20px; /* Creates the oval shape */
+  background-color: #f8f9fa; /* Background color of the label */
+  margin-bottom: .25rem; /* Margin bottom, you can adjust it based on .mb-1 or any class you're using */
+  font-size: 16px; /* Adjust the font size as needed */
+  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for background and text color */
+
+}
+
+
+/* Base styles for form elements */
+input, textarea {
+    width: 100%; /* Make input and textarea span the full width of their container */
+    padding: 8px 12px; /* Add some padding inside the input fields */
+    margin: 8px 0; /* Add some margin for spacing */
+    display: inline-block; /* Ensure elements don't break onto new lines */
+    border: 1px solid #ccc; /* A light grey border */
+    border-radius: 4px; /* Slightly rounded corners */
+    box-sizing: border-box; /* Include padding and border in element's total width and height */
+}
+
+/* Specific styles to make textarea visually similar to input */
+textarea {
+    height: auto; /* Override the height if needed, or let it grow with content */
+    resize: vertical; /* Allow vertical resize only */
+}
+
+/* Style adjustments for small helper text */
+.form-text.text-muted {
+    display: block; /* Ensure it displays as a block to appear below the input/textarea */
+    margin-top: 5px; /* Space between input/textarea and text */
+    font-size: 0.875em; /* Slightly smaller font size */
+    color: #6c757d; /* A default muted text color, adjust as needed */
+}
+
+
+
+.topics-list {
+    grid-template-columns: repeat(2, 1fr); /* Creates three columns */
+    gap: 10px; /* Space between grid items */
+    max-height: 300px; /* Adjust this value based on your design needs */
+    overflow-y: auto; /* Enables vertical scrolling */
+    padding: 10px;
+    list-style-type:none;
+    margin-top: 20px; /* Spacing from previous content */
+    
+}
+
+.card {
+
+    width: 100%;
+
+
+}
+
+
+.topic-label {
+    display: flex; /* Ensures the content inside each label is nicely aligned */
+    align-items: center; /* Vertically centers the content */
+    cursor: pointer;
+    padding: 10px; /* Padding inside each label */
+    background-color: white; /* Optional: sets background color for each label */
+    border: 1px solid #ddd; /* Optional: sets a border for each label */
+    border-radius: 5px; /* Optional: rounded corners for each label */
+}
+
+.topic-checkbox {
+    display: none; /* Hide the checkbox itself */
+}
+
+.checkmark {
+    padding: 10px;
+    display: flex;
+    align-items: center; /* Aligns the text and image vertically */
+    min-height: 50px; /* Ensures each item has enough vertical space */
+    border-radius: 5px;
+}
+.topic-icon {
+    width: 40px; /* Adjust size of the image */
+    height: 40px;
+    margin-right: 10px; /* Space between the image and the text */
+}
+
+.topic-checkbox:checked + .checkmark {
+    border-color: #4CAF50; /* Green border for selected items */
+    background-color: rgba(76, 175, 80, 0.2); /* Light green background */
+}
+
+.topic-checkbox:checked + .checkmark .topic-icon {
+    opacity: 0.6; /* Slightly fade the icon to indicate selection */
+}
+
+.status-icon {
+    display: none; /* Initially hidden */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+    color: #4CAF50; /* Green check mark */
+}
+
+.topic-checkbox:checked + .checkmark .status-icon {
+    display: block; /* Show check mark on selection */
+    content: '✔'; /* Unicode check mark */
+}
+
+.join-btn {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.join-btn[data-selected="true"] {
+    background-color: #555; /* Darker color indicating selection */
+}
+
+.hidden-checkbox {
+    display: none; /* Hide the checkbox but keep in the form for submission */
+}
+
+
+</style>
+
+</head>
+<body>
+    <div class="container">
+        <section class="info">
+            <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
+            <p>An invite-only forum for Gen Z entrepreneurs</p>
+        </section>
+        <section class="signup-form">
+            <h1>Find people like you</h1>
+        <small>Join at least 3 communities to connect with people around the world just like you. You'll see their posts on your feed.</small>
+            <form id="community-selection-form" action="{{ url_for('join_communities') }}" method="POST">
+    <div class="topics-list">
+        {% for community in communities %}
+            <div class="card">
+                <div class="card-header">
+                    <h1><img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic"> {{ community.name }}</h1>
+                </div>
+                <div class="card-content">
+                    <p>{{ community.description }}</p>
+                    <p>Members: {{ community.members_count }}</p><button type="button" class="join-btn" data-id="{{ community.id }}" data-selected="false">Join</button>
+                    <input type="checkbox" name="selected_communities[]" value="{{ community.id }}" class="hidden-checkbox" hidden>
+                    
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <button type="submit" class="btn-submit">Let me in</button>
+</form>
+
+
+
+        </section>
+    </div>
+
+
+</body>
+
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const joinButtons = document.querySelectorAll('.join-btn');
+    joinButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const isSelected = this.getAttribute('data-selected') === 'true';
+            if (!isSelected && document.querySelectorAll('.join-btn[data-selected="true"]').length >= 3) {
+                alert('You can only select 3 communities.');
+                return;
+            }
+            this.setAttribute('data-selected', !isSelected);
+            this.textContent = isSelected ? 'Join' : 'Joined'; // Toggle text
+            this.nextElementSibling.checked = !isSelected; // Toggle checkbox
+        });
+    });
+
+    document.getElementById('community-selection-form').addEventListener('submit', function(event) {
+        const selectedCount = document.querySelectorAll('.join-btn[data-selected="true"]').length;
+        if (selectedCount !== 3) {
+            alert('Please join at least 3 communities');
+            event.preventDefault();
+        }
+    });
+});
+</script>
+
+
+
+
+
+
+</html>
+
+
+
+
+
+
+
+
+
+
