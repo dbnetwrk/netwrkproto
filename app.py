@@ -1802,6 +1802,21 @@ def ai_generator_prompts():
 
 
 
+@app.route('/ai_generator_prompts_community')
+def ai_generator_prompts_community():
+    community_id = request.args.get('community_id', type=int)
+    if community_id:
+        community = Community.query.get_or_404(community_id)
+        prompts = AIPrompt.query.filter_by(community_id=community_id).all()
+    else:
+        community = None
+        prompts = AIPrompt.query.all()  # Depending on your design, you might adjust this query.
+
+    communities = Community.query.order_by(Community.name).all()
+    return render_template('ai_generator_prompts_community.html', prompts=prompts, communities=communities, community=community)
+
+
+
 @app.route('/queue_posts/<int:community_id>')
 def queue_posts(community_id):
     community = Community.query.get_or_404(community_id)
@@ -2054,6 +2069,77 @@ def add_prompt(community_id=None):
     return render_template('add_prompt.html', communities=communities, community=community)
 
 
+@app.route('/add_prompt_community', methods=['GET', 'POST'])
+@app.route('/add_prompt_community/<int:community_id>', methods=['GET', 'POST'])
+def add_prompt_community(community_id=None):
+    community = Community.query.get(community_id) if community_id else None
+    communities = Community.query.all()  # Fetch all communities for the dropdown
+
+    if request.method == 'POST':
+        community_id = request.form.get('community_id') or community_id
+        if not community_id:
+            flash("Please select a community.")
+            return render_template('add_prompt_community.html', communities=communities, community=community)
+
+        prompt_text = request.form.get('prompt')
+        
+        if not prompt_text:
+            flash("Please enter a prompt text.")
+            return render_template('add_prompt_community.html', communities=communities, community=community)
+
+        # Create the new prompt object
+        new_prompt = AIPrompt(prompt=prompt_text, community_id=community_id)
+        db.session.add(new_prompt)
+        db.session.commit()
+
+        flash("Prompt added successfully.")
+        return redirect(url_for('ai_generator_prompts_community', community_id=community_id))
+    
+    return render_template('add_prompt_community.html', communities=communities, community=community)
+
+
+from flask import request, render_template, redirect, url_for, flash
+
+@app.route('/manage_community_job/<int:community_id>', methods=['GET', 'POST'])
+def manage_community_job(community_id):
+    job_id = f"community_{community_id}"
+    job = scheduler.get_job(job_id)
+
+    if request.method == 'POST':
+        if 'pause' in request.form:
+            job.pause()
+            flash('Job has been paused.')
+        elif 'resume' in request.form:
+            job.resume()
+            flash('Job has been resumed.')
+        elif 'cancel' in request.form:
+            job.remove()
+            flash('Job has been cancelled.')
+        elif 'update_interval' in request.form:
+            interval = int(request.form.get('interval', 0))
+            if interval > 0:
+                job.reschedule(trigger='interval', minutes=interval)
+                flash(f'Job interval has been updated to run every {interval} minutes.')
+            else:
+                flash('Invalid interval. Please enter a positive number of minutes.')
+        elif 'start_job' in request.form:
+            interval = int(request.form.get('start_interval', 0))
+            if interval > 0:
+                scheduler.add_job(
+                    func=execute_post_prompt_community,  # Ensure this function is properly defined elsewhere in your code
+                    trigger='interval',
+                    minutes=interval,
+                    args=[community_id],
+                    next_run_time=datetime.now() + timedelta(minutes=1),  # Ensure this time is suitable for your needs
+                    id=job_id
+                )
+                flash(f'Job for community {community_id} started, running every {interval} minutes.')
+            else:
+                flash('Invalid interval. Please enter a positive number of minutes.')
+
+        return redirect(url_for('manage_community_job', community_id=community_id))
+
+    return render_template('manage_community_job.html', job=job, community_id=community_id)
 
 
 
@@ -2215,6 +2301,56 @@ def execute_post_prompt(prompt_id):
 
 
 
+def execute_post_prompt_community(community_id):
+    with app.app_context():  # Ensure you have access to Flask context
+        print(f"Starting to execute a prompt for community ID: {community_id}")
+        
+        # Retrieve all prompts for the community
+        prompts = AIPrompt.query.filter_by(community_id=community_id).all()
+        if not prompts:
+            print("No prompts available for this community.")
+            return
+
+        # Randomly select a prompt
+        prompt = random.choice(prompts)
+        
+        community = Community.query.get_or_404(community_id)
+        seeders = User.query.join(user_community_association).filter(
+            user_community_association.c.community_id == community.id,
+            User.seeder == True
+        ).all()
+
+        if not seeders:
+            print("No seeders available")
+            return
+
+        seeder = random.choice(seeders)
+        custom_prompt = f"{prompt.prompt} About the seeder: {seeder.about_me}. " \
+                        f"Community title: {community.name}. Community description: {community.description}."
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "system", "content": custom_prompt}]
+            )
+            generated_text = response.choices[0].message.content
+            parts = generated_text.split('\n\n', 1)
+            title = parts[0].strip() if parts else ""
+            content = parts[1].strip() if len(parts) > 1 else ""
+
+            new_post = Post(
+                title=title,
+                content=content,
+                user_id=seeder.id,
+                community_id=community.id,
+                posted_time=datetime.utcnow(),
+                image_filename=None  # Update if using images
+            )
+            db.session.add(new_post)
+            db.session.commit()
+            print("AI-generated post published successfully")
+        except Exception as e:
+            print(f'Failed to generate post: {str(e)}')
 
 
 
