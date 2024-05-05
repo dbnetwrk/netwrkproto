@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Your Sign Up</title>
+<link href="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+
+<style>
+body, html {
+    object-fit: fill;
+  background-color: #000d14;
+  background-image: url("https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655b0f1c8fbbaaf6dd0be0ad_Frame%206.png");
+  background-position: 50%;
+  background-size: cover;
+  padding-bottom: 0;
+ font-family: 'Roboto', Arial, sans-serif;
+ color: white;
+}
+
+#interests-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* Space between each radio button */
+}
+
+#interests-container label {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 15px; /* Adjust padding to control the size of the oval */
+  border: 2px solid #d1d3d4; /* Border color */
+  border-radius: 20px; /* Creates the oval shape */
+  margin-bottom: .25rem; /* Margin bottom, you can adjust it based on .mb-1 or any class you're using */
+  font-size: 16px; /* Adjust the font size as needed */
+  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for background and text color */
+}
+
+#interests-container label.active {
+    background-color: #007bff; /* Bootstrap primary color */
+    color: #ffffff; /* White text */
+    border-color: #007bff; /* Matching border color */
+}
+
+/* Hide the actual radio button input */
+#interests-container input[type="checkbox"] {
+  display: none;
+}
+
+.info {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #fff;
+    width: 90%;
+}
+
+.centered-header {
+    text-align: center; /* Centers the text inside the container */
+    width: 100%; /* Ensures the container takes full width of its parent */
+    display: flex;
+    flex-direction: column; /* Stacks the h2 and h3 vertically */
+    align-items: center; /* Centers the items (h2 and h3) horizontally */
+    justify-content: center; /* Adjusts the distribution of the items inside the container (if needed) */
+}
+
+
+.container {
+  display: flex;
+  overflow-x: auto;
+  gap: 20px;
+  margin-bottom: 10px;
+  margin-left: 15px;
+  margin-right: 15px;
+}
+
+
+.search-interests-container {
+    margin-bottom: 20px; /* Adds more space below the container */
+}
+
+#interest-search {
+    border-radius: 20px; /* Gives the search input a rounded appearance */
+    padding: 10px 20px; /* Adjusts the padding for a better visual */
+    border: 1px solid #d1d3d4; /* Subtle border color */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+}
+
+.or-label {
+    align-items: center;
+    margin-top: 10px; /* Adds space between the search input and the 'or' label */
+}
+
+.or-label label {
+    background-color: #f8f9fa; /* Light background for the label */
+    padding: 5px 10px; /* Padding around the text */
+    border-radius: 20px; /* Rounded edges */
+    border: 1px solid #d1d3d4; /* Light border */
+    font-weight: bold; /* Makes the 'or' label text bold */
+}
+
+.category-selection-container {
+    margin-bottom: 20px; /* Adds more space below this container */
+}
+
+#category-select-interests {
+    border-radius: 20px; /* Rounded edges for the select dropdown */
+    padding: 10px 20px; /* More comfortable padding */
+    border: 1px solid #d1d3d4; /* Light border */
+    -webkit-appearance: none; /* Removes default styling on WebKit browsers */
+    -moz-appearance: none; /* Removes default styling on Mozilla browsers */
+    appearance: none; /* Standard property for removing default styles */
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="%23007bff" d="M7.667 12.083l2.666-2.666 2.667 2.666L15 10.417l-5-5-5 5z"/></svg>'); /* Custom dropdown arrow */
+    background-repeat: no-repeat;
+    background-position: right 15px center; /* Position the arrow nicely */
+    background-size: 12px; /* Resize arrow */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+}
+
+.search-layout {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: start; /* Align items at the start of the container */
+    gap: 20px; /* Adjust the gap size as needed */
+}
+
+/* Optional: Make the containers flexible but ensure they don't shrink too much */
+.search-interests-container, .category-selection-container {
+    flex: 1;
+    min-width: 250px; /* Prevent the containers from becoming too narrow */
+}
+
+
+</style>
+
+</head>
+<body>
+
+    <div class ="centered-header">
+    <h2>Life is about more than work</h2>
+            <p>Select 5+ personal interests. We'll match you with people and communities sharing these interests and your industry for authentic connections.</p></div>
+
+<div class="container">
+
+
+        <form id="interests-form" action="/signup_final" method="post" class="needs-validation" novalidate>
+            
+
+            <div id="search_div_stuff" class="search-layout">
+    <!-- Search bar for interests -->
+    <div class="mb-3 search-interests-container">
+        <input type="text" id="interest-search" class="form-control mb-2" placeholder="Search for an interest...">
+        
+    </div>
+
+    <!-- Category selection for interests -->
+    <div class="mb-3 category-selection-container">
+        <div class="d-flex justify-content-center mb-2">
+            <label for="category-select-interests" class="form-label visually-hidden"></label>
+        </div>
+        <select id="category-select-interests" class="form-select">
+            <option value="">Browse by Category</option>
+            <!-- Dynamically populate interest categories here -->
+        </select>
+    </div>
+</div>
+
+
+            
+    
+            
+            <!-- Container for listing interests -->
+            <div id="interests-container" class="mb-4">
+                <!-- Interests will be populated here based on the category or search -->
+            </div>
+
+
+            <!-- Container for displaying selected interests -->
+            <div id="selected-interests-container" class="mb-4">
+                <h4>Selected Interests for this Category:</h4>
+                <ul id="selected-interests-list" class="list-unstyled"></ul>
+            </div>
+
+
+            <button type="submit" class="btn btn-primary btn-lg btn-complete-signup">Next</button>
+        </form>
+</div>
+
+
+<script>
+
+
+//Functions to display interests
+
+let allInterests = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.getElementById('category-select-interests');
+    const searchInput = document.getElementById('interest-search');
+    const interestsContainer = document.getElementById('interests-container');
+    let selectedInterests = {};
+    const interestsForm = document.getElementById('interests-form');
+    // Fetch and populate categories (you would need to provide the endpoint to fetch categories)
+    // fetch('/api/categories').then(...)
+
+
+
+
+    function fetchAndDisplayInterests(categoryId) {
+        fetch(`/api/interests/${categoryId}`).then(response => response.json()).then(interests => {
+            displayInterests(interests);
+        });
+    }
+
+    // Fetch and populate categories on page load
+    fetch('/api/interest_categories').then(response => response.json()).then(categories => {
+        categories.forEach(category => {
+            const option = new Option(category.name, category.id);
+            categorySelect.appendChild(option);
+        });
+        // Fetch interests for the first category by default
+        if (categories.length > 0) {
+            fetchAndDisplayInterests(categories[0].id);
+        }
+    });
+
+
+    // Handler for when a category is selected
+    categorySelect.addEventListener('change', function() {
+        const categoryId = this.value;
+        fetch(`/api/interests/${categoryId}`).then(response => response.json()).then(interests => {
+            displayInterests(interests);
+        });
+    });
+
+    // Handler for the search bar input
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value;
+        if(searchTerm.length > 2) { // Only search when at least 3 characters are typed
+            fetch(`/api/search_interests?term=${searchTerm}`).then(response => response.json()).then(interests => {
+                displayInterests(interests);
+            });
+        }
+    });
+
+    function displayInterests(interests) {
+        // Do not clear interestsContainer here to preserve existing checkboxes
+        interestsContainer.innerHTML = ''; // Modified to clear only when necessary
+        interests.forEach(interest => {
+            const isChecked = selectedInterests[interest.id] ? 'checked' : '';
+            const interestElement = document.createElement('div');
+            interestElement.innerHTML = `
+                <label><input type="checkbox" name="interests" value="${interest.id}" ${isChecked}> ${interest.name}</label>
+            `;
+            interestsContainer.appendChild(interestElement);
+        });
+
+        // Listen for changes to checkboxes and update selectedInterests accordingly
+        interestsContainer.querySelectorAll('input[type="checkbox"][name="interests"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    selectedInterests[this.value] = true;
+                } else {
+                    delete selectedInterests[this.value];
+                }
+            });
+        });
+
+        // Update the display for each interest checkbox
+        interestsContainer.querySelectorAll('input[type="checkbox"][name="interests"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateSelectedInterestsDisplay();
+            });
+        });
+
+
+    }
+
+    function updateSelectedInterestsDisplay() {
+        const selectedInterestsList = document.getElementById('selected-interests-list');
+        // Clear the list before updating
+        selectedInterestsList.innerHTML = '';
+        
+        // Find all checked checkboxes and display their corresponding labels
+        document.querySelectorAll('input[type="checkbox"][name="interests"]:checked').forEach(checkbox => {
+        const listItem = document.createElement('li');
+        // Directly use the next sibling's textContent as the label is the parent or surrounding container of the checkbox
+        listItem.textContent = checkbox.parentNode.textContent.trim(); // Use parentNode if the label wraps the checkbox, adjust as necessary
+        selectedInterestsList.appendChild(listItem);
+    });
+
+    }
+
+    updateSelectedInterestsDisplay();
+
+
+
+interestsForm.addEventListener('submit', function(e) {
+        // Prevent the default form submission to manually handle it
+        e.preventDefault();
+
+        // Clear previously dynamically added inputs
+        document.querySelectorAll('.dynamic-interest-input').forEach(input => input.remove());
+
+        // For each selected interest, add a hidden input to the form
+        Object.keys(selectedInterests).forEach(interestId => {
+            if(selectedInterests[interestId]) { // Check if interest is selected
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'interests'; // Must match the name expected by your backend
+                hiddenInput.value = interestId;
+                hiddenInput.classList.add('dynamic-interest-input'); // Add a class for easy removal later
+                interestsForm.appendChild(hiddenInput);
+            }
+        });
+
+        // Now submit the form
+        interestsForm.submit();
+    });
+
+
+
+
+});
+
+
+document.querySelectorAll('#interests-container label').forEach(label => {
+    label.addEventListener('click', function() {
+        // Remove active class from all labels
+        document.querySelectorAll('#interests-container label').forEach(innerLabel => {
+            innerLabel.classList.remove('active');
+        });
+        // Add active class to the clicked label
+        this.classList.add('active');
+    });
+});
+
+
+
+</script>
+
+
+
+</body>
+</html>

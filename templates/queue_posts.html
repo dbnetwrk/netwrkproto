@@ -1,0 +1,76 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h3>Manage Posts for {{ community.name }}</h3>
+    <div class="row mb-3">
+        <!-- Actions and Forms -->
+        <div class="col-md-8">
+            <div class="d-flex align-items-start">
+                <a href="{{ url_for('add_recycled_post', community_id=community.id) }}" class="btn btn-success me-2">Add New Post</a>
+                <!-- Scheduling Form -->
+                <form method="POST" action="{{ url_for('set_schedule', community_id=community.id) }}" class="d-flex align-items-end">
+                    <div class="me-2">
+                        <label for="interval" class="form-label">Set Interval (min):</label>
+                        <input type="number" class="form-control" id="interval" name="interval" required>
+                    </div>
+                    <button type="submit" class="btn btn-info">Set Schedule</button>
+                </form>
+            </div>
+            {% if next_run_time %}
+            <div class="mt-2">
+                <small>Next run in {{ next_run_time|time_until }} minutes</small>
+                <!-- Stop Schedule Button -->
+                <form method="POST" action="{{ url_for('stop_schedule', community_id=community.id) }}" class="d-inline-block ms-3">
+                    <button type="submit" class="btn btn-danger">Stop Schedule</button>
+                </form>
+            </div>
+            {% else %}
+            <small class="mt-2">No active schedule.</small>
+            {% endif %}
+        </div>
+    </div>
+    <!-- List of Posts -->
+    <ul class="list-group">
+        {% for post in posts %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div class="flex-grow-1 me-3">
+                {{ post.title }}
+            </div>
+            <div>
+                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-primary me-1">Edit</a>
+                <button onclick="postWithRandomSeeder({{ post.id }})" class="btn btn-sm btn-warning">Post Now</button>
+            </div>
+        </li>
+        {% else %}
+        <li class="list-group-item">No posts found.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+
+
+<script>
+function postWithRandomSeeder(postId) {
+    fetch('/post_recycled/' + postId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert("Post published: " + data.message);
+        if (response.status === 200) {
+            location.reload(); // Reloads the page to reflect any changes
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+</script>
+
+{% endblock %}
+
+

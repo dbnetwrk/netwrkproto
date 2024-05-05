@@ -1,0 +1,81 @@
+
+<!-- templates/profile.html -->
+{% extends "base.html" %}
+
+{% block title %}Messages{% endblock %}
+
+{% block content %}
+
+<style>
+
+.conversations {
+  padding: 0;
+  list-style: none;
+}
+
+.conversation {
+    display: block;
+    padding: 10px;
+    border-bottom: 1px solid #ccc; /* This creates the separator between conversations */
+    text-decoration: none; /* Removes the default anchor tag underline */
+    color: inherit; /* Ensures the text color is consistent */
+    background-color: white; /* Default background color */
+    transition: background-color 0.3s; /* Smooth transition for hover effect */
+}
+.conversation:hover {
+  background-color: #f2f2f2; /* Gray background on hover */
+  text-decoration: none;
+}
+
+.conversation a {
+  color: #000000;
+  text-decoration: none; /* Optional: removes underline from links */
+}
+
+
+
+.conversation p {
+  margin: 5px 0; /* Spacing between paragraphs */
+}
+
+.conversation strong, .conversation b {
+  font-weight: bold;
+}
+
+/* Use this for the time-ago formatting */
+.time-ago {
+  font-style: italic;
+  color: #999;
+}
+
+
+
+</style>
+
+    
+<div class="feed-container ">
+    {% for conversation in conversations %}
+    <!-- Use an anchor tag as the clickable area for the whole conversation -->
+    <a href="{{ url_for('get_messages', conversation_id=conversation.id) }}" class="conversation">
+        <p>
+            <!-- Dynamically display participants -->
+            <b>
+                {% for participant in conversation.participants %}
+                    {{ participant.display_name }}
+                    {% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </b> 
+            · {{ conversation.sent_at | time_ago }}
+        </p>
+        <p>{{ conversation.latest_message }}</p>
+    </a>
+    {% else %}
+    <p>No conversations found.</p>
+    {% endfor %}
+</div>
+
+
+
+
+
+{% endblock %}

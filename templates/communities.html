@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Communities{% endblock %}
+
+{% block content %}
+<!-- Inside communities.html at the top -->
+
+<style>
+
+.communities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Creates a responsive grid */
+    gap: 20px; /* Space between cards */
+    padding: 20px;
+}
+
+.community-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden; /* Ensures content fits within the card */
+    text-align: center; /* Center content */
+    padding: 15px;
+    cursor: pointer;
+}
+
+.community-card img {
+    width: 25%; /* Ensure the image covers the width of the card */
+    height: auto; /* Fixed height for uniformity */
+    object-fit: cover; /* Ensures images cover the area without stretching */
+    border-radius: 4px; /* Optional: Rounds the corners of the image */
+}
+
+.community-card h3 {
+    margin-top: 10px;
+    font-size: 1.25em; /* Adjust based on your design */
+}
+
+.community-card p {
+    font-size: 0.9em; /* Smaller font size for creator info */
+    color: #666; /* Lighter text color */
+}
+
+.community-card-link {
+    text-decoration: none; /* Removes underline from links */
+    color: inherit; /* Prevents color changes on text links */
+}
+
+.header-with-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-with-link h2 {
+    margin: 0; /* Adjusts the margin to ensure the title aligns properly */
+    flex-grow: 1; /* Allows the title to take up the necessary space */
+}
+
+.view-more {
+    margin-left: 20px; /* Adds some space between the title and the link */
+    text-decoration: none;
+    color: #007BFF; /* Example link color, adjust as needed */
+    font-weight: bold;
+}
+
+.view-more:hover {
+    color: #0056b3; /* Darker shade for hover effect, adjust as needed */
+}
+
+.community-top-charts {
+    max-width: 600px; /* Adjust based on your layout */
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.topics-list {
+    list-style-type: none; /* Removes default list styling */
+    padding: 0;
+}
+
+.topics-list li {
+    padding: 10px 20px;
+    border-bottom: 1px solid #ccc; /* Adds a light separator */
+    position: relative; /* Necessary for positioning the pseudo-element */
+}
+
+.topics-list li:last-child {
+    border-bottom: none; /* Removes separator from the last item */
+}
+
+.topics-list li a {
+    text-decoration: none;
+    color: #333; /* Dark grey color for the text */
+    display: block; /* Makes the entire list item clickable */
+}
+
+.topics-list li::after {
+    content: '→'; /* Right-pointing arrow */
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #333; /* Match the text color or choose a different one */
+}
+
+
+
+</style>
+
+
+
+<div class ="feed-container">
+
+
+
+<div class="header-with-link">
+    <h2>Top 10 Communities</h2>
+    <a href="{{ url_for('more_communities', type='regular') }}" class="view-more">(more)</a>
+</div>
+    
+<div class="communities-grid">
+    {% for community in non_anon_communities %}
+    <!-- Wrap the entire card in an <a> tag -->
+    <a href="{{ url_for('view_community', community_id=community.id) }}" class="community-card-link">
+        <div class="community-card">
+            <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic">
+            <h3>{{ community.name }}</h3>
+            <!-- <p>Created by: {{ community.creator.display_name(community.id) }}</p> -->
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+
+<div class="header-with-link">
+    <h2>Top Anonymous Communities</h2>
+    <a href="{{ url_for('more_communities', type='anonymous') }}" class="view-more">(more)</a>
+</div>
+
+<div class="communities-grid">
+    {% for community in anon_communities %}
+    <!-- Wrap the entire card in an <a> tag -->
+    <a href="{{ url_for('view_community', community_id=community.id) }}" class="community-card-link">
+        <div class="community-card">
+            <img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic">
+            <h3>{{ community.name }}</h3>
+            <!--<p>Created by: {{ community.creator.display_name(community.id) }}</p> -->
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<h2>Top 10 Users by Karma</h2>
+
+<div class="communities-grid">
+    {% for user in top_users_by_karma %}
+        <!-- Update the URL to point to the user's profile -->
+        <a href="{{ url_for('profile', user_id=user.id) }}" class="community-card-link">
+            <div class="community-card">
+                <!-- Check if profile_pic_url is set, else provide a default -->
+                <img src="{{ user.profile_pic_url or url_for('static', filename='images/default_profile.png') }}" alt="Profile Picture" class="user-profile-pic">
+                <h3>{{ user.first_name }}</h3>
+                <p>Karma: {{ user.karma }}</p>
+            </div>
+        </a>
+    {% endfor %}
+</div>
+
+
+<div class="community-top-charts">
+    <h1>Community Top Charts</h1>
+    <ul class="topics-list">
+        {% for topic in topics %}
+        <li><a href="{{ url_for('leaderboard', interest_id=topic.id) }}">{{ topic.name }}</a></li>
+        {% endfor %}
+    </ul>
+</div>
+
+
+</div>
+
+{% endblock %}
+
+

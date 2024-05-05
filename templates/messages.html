@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Conversation {{ conversation_id }}{% endblock %}
+
+{% block content %}
+
+
+<div class ="conversation">
+<div class ="participants">
+<ul>
+    {% for user in users_in_conversation %}
+
+            {% if conversation.is_anonymous %}
+
+            {{ user.display_name(conversation.is_anonymous) }}
+
+            {% else %}
+
+            <a href="{{ url_for('profile', user_id=user.id) }}">{{ user.display_name(conversation.is_anonymous) }}</a> 
+
+            <img src="{{ user.profile_pic_url or url_for('static', filename='images/default_profile.png') }}" alt="Profile Picture" class="user-profile-pic">
+
+             {% endif %}
+
+            {% endfor %}
+</ul>
+</div>
+
+
+<div class="messages">
+    <ul>
+        {% for message in messages %}
+        <div class="message-row">
+            <li class="message-container">
+                <div class="message-content">
+                    <strong>{{ message.user.display_name(message.conversation.is_anonymous) }}</strong>: {{ message.body }}
+                </div>
+            </li>
+            <div class="message-timestamp">
+                {{ message.sent_at | time_ago }}
+            </div>
+        </div>
+        {% else %}
+        <li>No messages found in this conversation.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class = "message-form">
+<form action="{{ url_for('send_message') }}" method="post">
+    <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
+    <textarea name="message" placeholder="Type your message here..." required></textarea>
+    <button type="submit">Send Message</button>
+</form>
+</div>
+</div>
+
+
+
+{% endblock %}
+
+
+
+    
+

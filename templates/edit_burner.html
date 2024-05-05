@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="feed-container">
+    <h1>Edit Anon</h1>
+    <form action="{{ url_for('edit_burner_username') }}" method="post">
+        <input type="text" id="burner_username" name="burner_username" value="{{ current_burner_username }}" required>
+        <div>
+            <small>Your anon lets you speak freely in anonymous communities without employer concerns</small>
+        </div><br>
+        <button type="submit">Update</button>
+    </form>
+</div>
+{% endblock %}
+

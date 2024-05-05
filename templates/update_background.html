@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="feed-container">
+    <div class = "comment-form">
+    <h2>Change App Background Color</h2>
+    <form action="{{ url_for('update_background') }}" method="post">
+        <fieldset>
+            <legend></legend>
+            {% set pale_colors = ['#f9f9fb', '#f0f8ff', '#faebd7', '#f5f5dc', '#f8f8ff', '#f5fffa', '#E8F5E9', '#FFFDE7', '#FFEBEE', '#E3F2FD', '#EDE7F6', '#E0F7FA', '#FFF3E0', '#FCE4EC', '#F5F5F5', '#EFEBE9', '#121212']
+ %}
+            {% for color in pale_colors %}
+            <div>
+                <input type="radio" id="{{ color }}" name="background_color" value="{{ color }}" {% if current_color == color %}checked{% endif %}>
+                <label for="{{ color }}" style="background-color: {{ color }}; padding: 5px; display: inline-block; width: 50px;">&nbsp;</label>
+            </div>
+            {% endfor %}
+        </fieldset>
+        <br>
+        <button type="submit" class ="card-action">Update</button>
+    </form>
+</div>
+</div>
+{% endblock %}
+

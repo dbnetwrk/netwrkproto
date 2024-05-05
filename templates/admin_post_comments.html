@@ -1,0 +1,244 @@
+{% extends "admin_panel_base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+
+<style>
+
+.community-name-link {
+    text-decoration: none; /* Removes the underline */
+    color: inherit; /* Optional: ensures the link uses the parent's text color */
+}
+
+
+
+div.feed-container {
+    width: 100%;
+    margin-left: 0px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 50px;
+}
+
+</style>
+
+
+<head>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+     
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+
+</head>
+
+<div class="feed-container">
+    <div class="mb-3">
+        <a href="{{ url_for('manage_posts') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Posts
+        </a>
+    </div>
+    <div class="card">
+    <div class="card-header">
+        <!-- Conditionally display the community's profile picture -->
+        
+            <img src="{{ url_for('static', filename=post.community.profile_pic_url) }}" alt="Community Profile Picture" class='user-profile-pic'>
+        
+
+        <div class="post-info">
+            <!-- Link to the community, displaying its name -->
+            <a href="{{ url_for('view_community', community_id=post.community.id) }}" class="community-name-link">{{ post.community.name }} · {{ post.posted_time|time_ago }}</a>
+            <!-- Display user's display name, respecting anonymity -->
+            <small>{% if post.community.is_anonymous %}
+        <!-- In anonymous communities, clicking the name initiates an anonymous message -->
+        <small><a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+    {% else %}
+        <!-- In regular communities, clicking the name goes to the user's profile -->
+        <small><a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+    {% endif %}</small>
+        </div>
+    </div>
+    <h2>{{ post.title }}</h2>
+    <div class="card-content">{{ post.content|safe }}
+
+
+
+            {% if post.image_filename %}
+            <p></p>
+    <img src="{{ url_for('static', filename='images/posts/' + post.image_filename) }}" alt="Post Image">
+{% endif %}
+
+
+    </div>
+    
+</div>
+
+<div class="comment-form">
+ <h3>Comment as Seeder:</h3>
+    <form action="{{ url_for('admin_submit_comment', post_id=post.id) }}" method="POST" class="form">
+        <!-- Seeder Selection Dropdown -->
+        <div class="mb-3">
+            <label for="user_id" class="form-label">Choose Seeder:</label>
+            <select name="user_id" id="user_id" class="form-select" required>
+                {% for seeder in seeders %}
+                <option value="{{ seeder.id }}">{{ seeder.first_name }} {{ seeder.last_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Textarea for Comment Content -->
+        
+            <label for="comment_content" class="form-label">Comment:</label>
+            <textarea name="comment_content" id="comment_content" class="form-control" rows="3" required></textarea>
+        
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary">Post Comment</button>
+    </form>
+</div>
+{% from "comment_template.html" import render_comment %}
+<div class="comments-section">
+    {% for comment in comments %}
+        {% if comment.parent_id is none %}
+            {{ render_comment(comment) }}
+        {% endif %}
+    {% endfor %}
+</div>
+
+
+
+
+
+
+<!-- Hidden Reply Form with Seeder Selection -->
+<div class="reply-form" style="display:none;">
+    <form action="{{ url_for('admin_submit_comment', post_id=post.id) }}" method="POST" class="form">
+        <input type="hidden" name="parent_id" value="{{ parent_comment_id }}"> <!-- Set dynamically when showing form -->
+        
+        <!-- Seeder Selection Dropdown for Replies -->
+        <div class="mb-3">
+            <label for="user_id_reply" class="form-label">Reply as Seeder:</label>
+            <select name="user_id" id="user_id_reply" class="form-select" required>
+                {% for seeder in seeders %}
+                <option value="{{ seeder.id }}">{{ seeder.first_name }} {{ seeder.last_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Textarea for Comment Content -->
+        <div class="mb-3">
+            <label for="comment_content_reply" class="form-label">Reply:</label>
+            <textarea name="comment_content" id="comment_content_reply" class="form-control" rows="3" required></textarea>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary">Post Reply</button>
+    </form>
+</div>
+
+
+</div>
+
+
+
+
+
+
+<script>
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.reply-toggle button').forEach(button => {
+        const commentId = button.parentNode.getAttribute('data-comment-id');
+        const repliesContainer = document.querySelector(`.replies[data-comment-id="${commentId}"]`);
+        const numberOfReplies = repliesContainer.querySelectorAll('.reply').length;
+        console.log(`Comment ID: ${commentId}, Number of Replies: ${numberOfReplies}`);
+
+        // Store the number of replies in a data attribute
+        button.setAttribute('data-reply-count', numberOfReplies);
+
+        button.addEventListener('click', function() {
+            if (repliesContainer.style.display === 'none') {
+                // Show replies
+                repliesContainer.style.display = 'block';
+                this.innerHTML = `<i class="fas fa-minus"></i> Hide Replies (${button.getAttribute('data-reply-count')})`;
+            } else {
+                // Hide replies and show the plus icon and number of replies from the data attribute
+                repliesContainer.style.display = 'none';
+                this.innerHTML = `<i class="fas fa-plus"></i> Show Replies (${button.getAttribute('data-reply-count')})`;
+            }
+        });
+
+
+    });
+
+
+});
+
+
+
+
+
+
+
+function startAnonymousConversation(userId) {
+    if (confirm("Do you want to message this user anonymously?")) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", `/start_anonymous_conversation/${userId}`, true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        // Include CSRF token if needed, for example:
+        // xhr.setRequestHeader('X-CSRFToken', csrf_token); 
+        xhr.onload = function() {
+            if (this.status === 200) {
+                var response = JSON.parse(this.responseText);
+                alert(response.message);  // Notify user
+                window.location.href = `/messages/${response.conversation_id}`; // Redirect to the new conversation
+            } else {
+                alert('Error starting anonymous conversation.');
+            }
+        };
+        xhr.send();
+    }
+}
+
+
+ document.querySelectorAll('.reply-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const parentCommentId = this.getAttribute('data-comment-id');
+            let form = this.parentNode.querySelector('.reply-form');
+            
+            // If the form doesn't exist, create it
+            if (!form) {
+                form = document.querySelector('.reply-form').cloneNode(true);
+                form.style.display = 'block';
+                // Apply the desired styles to the form
+                form.style.borderLeft = '2px solid #ccc';
+                form.style.paddingLeft = '10px';
+                form.style.marginLeft = '10px';
+                form.style.position = 'relative';
+                form.querySelector('input[name="parent_id"]').value = parentCommentId;
+                this.parentNode.appendChild(form);
+            } else {
+                // If the form exists, toggle its visibility
+                if (form.style.display === 'none') {
+                    form.style.display = 'block';
+                    form.querySelector('textarea').focus();
+                } else {
+                    form.style.display = 'none';
+                }
+            }
+        });
+    });
+
+
+</script>
+
+
+
+
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="feed-container">
+    <div class="comment-form">
+        <h2>Manage Community</h2>
+        <form action="" method="post" enctype="multipart/form-data">
+            
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" class="form-control">{{ community.description }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="profile_pic">Profile Picture:</label>
+                <input type="file" id="profile_pic" name="profile_pic" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="header_pic">Header Picture:</label>
+                <input type="file" id="header_pic" name="header_pic" class="form-control">
+            </div>
+            
+
+            <button type="submit" class="card-action">Update</button>
+        </form>
+    </div>
+</div>
+
+
+<script>
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    const selectElement = document.getElementById('color');
+    updateSelectColor(selectElement);
+});
+
+
+
+function updateSelectColor(selectElement) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    // Update the select element's background color to match the selected option
+    selectElement.style.backgroundColor = selectedOption.style.backgroundColor;
+}
+</script>
+
+
+{% endblock %}
+
+
