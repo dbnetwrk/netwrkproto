@@ -277,6 +277,10 @@ class AIPrompt(db.Model):
         return f'<AIPrompt {self.prompt} every {self.interval_minutes} min>'
 
 
+class AICommentPrompt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    prompt = db.Column(db.Text, nullable=False)
+
 
 industry_images = {
     1: '/images/education.png',
@@ -2951,11 +2955,115 @@ def delete_community_posts():
     flash(f"All posts and comments deleted for the community with ID {community_id}.")
     return redirect(url_for('show_delete_page'))
 
-    
+
 @app.route('/show_delete_page')
 def show_delete_page():
     communities = Community.query.all()
     return render_template('delete_community.html', communities=communities)
+
+
+#ai comment prompt management
+
+
+@app.route('/ai_comment_prompts')
+def ai_comment_prompts():
+    prompts = AICommentPrompt.query.all()
+    return render_template('ai_comment_prompts.html', prompts=prompts)
+
+
+
+@app.route('/add_ai_comment_prompt', methods=['POST'])
+def add_ai_comment_prompt():
+    prompt_text = request.form.get('prompt')
+    if prompt_text:
+        new_prompt = AICommentPrompt(prompt=prompt_text)
+        db.session.add(new_prompt)
+        db.session.commit()
+        flash('New prompt added successfully.')
+    else:
+        flash('Prompt text is required.')
+    return redirect(url_for('ai_comment_prompts'))
+
+
+@app.route('/edit_ai_comment_prompt/<int:id>', methods=['POST'])
+def edit_ai_comment_prompt(id):
+    prompt = AICommentPrompt.query.get_or_404(id)
+    prompt_text = request.form.get('prompt')
+    if prompt_text:
+        prompt.prompt = prompt_text
+        db.session.commit()
+        flash('Prompt updated successfully.')
+    else:
+        flash('Prompt text is required.')
+    return redirect(url_for('ai_comment_prompts'))
+
+
+
+
+@app.route('/delete_ai_comment_prompt/<int:id>', methods=['POST'])
+def delete_ai_comment_prompt(id):
+    prompt = AICommentPrompt.query.get_or_404(id)
+    db.session.delete(prompt)
+    db.session.commit()
+    flash('Prompt deleted successfully.')
+    return redirect(url_for('ai_comment_prompts'))
+
+
+
+@app.route('/start_seed_job', methods=['POST'])
+def start_seed_job():
+    num_comments_per_post = request.form.get('num_comments_per_post', type=int)
+    
+    if num_comments_per_post is None or num_comments_per_post <= 0:
+        flash('Please enter a valid number of comments per post.')
+        return redirect(url_for('ai_comment_prompts'))
+
+    # Schedule the job with APScheduler
+    job_id = "generate_comments_job"
+    scheduler.add_job(id=job_id, func=generate_comments_for_all_posts, args=[num_comments_per_post], trigger='date')
+    flash(f'Job scheduled to generate {num_comments_per_post} comments per post.')
+
+    return redirect(url_for('ai_comment_prompts'))
+
+def generate_comments_for_all_posts(num_comments_per_post):
+    with app.app_context():  # Ensure Flask context for DB access
+        prompts = AICommentPrompt.query.all()
+        posts = Post.query.all()
+
+        if not posts:
+            return "No posts available."
+        if not prompts:
+            return "No prompts available."
+
+        results = []
+        for post in posts:
+            for _ in range(num_comments_per_post):
+                user = User.query.order_by(func.random()).first()
+                if not user:
+                    continue
+
+                prompt = choice(prompts).prompt
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[{"role": "system", "content": prompt}]
+                    )
+                    generated_comment = response.choices[0].message.content.strip()
+
+                    new_comment = Comment(
+                        content=generated_comment,
+                        user_id=user.id,
+                        post_id=post.id,
+                        posted_time=datetime.utcnow(),
+                        is_burner=False
+                    )
+                    db.session.add(new_comment)
+                    db.session.commit()
+
+                    results.append(f"Generated and posted comment successfully for post {post.id} in community {post.community.name}")
+                except Exception as e:
+                    results.append(f"Failed to generate comment for post {post.id}: {str(e)}")
+        return results
 
 
 

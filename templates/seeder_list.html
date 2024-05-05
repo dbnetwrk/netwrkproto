@@ -1,12 +1,14 @@
-
 {% extends "admin_panel_base.html" %}
 
 {% block title %}Seeder List{% endblock %}
 
 {% block content %}
 
-<a href="/add_seeder" class="btn btn-primary">Add New Seeder</a>
-
+<div class="mb-3">
+    <a href="/add_seeder" class="btn btn-primary">Add New Seeder</a>
+    <!-- Swipe mode button linking to seeder_review -->
+    <a href="{{ url_for('seeder_review') }}" class="btn btn-success">Swipe Mode</a>
+</div>
 
 <table class="table">
     <thead>
@@ -34,6 +36,5 @@
         {% endfor %}
     </tbody>
 </table>
-
 
 {% endblock %}
