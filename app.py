@@ -2931,6 +2931,33 @@ def show_post_randomizer():
     return render_template('post_randomizer.html')
 
 
+#delete all posts in community
+
+
+@app.route('/delete_community_posts', methods=['POST'])
+def delete_community_posts():
+    community_id = request.form.get('community_id')
+    if not community_id:
+        flash("No community selected.")
+        return redirect(url_for('show_delete_page'))
+
+    # Delete comments associated with posts in the selected community
+    Comment.query.filter(Comment.post.has(community_id=community_id)).delete(synchronize_session=False)
+    
+    # Delete posts in the community
+    Post.query.filter_by(community_id=community_id).delete(synchronize_session=False)
+    
+    db.session.commit()
+    flash(f"All posts and comments deleted for the community with ID {community_id}.")
+    return redirect(url_for('show_delete_page'))
+
+    
+@app.route('/show_delete_page')
+def show_delete_page():
+    communities = Community.query.all()
+    return render_template('delete_community.html', communities=communities)
+
+
 
 if __name__ == '__main__':
     
