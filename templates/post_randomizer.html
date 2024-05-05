@@ -1,0 +1,14 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Post Randomizer</h2>
+    <form method="POST" action="{{ url_for('randomize_post_dates') }}">
+        <div class="mb-3">
+            <label for="end_date" class="form-label">Earliest Post Date (YYYY-MM-DD)</label>
+            <input type="date" class="form-control" id="end_date" name="end_date" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Randomize Post Dates</button>
+    </form>
+</div>
+{% endblock %}

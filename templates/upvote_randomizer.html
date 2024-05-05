@@ -1,0 +1,33 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+
+<form method="POST" action="{{ url_for('upvote_randomizer') }}">
+    <div class="mb-3">
+        <label for="min_upvotes" class="form-label">Minimum Upvotes</label>
+        <input type="number" class="form-control" id="min_upvotes" name="min_upvotes" required>
+    </div>
+    <div class="mb-3">
+        <label for="max_upvotes" class="form-label">Maximum Upvotes</label>
+        <input type="number" class="form-control" id="max_upvotes" name="max_upvotes" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Randomize Upvotes</button>
+</form>
+
+
+<script>
+document.getElementById('min_upvotes').addEventListener('change', validateRange);
+document.getElementById('max_upvotes').addEventListener('change', validateRange);
+
+function validateRange() {
+    let minVal = parseInt(document.getElementById('min_upvotes').value);
+    let maxVal = parseInt(document.getElementById('max_upvotes').value);
+    if (minVal > maxVal) {
+        alert('Minimum upvotes cannot be greater than maximum upvotes.');
+        document.getElementById('max_upvotes').value = minVal;
+    }
+}
+</script>
+
+
+{% endblock %}

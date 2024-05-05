@@ -2872,6 +2872,64 @@ def random_seeder_id(community_id):
     return None
 
 
+#upvote randomizer
+
+@app.route('/upvote_randomizer', methods=['GET'])
+def show_upvote_randomizer():
+    return render_template('upvote_randomizer.html')
+
+
+
+@app.route('/upvote_randomizer', methods=['POST'])
+def upvote_randomizer():
+    min_upvotes = int(request.form.get('min_upvotes', 0))
+    max_upvotes = int(request.form.get('max_upvotes', 0))
+
+    if min_upvotes > max_upvotes:
+        flash("Minimum upvotes cannot be greater than maximum upvotes.")
+        return redirect(url_for('show_upvote_randomizer'))  # Redirect to the form page
+
+    # Fetch all posts
+    posts = Post.query.all()
+    for post in posts:
+        post.upvotes = random.randint(min_upvotes, max_upvotes)
+    db.session.commit()
+
+    flash("Upvotes randomized successfully.")
+    return redirect(url_for('show_upvote_randomizer'))  # Redirect back to the form or any other appropriate page
+
+
+#post randomizer for prototype:
+
+
+@app.route('/randomize_post_dates', methods=['POST'])
+def randomize_post_dates():
+    end_date_str = request.form.get('end_date')
+    try:
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+    except ValueError:
+        flash("Invalid date format. Please use YYYY-MM-DD format.")
+        return redirect(url_for('show_post_randomizer'))
+
+    if end_date >= datetime.utcnow():
+        flash("End date must be before today's date.")
+        return redirect(url_for('show_post_randomizer'))
+
+    # Fetch all posts
+    posts = Post.query.all()
+    for post in posts:
+        random_days = random.randint(0, (datetime.utcnow() - end_date).days)
+        random_date = datetime.utcnow() - timedelta(days=random_days)
+        post.posted_time = random_date
+    db.session.commit()
+
+    flash("Post dates randomized successfully.")
+    return redirect(url_for('show_post_randomizer'))
+
+@app.route('/show_post_randomizer')
+def show_post_randomizer():
+    return render_template('post_randomizer.html')
+
 
 
 if __name__ == '__main__':
