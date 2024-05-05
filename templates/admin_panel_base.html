@@ -63,8 +63,8 @@
     </a>
     <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
         <li><a class="dropdown-item" href="{{ url_for('reddit_scraper_proto') }}">Image Populator</a></li>
-        <li><a class="dropdown-item" href="#">Upvote Randomizer</a></li>
-        <li><a class="dropdown-item" href="#">Post Randomizer</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('upvote_randomizer') }}">Upvote Randomizer</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('show_post_randomizer') }}">Post Randomizer</a></li>
         <li><a class="dropdown-item" href="#">Comment Generator</a></li>
         <li><a class="dropdown-item" href="#">Delete All</a></li>
     </ul>
