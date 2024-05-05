@@ -29,6 +29,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app = Flask(__name__)
 
 
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://ubjg47i7g7isg8:p7b28d89d1d5c485255cd8f3ec14ffd4eedc961ef6e2d551b4c1be75734150385@cb889jp6h2eccm.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d7t68f59g1ep1t'
@@ -3010,6 +3011,8 @@ def delete_ai_comment_prompt(id):
 
 
 
+from threading import Thread
+
 @app.route('/start_seed_job', methods=['POST'])
 def start_seed_job():
     num_comments_per_post = request.form.get('num_comments_per_post', type=int)
@@ -3018,12 +3021,11 @@ def start_seed_job():
         flash('Please enter a valid number of comments per post.')
         return redirect(url_for('ai_comment_prompts'))
 
-    # Assuming generate_comments_for_all_posts is adapted to take num_comments_per_post as an argument
-    results = generate_comments_for_all_posts(num_comments_per_post)
-    if results:
-        for result in results:
-            flash(result)
+    # Start the job in a background thread
+    thread = Thread(target=generate_comments_for_all_posts, args=(num_comments_per_post,))
+    thread.start()
 
+    flash('Comment generation started!')
     return redirect(url_for('ai_comment_prompts'))
 
 def generate_comments_for_all_posts(num_comments_per_post):
