@@ -14,6 +14,7 @@ from sqlalchemy import or_
 import re
 import shutil
 from flask import Flask
+from flask_socketio import SocketIO, emit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from dotenv import load_dotenv
@@ -27,7 +28,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 
 app = Flask(__name__)
-
+socketio = SocketIO(app)
 
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -2556,50 +2557,66 @@ import pytz
 import uuid
 @app.route('/schedule_post', methods=['GET', 'POST'])
 def schedule_post():
-
-
     communities = Community.query.all()  # Get all communities
     users = User.query.filter(User.seeder == True).all()
 
     if request.method == 'POST':
+        action = request.form.get('action', 'schedule')
         title = request.form['title']
         content = request.form['content']
         user_id = int(request.form['user_id'])
         community_id = int(request.form['community_id'])
-        posted_time_str = request.form['posted_time']
+        posted_time_str = request.form.get('posted_time')
         image = request.files['image']
-
-        # Convert posted_time from string to datetime object
-        posted_time = datetime.strptime(posted_time_str, '%Y-%m-%dT%H:%M')
-        # Convert to UTC from EST
-        est = pytz.timezone('America/New_York')
-        utc = pytz.utc
-        posted_time = est.localize(posted_time).astimezone(utc)
 
         image_filename = None
         if image:
             image_filename = secure_filename(image.filename)
             image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
 
-        # Create the post object (not added to db yet)
-        new_post = Post(title=title, content=content, user_id=user_id, community_id=community_id, 
-                        posted_time=posted_time, image_filename=image_filename)
+        # Create the post object
+        new_post = Post(title=title, content=content, user_id=user_id, community_id=community_id,
+                        image_filename=image_filename)
 
-        job_id = "post_" + str(uuid.uuid4())
+        if action == 'post_now':
+            # Post immediately
+            new_post.posted_time = datetime.utcnow()  # or another appropriate time
+            db.session.add(new_post)
+            db.session.commit()
+            flash('Post made successfully!')
+            return redirect(url_for('schedule_post'))
 
-        # Schedule the post
-        scheduler.add_job(post_to_community, 'date', run_date=posted_time, args=[new_post], id=job_id)
+        elif posted_time_str:
+            # Schedule the post for a future time
+            posted_time = datetime.strptime(posted_time_str, '%Y-%m-%dT%H:%M')
+            # Convert to UTC from EST
+            est = pytz.timezone('America/New_York')
+            utc = pytz.utc
+            posted_time = est.localize(posted_time).astimezone(utc)
 
-        flash('Post scheduled successfully!')
-        return redirect(url_for('schedule_post'))  # Redirect as needed
+            new_post.posted_time = posted_time
 
-   # Fetch scheduled posts information
+            job_id = "post_" + str(uuid.uuid4())
+            scheduler.add_job(post_to_community, 'date', run_date=posted_time, args=[new_post], id=job_id)
+            db.session.add(new_post)
+            db.session.commit()
+
+            flash('Post scheduled successfully!')
+            return redirect(url_for('schedule_post'))
+        else:
+            # Handle case where no time is provided but schedule button pressed
+            flash('No post time provided, posting now.')
+            new_post.posted_time = datetime.utcnow()  # or another appropriate time
+            db.session.add(new_post)
+            db.session.commit()
+            return redirect(url_for('schedule_post'))
+
+    # Fetch scheduled posts information
     scheduled_posts = []
     jobs = scheduler.get_jobs()
     for job in jobs:
         if job.id.startswith("post_"):  # Filter jobs by the 'post_' prefix
             post_info = job.args[0]  # Assuming the first argument is the Post object
-            print(post_info)
             scheduled_posts.append({
                 'job_id': job.id,
                 'run_time': job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z'),  # Formatting date time with timezone
@@ -2609,8 +2626,8 @@ def schedule_post():
                 #'seeder': f"{post_info.user.first_name} {post_info.user.last_name}"  # Assuming User has first_name and last_name fields
             })
 
-
     return render_template('schedule_post.html', communities=communities, users=users, scheduled_posts=scheduled_posts)
+
 
 def post_to_community(post):
 
@@ -2907,6 +2924,8 @@ def upvote_randomizer():
 #post randomizer for prototype:
 
 
+
+
 @app.route('/randomize_post_dates', methods=['POST'])
 def randomize_post_dates():
     end_date_str = request.form.get('end_date')
@@ -2969,7 +2988,9 @@ def show_delete_page():
 @app.route('/ai_comment_prompts')
 def ai_comment_prompts():
     prompts = AICommentPrompt.query.all()
-    return render_template('ai_comment_prompts.html', prompts=prompts)
+    communities = Community.query.all()  # Assuming you have a model called Community
+    return render_template('ai_comment_prompts.html', prompts=prompts, communities=communities)
+
 
 
 
@@ -2986,10 +3007,17 @@ def add_ai_comment_prompt():
     return redirect(url_for('ai_comment_prompts'))
 
 
-@app.route('/edit_ai_comment_prompt/<int:id>', methods=['POST'])
+@app.route('/edit_ai_comment_prompt/<int:id>', methods=['GET'])
 def edit_ai_comment_prompt(id):
     prompt = AICommentPrompt.query.get_or_404(id)
-    prompt_text = request.form.get('prompt')
+    return render_template('edit_ai_comment_prompt.html', prompt=prompt)
+
+
+
+@app.route('/update_ai_comment_prompt/<int:id>', methods=['POST'])
+def update_ai_comment_prompt(id):
+    prompt = AICommentPrompt.query.get_or_404(id)
+    prompt_text = request.form.get('prompt_text')
     if prompt_text:
         prompt.prompt = prompt_text
         db.session.commit()
@@ -2997,7 +3025,6 @@ def edit_ai_comment_prompt(id):
     else:
         flash('Prompt text is required.')
     return redirect(url_for('ai_comment_prompts'))
-
 
 
 
@@ -3016,22 +3043,26 @@ from threading import Thread
 @app.route('/start_seed_job', methods=['POST'])
 def start_seed_job():
     num_comments_per_post = request.form.get('num_comments_per_post', type=int)
-    
+    community_id = request.form.get('community_id')
+
     if num_comments_per_post is None or num_comments_per_post <= 0:
         flash('Please enter a valid number of comments per post.')
         return redirect(url_for('ai_comment_prompts'))
 
     # Start the job in a background thread
-    thread = Thread(target=generate_comments_for_all_posts, args=(num_comments_per_post,))
+    thread = Thread(target=generate_comments_for_all_posts, args=(num_comments_per_post, community_id))
     thread.start()
 
     flash('Comment generation started!')
     return redirect(url_for('ai_comment_prompts'))
 
-def generate_comments_for_all_posts(num_comments_per_post):
+def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
     with app.app_context():
         prompts = AICommentPrompt.query.all()
-        posts = Post.query.all()
+        if community_id:
+            posts = Post.query.filter(Post.community_id == community_id).all()
+        else:
+            posts = Post.query.all()
 
         if not posts:
             return "No posts available."
@@ -3039,24 +3070,28 @@ def generate_comments_for_all_posts(num_comments_per_post):
             return "No prompts available."
 
         results = []
+
         for post in posts:
-            
+            # Include post title and content in the AI prompt
+            post_context = f"You're in a conversation with your friend. Your friend just said this: {post.title}\nContent: {post.content}\n\n"
+
             for _ in range(num_comments_per_post):
                 user = User.query.order_by(func.random()).first()
                 if not user:
                     results.append("No users available for commenting.")
                     continue
 
-                prompt = choice(prompts).prompt
+                # Choose a random prompt and append post details
+                prompt_text = choice(prompts).prompt
+                combined_prompt = f"{post_context} {prompt_text}"
+
                 try:
                     # Call OpenAI's API to generate the comment
                     response = client.chat.completions.create(
                         model="gpt-3.5-turbo",
-                        messages=[{"role": "system", "content": prompt}]
+                        messages=[{"role": "system", "content": combined_prompt}]
                     )
                     generated_comment = response.choices[0].message.content.strip()
-
-                    print(generated_comment)
 
                     # Create a new comment object and save it to the database
                     new_comment = Comment(
@@ -3074,6 +3109,7 @@ def generate_comments_for_all_posts(num_comments_per_post):
                     results.append(f"Failed to generate comment for post {post.id} in community {post.community.name}: {str(e)}")
 
         return results
+
 
 
 

@@ -7,14 +7,21 @@
     
 
     <!-- Form to Start Seed Job -->
-    <form method="POST" action="{{ url_for('start_seed_job') }}" class="mb-3">
-        <div class="input-group">
-            <input type="number" name="num_comments_per_post" class="form-control" placeholder="Number of comments per post" required>
-            <div class="input-group-append">
-                <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
-            </div>
+<form method="POST" action="{{ url_for('start_seed_job') }}" class="mb-3">
+    <div class="input-group mb-3">
+        <input type="number" name="num_comments_per_post" class="form-control" placeholder="Number of comments per post" required>
+        <select name="community_id" class="form-control">
+            <option value="">All Communities</option>
+            {% for community in communities %}
+            <option value="{{ community.id }}">{{ community.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="input-group-append">
+            <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
         </div>
-    </form>
+    </div>
+</form>
+
     
     <!-- Form to Add New Prompt -->
     <form method="POST" action="{{ url_for('add_ai_comment_prompt') }}" class="mb-3">
@@ -25,7 +32,7 @@
             </div>
         </div>
     </form>
-    
+
     <!-- List Existing Prompts -->
     {% for prompt in prompts %}
     <div class="card mb-2">
@@ -42,5 +49,9 @@
     <p>No prompts found.</p>
     {% endfor %}
 </div>
+
+
+
+
 {% endblock %}
 

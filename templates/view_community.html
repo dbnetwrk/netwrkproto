@@ -34,11 +34,7 @@
             <h1>{{ community.name }}</h1>
         </div>
         <div class="card-content">
-            <p>Created by: {{ community.creator.display_name(community.is_anonymous) }}
-            {% if creator_owns_top_community %}
-                <span class="card-action">Top Community Owner</span>
-            {% endif %}
-            </p>
+            
             <p>{{ community.description }}</p>
             <!-- Display the number of members -->
             <p>Members: {{ member_count }}</p>
