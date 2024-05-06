@@ -277,11 +277,11 @@ textarea {
     <div class="container">
         <section class="info">
             <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
-            <p>An invite-only forum for Gen Z entrepreneurs</p>
+            <p>An online community for Gen Z techies & entrepreneurs in {{ location }} </p>
         </section>
         <section class="signup-form">
             <h1>Find people like you</h1>
-        <small>Join at least 3 communities to connect with people around the world just like you. You'll see their posts on your feed.</small>
+        <small>Join at least 3 communities to connect with people around {{ location }} just like you. You'll see their posts on your feed.</small>
             <form id="community-selection-form" action="{{ url_for('join_communities') }}" method="POST">
     <div class="topics-list">
         {% for community in communities %}

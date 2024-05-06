@@ -12,7 +12,7 @@
             {% for user in users_in_conversation %}
             <li class="list-group-item">
                 {% if conversation.is_anonymous %}
-                    Anonymous
+                    {{ user.burner_username or 'Anonymous' }}
                 {% else %}
                     <a href="{{ url_for('profile', user_id=user.id) }}">{{ user.first_name }} {{ user.last_name }}</a>
                     <img src="{{ user.profile_pic_url or url_for('static', filename='images/default_profile.png') }}" alt="Profile Picture" class="rounded-circle" style="width:30px; height:30px;">
@@ -28,7 +28,11 @@
             <ul class="list-unstyled">
                 {% for message in messages %}
                 <li class="mb-2">
-                    <strong>{{ message.user.first_name }} {{ message.user.last_name }}</strong>: {{ message.body }}
+                    {% if conversation.is_anonymous %}
+                        <strong>{{ message.user.burner_username or 'Anonymous' }}</strong>
+                    {% else %}
+                        <strong>{{ message.user.first_name }} {{ message.user.last_name }}</strong>
+                    {% endif %}: {{ message.body }}
                     <div class="text-muted">
                         <small>{{ message.sent_at }}</small>
                     </div>
@@ -40,24 +44,21 @@
         </div>
     </div>
 
-   <div class="card mt-3">
-    <div class="card-body">
-        <h5 class="card-title">Send a Message</h5>
-        <form action="{{ url_for('send_message_admin') }}" method="post">
-            <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
-            <input type="hidden" name="user_id" value="{{ seeder_id }}">
-            <div class="mb-3">
-                <textarea class="form-control" name="message" placeholder="Type your message here..." rows="3" required></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary">Send Message</button>
-        </form>
-    </div>
-</div>
-
-
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Send a Message</h5>
+            <form action="{{ url_for('send_message_admin') }}" method="post">
+                <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
+                <input type="hidden" name="user_id" value="{{ seeder_id }}">
+                <div class="mb-3">
+                    <textarea class="form-control" name="message" placeholder="Type your message here..." rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Send Message</button>
+            </form>
         </div>
     </div>
 </div>
 {% endblock %}
+
 
 

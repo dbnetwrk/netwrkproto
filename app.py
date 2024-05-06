@@ -319,7 +319,10 @@ industry_images = {
 
 
 
-
+@app.context_processor
+def inject_location():
+    location = request.args.get('location', 'Miami')  # Default location is 'Miami'
+    return dict(location=location)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -1607,6 +1610,7 @@ def edit_seeder(id):
 
 from sqlalchemy import func
 from sqlalchemy.sql import distinct
+from sqlalchemy import case
 
 @app.route('/seeder_messages')
 def seeder_messages():
@@ -1626,18 +1630,28 @@ def seeder_messages():
         Message.conversation_id
     ).subquery()
 
-    # Fetch all users in each conversation and identify the seeder
+    # Fetch all users in each conversation and identify the seeder, showing burner_username if anonymous
     participants_query = db.session.query(
         UserConversation.conversation_id,
-        func.array_agg(func.concat(User.first_name, ' ', User.last_name)).label('all_participants'),
+        func.array_agg(
+            case(
+    (Conversation.is_anonymous == True, User.burner_username),
+    else_=func.concat(User.first_name, ' ', User.last_name)
+)
+
+        ).label('all_participants'),
         func.array_agg(User.seeder).label('seeder_flags'),
         func.array_agg(User.id).label('user_ids'),
-        func.array_agg(User.profile_pic_url).label('profile_pics')  # Added to get profile pictures
+        func.array_agg(User.profile_pic_url).label('profile_pics'),
+        func.array_agg(Conversation.is_anonymous).label('is_anonymous')  # Fetch anonymity status
     ).join(
         User, User.id == UserConversation.user_id
+    ).join(
+        Conversation, Conversation.id == UserConversation.conversation_id  # Join with Conversation to access is_anonymous
     ).group_by(
         UserConversation.conversation_id
     ).subquery()
+
 
     # Join to get the actual message details along with participant info
     conversations = db.session.query(
@@ -1663,7 +1677,31 @@ def seeder_messages():
     ).all()
 
 
-    # Structure data for the template
+    # Adjust the final query to pass anonymity status
+    conversations = db.session.query(
+        Conversation.id.label('conversation_id'),
+        Message.body.label('latest_message'),
+        Message.read.label('message_read'),  # Include read status of the message
+        latest_message_time.c.max_sent_at.label('max_sent_at'),
+        participants_query.c.all_participants,
+        participants_query.c.seeder_flags,
+        participants_query.c.user_ids,
+        participants_query.c.profile_pics,
+        participants_query.c.is_anonymous  # Include anonymity flag
+    ).join(
+        latest_message_time, Conversation.id == latest_message_time.c.conversation_id
+    ).join(
+        Message, and_(
+            Message.conversation_id == latest_message_time.c.conversation_id,
+            Message.sent_at == latest_message_time.c.max_sent_at
+        )
+    ).join(
+        participants_query, participants_query.c.conversation_id == Conversation.id
+    ).order_by(
+        latest_message_time.c.max_sent_at.desc()
+    ).all()
+
+    # Modify the structure data loop to account for anonymity
     conversations_with_details = []
     for conv in conversations:
         participants = []
@@ -1672,7 +1710,8 @@ def seeder_messages():
         seeder_pic = None
         other_participants = []
         other_pics = []
-        
+        is_anonymous = conv.is_anonymous[0]  # Assume all flags are the same per conversation
+
         for name, seeder, user_id, pic in zip(conv.all_participants, conv.seeder_flags, conv.user_ids, conv.profile_pics):
             if seeder:
                 seeder_name = name
@@ -1686,14 +1725,15 @@ def seeder_messages():
             'id': conv.conversation_id,
             'latest_message': conv.latest_message,
             'latest_sent_at': conv.max_sent_at,
-            'message_read': conv.message_read,  # Added read status
+            'message_read': conv.message_read,
             'seeder': {'name': seeder_name, 'id': seeder_id, 'pic': seeder_pic},
             'other_participants': other_participants,
-            'other_pics': other_pics
+            'other_pics': other_pics,
+            'is_anonymous': is_anonymous  # Include this to handle display logic in template
         })
 
-
     return render_template('seeder_messages.html', conversations=conversations_with_details)
+
 
 
 @app.route('/messages_admin/<int:conversation_id>')
