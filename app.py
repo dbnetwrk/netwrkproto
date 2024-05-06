@@ -1761,6 +1761,49 @@ def get_messages_admin(conversation_id):
 
 
 
+@app.route('/compose_message', methods=['GET', 'POST'])
+def compose_message():
+    if request.method == 'POST':
+        seeder_id = request.form['seeder_id']
+        user_identifier = request.form['user_identifier']
+        message = request.form['message']
+        
+        # Check if the identifier includes a space, suggesting it's a full name
+        if " " in user_identifier:
+            # Split the identifier into first and last name
+            first_name, last_name = user_identifier.split(maxsplit=1)
+            user = User.query.filter_by(first_name=first_name, last_name=last_name, seeder=False).first()
+            is_anonymous = False
+        else:
+            user = User.query.filter_by(burner_username=user_identifier, seeder=False).first()
+            is_anonymous = True
+        
+        if user:
+            # Create the conversation
+            conversation = Conversation(is_anonymous=is_anonymous)
+            db.session.add(conversation)
+            db.session.commit()
+            
+            # Link the user and the seeder to the conversation
+            db.session.add_all([
+                UserConversation(user_id=user.id, conversation_id=conversation.id),
+                UserConversation(user_id=seeder_id, conversation_id=conversation.id)
+            ])
+            
+            # Add the initial message
+            new_message = Message(body=message, user_id=seeder_id, conversation_id=conversation.id)
+            db.session.add(new_message)
+            db.session.commit()
+        
+        return redirect(url_for('seeder_messages'))
+    else:
+        seeders = User.query.filter_by(seeder=True).order_by(User.first_name, User.last_name).all()
+        users = User.query.filter_by(seeder=False).order_by(User.first_name, User.last_name).all()
+        return render_template('compose_message.html', seeders=seeders, users=users)
+
+
+
+
 
 @app.route('/send_message_admin', methods=['POST'])
 def send_message_admin():

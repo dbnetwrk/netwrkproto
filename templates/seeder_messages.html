@@ -3,6 +3,8 @@
 {% block content %}
 <div class="container mt-3">
     <h2>Seeder Messages</h2>
+    <a href="{{ url_for('compose_message') }}" class="btn btn-primary">Compose</a>
+
     <div class="list-group">
         {% for conversation in conversations %}
         <a href="{{ url_for('get_messages_admin', conversation_id=conversation.id) }}" class="list-group-item list-group-item-action">
