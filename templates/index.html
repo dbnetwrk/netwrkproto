@@ -308,6 +308,30 @@ textarea {
     </div>
 
     <div class="step step-3">
+        <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
+
+    <!-- Replacing About You with Burner Username -->
+    <div class="step step-4">
+        <div class="input-group">
+            <label for="burnerUsername">Set your Anonymous Username</label>
+            <input type="text" id="burner_username" name="burner_username" required>
+            <small>To speak freely in anonymous communities.</small>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
+
+    
+    
+
+    
+
+
+    <div class="step step-5">
     <div class="input-group">
         <h1>Select your age group</h1>
         <small>This helps us personalize your Netwrk experience.</small>
@@ -320,28 +344,9 @@ textarea {
             </button>
         </div>
     </div>
-    <button type="button" onclick="nextStep()" class="next-button" disabled>Next</button>
-
-</div>
-
     
-    <div class="step step-4">
-        <div class="input-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <button type="button" onclick="nextStep()">Next</button>
-    </div>
-
-    <!-- Replacing About You with Burner Username -->
-    <div class="step step-5">
-        <div class="input-group">
-            <label for="burnerUsername">Set your Anonymous Username</label>
-            <input type="text" id="burner_username" name="burner_username" required>
-            <small>To speak freely in anonymous communities.</small>
-        </div>
-        <button type="submit">Next</button>
-    </div>
+<button type="submit">Next</button>
+</div>
 
 
     <!--

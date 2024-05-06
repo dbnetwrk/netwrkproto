@@ -1,0 +1,37 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-3">
+    <h2>Compose New Message</h2>
+    <form action="{{ url_for('compose_message') }}" method="post">
+        <div class="mb-3">
+            <label for="seeder_id" class="form-label">Choose Seeder</label>
+            <select class="form-control" id="seeder_id" name="seeder_id" required>
+                {% for seeder in seeders %}
+                <option value="{{ seeder.id }}">{{ seeder.first_name }} {{ seeder.last_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="user_identifier" class="form-label">Choose User</label>
+            <select class="form-control" id="user_identifier" name="user_identifier" required>
+                <optgroup label="Real Names">
+                    {% for user in users %}
+                    <option value="{{ user.first_name }} {{ user.last_name }}">{{ user.first_name }} {{ user.last_name }}</option>
+                    {% endfor %}
+                </optgroup>
+                <optgroup label="Burner Usernames">
+                    {% for user in users %}
+                    <option value="{{ user.burner_username }}">{{ user.burner_username }}</option>
+                    {% endfor %}
+                </optgroup>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="message" class="form-label">Message</label>
+            <textarea class="form-control" id="message" name="message" rows="3" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Message</button>
+    </form>
+</div>
+{% endblock %}
