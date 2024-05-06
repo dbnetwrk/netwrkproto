@@ -1,0 +1,15 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Edit Prompt</h2>
+    <form method="POST" action="{{ url_for('update_ai_comment_prompt', id=prompt.id) }}" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="prompt_text" class="form-control" value="{{ prompt.prompt }}" required>
+            <div class="input-group-append">
+                <button class="btn btn-outline-primary" type="submit">Update Prompt</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
