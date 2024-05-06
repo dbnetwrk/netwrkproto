@@ -18,6 +18,8 @@ from flask_socketio import SocketIO, emit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from dotenv import load_dotenv
+import random
+from flask import request
 load_dotenv()
 
 
@@ -371,7 +373,7 @@ def index():
 
 
 
-import random
+
 
 def generate_burner_username():
     professions = ['Strategist', 'Vanguard', 'Innovator', 'Architect', 'Visionary', 'Pioneer',
@@ -572,7 +574,7 @@ def show_post(post_id):
     return render_template('post_detail.html', post=post, comments=comments, user=user)
 
 
-from flask import request
+
 
 
 @app.route('/feed')
