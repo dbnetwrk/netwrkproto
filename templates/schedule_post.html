@@ -1,61 +1,69 @@
 {% extends "admin_panel_base.html" %}
 
 {% block content %}
-<div class="container">
-    <h2>Schedule a Post</h2>
-    <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label for="title" class="form-label">Title</label>
-            <input type="text" class="form-control" id="title" name="title" required>
-        </div>
-        <div class="mb-3">
-            <label for="content" class="form-label">Content</label>
-            <textarea class="form-control" id="content" name="content" required></textarea>
-        </div>
-        <div class="mb-3">
-            <label for="user_id" class="form-label">Select Seeder</label>
-            <select class="form-select" id="user_id" name="user_id">
-                {% for user in users %}
-                <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="mb-3">
-            <label for="community_id" class="form-label">Select Community</label>
-            <select class="form-select" id="community_id" name="community_id">
-                {% for community in communities %}
-                <option value="{{ community.id }}">{{ community.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="mb-3">
-    <label for="posted_time" class="form-label">Post Time (EST) - Leave blank for immediate post</label>
-    <input type="datetime-local" class="form-control" id="posted_time" name="posted_time">
-</div>
-        <div class="mb-3">
-            <label for="image" class="form-label">Image (optional)</label>
-            <input type="file" class="form-control" id="image" name="image">
-        </div>
-        <button type="submit" name="action" value="schedule" class="btn btn-primary">Schedule Post</button>
-<button type="submit" name="action" value="post_now" class="btn btn-success">Post Now</button>
-    </form>
-<h2>Scheduled Posts</h2>
-    <ul class="list-group">
-        {% for post in scheduled_posts %}
-        <li class="list-group-item">
-            <strong>{{ post.title }}</strong>
-            <p>{{ post.content }}</p>
-            <p>Scheduled time: {{ post.run_time }}</p>
-            <p>Community: {{ post.community }}</p>
-            <p>Posted by: {{ post.seeder }}</p>
-            <!-- Delete button form -->
-            <form method="POST" action="{{ url_for('cancel_job', job_id=post.job_id) }}">
-                <button type="submit" class="btn btn-danger">Cancel Post</button>
-            </form>
-        </li>
-        {% else %}
-        <p>No scheduled posts.</p>
-        {% endfor %}
-    </ul>
+<div class="container mt-4">
+    <!-- Schedule a Post Section -->
+    <div class="mb-5 p-4 border rounded bg-light">
+        <h2 class="mb-3">Schedule a Post</h2>
+        <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" class="form-control" id="title" name="title" required>
+            </div>
+            <div class="mb-3">
+                <label for="content" class="form-label">Content</label>
+                <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="user_id" class="form-label">Select Seeder</label>
+                <select class="form-select" id="user_id" name="user_id">
+                    {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="community_id" class="form-label">Select Community</label>
+                <select class="form-select" id="community_id" name="community_id">
+                    {% for community in communities %}
+                    <option value="{{ community.id }}">{{ community.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="posted_time" class="form-label">Post Time (EST) - Leave blank for immediate post</label>
+                <input type="datetime-local" class="form-control" id="posted_time" name="posted_time">
+            </div>
+            <div class="mb-3">
+                <label for="image" class="form-label">Image (optional)</label>
+                <input type="file" class="form-control" id="image" name="image">
+            </div>
+            <button type="submit" name="action" value="schedule" class="btn btn-primary">Schedule Post</button>
+            <button type="submit" name="action" value="post_now" class="btn btn-success">Post Now</button>
+        </form>
+    </div>
+
+    <!-- Scheduled Posts Section -->
+    <div class="p-4 border rounded bg-light">
+        <h2 class="mb-3">Scheduled Posts</h2>
+        <ul class="list-group">
+            {% for post in scheduled_posts %}
+            <li class="list-group-item">
+                <strong>{{ post.title }}</strong>
+                <p>{{ post.content }}</p>
+                <p>Scheduled time: {{ post.run_time }}</p>
+                <p>Community: {{ post.community }}</p>
+                <p>Posted by: {{ post.seeder }}</p>
+                <!-- Delete button form -->
+                <form method="POST" action="{{ url_for('cancel_job', job_id=post.job_id) }}">
+                    <button type="submit" class="btn btn-danger">Cancel Post</button>
+                </form>
+            </li>
+            {% else %}
+            <p>No scheduled posts.</p>
+            {% endfor %}
+        </ul>
+    </div>
 </div>
 {% endblock %}
+

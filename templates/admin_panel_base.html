@@ -24,6 +24,13 @@
                             <a class="nav-link" href="{{ url_for('seeder_messages') }}">Seeder Messages</a>
                         </li>
                         
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('schedule_post') }}">Post Scheduler (Manual)</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('manage_posts') }}">Post Manager</a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('community_overview') }}">Post Recycler</a>
                         </li>
@@ -32,17 +39,12 @@
                             <a class="nav-link" href="{{ url_for('ai_generator_prompts_community') }}">AI Discussion Generator</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('schedule_post') }}">Manual Post Scheduler</a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('upvote_booster_form') }}">Upvote Booster</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('reddit_scraper') }}">Content Scraper</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('manage_posts') }}">Post Manager</a>
-                        </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('manage_communities') }}">Community Manager</a>
                         </li>
