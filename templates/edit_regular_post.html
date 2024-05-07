@@ -1,0 +1,29 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Post</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea class="form-control" id="content" name="content" rows="5" required>{{ post.content }}</textarea>
+        </div>
+        
+        <!-- If your posts include images, you can uncomment and adapt this section -->
+         <div class="mb-3">
+            <label for="image" class="form-label">Image (optional)</label>
+            <input type="file" class="form-control" id="image" name="image">
+            {% if post.image_filename %}
+                <img src="{{ url_for('static', filename='images/posts/' + post.image_filename) }}" alt="Current Post Image" class="img-thumbnail mt-2" style="width: 150px;">
+            {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Update Post</button>
+        <a href="{{ url_for('manage_posts') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -2741,7 +2741,7 @@ def manage_posts():
 
     # Filter by seeder posts only
     if show_seeders_only:
-        query = query.join(User).filter(User.is_seeder == True)
+        query = query.join(User).filter(User.seeder == True)
     
     # Filter by community if a specific community ID is provided
     if community_id:
@@ -2752,6 +2752,22 @@ def manage_posts():
     communities = Community.query.all()  # Fetch all communities for dropdown
 
     return render_template('manage_posts.html', posts=posts, communities=communities)
+
+
+@app.route('/edit_regular_post/<int:post_id>', methods=['GET', 'POST'])
+def edit_regular_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    if request.method == 'POST':
+        # Update post details based on form inputs
+        post.title = request.form['title']
+        post.content = request.form['content']
+        db.session.commit()
+        flash('Post updated successfully.', 'success')
+        return redirect(url_for('manage_posts'))
+    
+    # Render edit post form template
+    return render_template('edit_regular_post.html', post=post)
+
 
 
 @app.route('/delete_post/<int:post_id>', methods=['POST'])
