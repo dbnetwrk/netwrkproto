@@ -20,6 +20,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from dotenv import load_dotenv
 import random
 from flask import request
+import boto3
 load_dotenv()
 
 
@@ -316,6 +317,20 @@ industry_images = {
 
 
 
+def upload_file_to_s3(file, bucket_name, object_name):
+    """Upload a file to an S3 bucket directly from a file object."""
+    s3_client = boto3.client('s3')
+    try:
+        s3_client.upload_fileobj(
+            file,
+            bucket_name,
+            object_name,
+            ExtraArgs={'ContentType': file.content_type}  # Removed ACL parameter
+        )
+        return f"https://{bucket_name}.s3.amazonaws.com/{object_name}"
+    except Exception as e:
+        print(f"Failed to upload file to S3: {e}")
+        return None
 
 
 
@@ -904,16 +919,29 @@ def create_post():
     if request.method == 'POST':
         title = request.form.get('title')
         content = request.form.get('content')
-        # Handle file upload
         image = request.files.get('image')
-        image_filename = None  # Default to None if no image is uploaded
-        if image and allowed_file(image.filename):  # Ensure the file is allowed
-            image_filename = secure_filename(image.filename)
-            # Save the image in a directory within static
-            image_path = os.path.join('static/images/posts', image_filename)
-            image.save(image_path)
+        image_url = None  # Default to None if no image is uploaded
 
-        new_post = Post(title=title, content=content, community_id=community_id, user_id=user_id, posted_time=datetime.utcnow(), upvotes=0, downvotes=0, image_filename=image_filename)
+        if image and allowed_file(image.filename):
+            print("okay so we know there's an image")
+            image_filename = secure_filename(image.filename)
+            s3_folder = 'posts/'  # Define the folder path in S3
+            bucket_name = 'netwrkproto'  # Your S3 bucket name
+
+            # Upload image directly to S3 and retrieve the URL
+            image_url = upload_file_to_s3(image, bucket_name, s3_folder + image_filename)
+
+        # Create a new post with the S3 image URL
+        new_post = Post(
+            title=title,
+            content=content,
+            community_id=community_id,
+            user_id=user_id,
+            posted_time=datetime.utcnow(),
+            upvotes=0,
+            downvotes=0,
+            image_filename=image_url  # Store the URL of the image
+        )
         db.session.add(new_post)
         db.session.commit()
 
