@@ -282,70 +282,80 @@ textarea {
 <body>
     <div class="container">
         <section class="info">
-            <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
-            <p>An online community for Gen Z techies & entrepreneurs in {{ location }} </p>
-        </section>
-        <section class="signup-form">
-            <form id="multiStepForm" action="/signup_step1" method="POST">
-    <div class="step step-1 active">
-        <div class="input-group">
-            <label for="firstName">First Name</label>
-            <input type="text" id="first_name" name="first_name" required>
-            
-
-            
+        <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
+        <p>An online community for Gen Z techies & entrepreneurs in {{ location }}.</p>
+    </section>
+    <section class="signup-form">
+    <form id="multiStepForm" action="/signup_step1" method="POST">
+        <!-- Introductory Step: Explanation of Community Types -->
+        <div class="step step-0 active">
+            <div class="input-group">
+                <h2>Welcome to Netwrk!</h2>
+                <p>Netwrk offers both non-anonymous and anonymous communities. Start by entering your real name so we can connect you with others.</p>
+            </div>
+            <button type="button" onclick="nextStep()">Start</button>
         </div>
-        <button type="button" onclick="nextStep()">Next</button>
-    </div>
-    <div class="step step-2">
-        <div class="input-group">
-            <label for="lastName">Last Name</label>
-            <input type="text" id="last_name" name="last_name" required>
-            
-            
+
+        <!-- Step 1: First Name -->
+        <div class="step step-1">
+            <div class="input-group">
+                <label for="firstName">First Name</label>
+                <input type="text" id="first_name" name="first_name" required>
+            </div>
+            <button type="button" onclick="nextStep()">Next</button>
         </div>
-        <button type="button" onclick="nextStep()">Next</button>
-    </div>
-
-    <div class="step step-3">
-        <div class="input-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
+        
+        <!-- Step 2: Last Name -->
+        <div class="step step-2">
+            <div class="input-group">
+                <label for="lastName">Last Name</label>
+                <input type="text" id="last_name" name="last_name" required>
+            </div>
+            <button type="button" onclick="nextStep()">Next</button>
         </div>
-        <button type="button" onclick="nextStep()">Next</button>
-    </div>
 
-    <!-- Replacing About You with Burner Username -->
-    <div class="step step-4">
-        <div class="input-group">
-            <label for="burnerUsername">Set your Anonymous Username</label>
-            <input type="text" id="burner_username" name="burner_username" required>
-            <small>To speak freely in anonymous communities.</small>
+        <!-- Step 3: Password -->
+        <div class="step step-3">
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="button" onclick="nextStep()">Next</button>
         </div>
-        <button type="button" onclick="nextStep()">Next</button>
-    </div>
 
-    
-    
+        <!-- Step 4: Explanation for Anonymous Username -->
+        <div class="step step-4">
+            <div class="input-group">
+                <h2>Anonymous Username</h2>
+                <p>Next, create an anonymous username to participate discreetly in our anonymous communities.</p>
+            </div>
+            <button type="button" onclick="nextStep()">Understand & Continue</button>
+        </div>
 
-    
+        <!-- Step 5: Setting Anonymous Username -->
+        <div class="step step-5">
+            <div class="input-group">
+                <label for="burnerUsername">Set your Anonymous Username</label>
+                <input type="text" id="burner_username" name="burner_username" required>
+            </div>
+            <button type="button" onclick="nextStep()">Next</button>
+        </div>
 
-
-    <div class="step step-5">
+        <div class="step step-6">
     <div class="input-group">
         <h1>Select your age group</h1>
         <small>This helps us personalize your Netwrk experience.</small>
+        <input type="hidden" id="selectedAgeGroup" name="age_group" />
         <div class="age-group-container">
-            <button type="button" class="age-group" data-value="2005-2012">
+            <button type="button" class="age-group" data-value="2005-2012" onclick="selectAgeGroup('2005-2012')">
                 Born after 2004
             </button>
-            <button type="button" class="age-group" data-value="1997-2004">
+            <button type="button" class="age-group" data-value="1997-2004" onclick="selectAgeGroup('1997-2004')">
                 Born 1996-2004
             </button>
         </div>
     </div>
-    
-<button type="submit">Next</button>
+    <button type="submit" disabled>Finish</button>
 </div>
 
 
@@ -423,24 +433,33 @@ textarea {
 
 document.addEventListener('DOMContentLoaded', function() {
     const ageGroups = document.querySelectorAll('.age-group');
+    const submitButton = document.querySelector('.step-6 button[type="submit"]');
 
-    const nextButton = document.querySelector('.next-button'); // Ensure this selector matches your button
-    nextButton.disabled = true; // Disable the button initially
+    // Initially disable the submit button until an age group is selected
+    if (submitButton) submitButton.disabled = true;
+
     ageGroups.forEach(button => {
         button.addEventListener('click', function() {
-            // Remove active class from all buttons
+            // Remove active class from all age group buttons
             ageGroups.forEach(btn => btn.classList.remove('active'));
 
-            // Add active class to the clicked button
+            // Add active class to the clicked age group button
             this.classList.add('active');
 
-            // Enable the "Next" button upon selection
-            nextButton.disabled = false;
+            // Enable the submit button when an age group is selected
+            if (submitButton) submitButton.disabled = false;
         });
     });
 });
 
 
+
+function selectAgeGroup(value) {
+    const ageGroupInput = document.getElementById('selectedAgeGroup');
+    if (ageGroupInput) {
+        ageGroupInput.value = value; // Set the hidden input's value to the selected age group
+    }
+}
 
 
 
@@ -448,10 +467,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
 
 
-        let currentStep = 1;
+        let currentStep = 0;
         function nextStep() {
     // Perform validation check for the current step
-    if (!validateCurrentStep(currentStep)) {
+    if (currentStep > 0 && !validateCurrentStep(currentStep)) {
         alert("Please fill out all required fields before proceeding.");
         return; // Stop the function from proceeding to the next step
     }
