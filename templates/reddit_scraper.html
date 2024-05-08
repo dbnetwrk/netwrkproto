@@ -73,7 +73,8 @@
                                 </button>
                             </div>
                             <div class="modal-body">
-                                <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data">
+                                <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data" data-index="{{ loop.index }}">
+
                                     <div class="mb-3">
                                         <label for="title" class="form-label">Title</label>
                                         <input type="text" class="form-control" name="title" value="{{ result.title }}">
@@ -125,6 +126,35 @@
 </div>
 
 
+
+
 </div>
+
+
+<!-- Include jQuery -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    $('form').on('submit', function(e) {
+        e.preventDefault(); // Prevent the normal submission action
+        var form = $(this);
+        var url = form.attr('action');
+
+        $.ajax({
+            type: "POST",
+            url: url,
+            data: form.serialize(), // serializes the form's elements.
+            success: function(data)
+            {
+                $('#scheduleModal' + form.data('index')).modal('hide'); // closes modal using the index from loop.index
+                alert('Post Scheduled Successfully'); // Optional: Replace with a more subtle notification
+            }
+        });
+    });
+});
+</script>
+
+
 {% endblock %}
 
