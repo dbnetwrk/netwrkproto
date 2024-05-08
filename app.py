@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 import random
 from flask import request
 import boto3
+import pytz
+import uuid
 load_dotenv()
 
 
@@ -2518,8 +2520,9 @@ import praw
 
 
 
-@app.route('/reddit_scraper', methods=['GET', 'POST'])
-def reddit_scraper():
+@app.route('/reddit_scraper/<content_type>', methods=['GET', 'POST'])
+@app.route('/reddit_scraper/', defaults={'content_type': 'images'}, methods=['GET', 'POST'])
+def reddit_scraper(content_type):
     communities = Community.query.all()  # Retrieve communities for every request
     subreddits = Subreddits.query.all()
     seeders = User.query.filter_by(seeder=True).all()
@@ -2527,7 +2530,6 @@ def reddit_scraper():
     if request.method == 'POST':
         clear_image_directory()
         subreddit_name = request.form.get('subreddit')
-        content_type = request.form.get('content_type', 'images')  # 'images', 'text', 'both'
         number_of_posts = request.form.get('number_of_posts', 100)
         sort_option = request.form.get('sort_option', 'hot')  # 'hot', 'top', 'new', etc.
 
@@ -2539,15 +2541,16 @@ def reddit_scraper():
 
         results = scrape_reddit_posts(subreddit_name, content_type, int(number_of_posts), sort_option)
         if results:
-            flash(f"Scraped {len(results)} posts from /r/{subreddit_name}")
+            flash(f"Scraped {len(results)} posts from /r/{subreddit_name} as {content_type}")
         return render_template('reddit_scraper.html', results=results, content_type=content_type, communities=communities, subreddits=subreddits, seeders=seeders)
 
     # Initialize form with session data if available
     return render_template('reddit_scraper.html', communities=communities, subreddits=subreddits, seeders=seeders,
                            subreddit_name=session.get('subreddit_name'),
-                           content_type=session.get('content_type'),
+                           content_type=content_type,
                            number_of_posts=session.get('number_of_posts'),
                            sort_option=session.get('sort_option'))
+
 
 
 
@@ -2693,6 +2696,7 @@ def stop_schedule(community_id):
         flash(f"Failed to stop scheduling: {str(e)}")
     
     return redirect(url_for('queue_posts', community_id=community_id))
+
 
 
 @app.route('/schedule_post', methods=['GET', 'POST'])
