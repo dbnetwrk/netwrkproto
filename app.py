@@ -282,6 +282,10 @@ class AIPrompt(db.Model):
     def __repr__(self):
         return f'<AIPrompt {self.prompt} every {self.interval_minutes} min>'
 
+class Subreddits(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    prompt = db.Column(db.Text, nullable=False)
+
 
 class AICommentPrompt(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -318,20 +322,31 @@ industry_images = {
 
 
 
-def upload_file_to_s3(file, bucket_name, object_name):
-    """Upload a file to an S3 bucket directly from a file object."""
-    s3_client = boto3.client('s3')
-    try:
-        s3_client.upload_fileobj(
-            file,
-            bucket_name,
-            object_name,
-            ExtraArgs={'ContentType': file.content_type}  # Removed ACL parameter
-        )
-        return f"https://{bucket_name}.s3.amazonaws.com/{object_name}"
-    except Exception as e:
-        print(f"Failed to upload file to S3: {e}")
-        return None
+from mimetypes import guess_type
+
+def upload_file_to_s3(file, bucket_name, filename, content_type=None):
+    # Assuming you use boto3 for S3 interaction
+    import boto3
+    s3 = boto3.client('s3')
+
+    if not content_type:
+        # Guess content type if not provided
+        content_type, _ = guess_type(filename)
+        if content_type is None:
+            content_type = 'application/octet-stream'  # Default content type
+
+    s3.upload_fileobj(
+        file,
+        bucket_name,
+        filename,
+        ExtraArgs={
+            "ContentType": content_type
+        }
+    )
+
+    return f"https://{bucket_name}.s3.amazonaws.com/{filename}"
+
+
 
 
 
@@ -2506,6 +2521,8 @@ import praw
 @app.route('/reddit_scraper', methods=['GET', 'POST'])
 def reddit_scraper():
     communities = Community.query.all()  # Retrieve communities for every request
+    subreddits = Subreddits.query.all()
+    seeders = User.query.filter_by(seeder=True).all()
 
     if request.method == 'POST':
         clear_image_directory()
@@ -2523,10 +2540,10 @@ def reddit_scraper():
         results = scrape_reddit_posts(subreddit_name, content_type, int(number_of_posts), sort_option)
         if results:
             flash(f"Scraped {len(results)} posts from /r/{subreddit_name}")
-        return render_template('reddit_scraper.html', results=results, content_type=content_type, communities=communities)
+        return render_template('reddit_scraper.html', results=results, content_type=content_type, communities=communities, subreddits=subreddits, seeders=seeders)
 
     # Initialize form with session data if available
-    return render_template('reddit_scraper.html', communities=communities,
+    return render_template('reddit_scraper.html', communities=communities, subreddits=subreddits, seeders=seeders,
                            subreddit_name=session.get('subreddit_name'),
                            content_type=session.get('content_type'),
                            number_of_posts=session.get('number_of_posts'),
@@ -2555,16 +2572,26 @@ def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
 
     results = []
     for submission in fetch_method(limit=limit):
-        if content_type in ['images', 'both'] and (submission.url.endswith(('jpg', 'jpeg', 'png'))):
-            file_name = f"{submission.id}.jpg"  # Create a predictable file name
-            local_filename = os.path.join('static/images/content', file_name)
+        if submission.url.endswith(('jpg', 'jpeg', 'png')) and content_type in ['images', 'both']:
+            file_name = f"{submission.id}.jpg"
+            # Ensure paths are constructed properly:
+            local_filename = os.path.join('static', 'images', 'content', file_name)
             download_image(submission.url, local_filename)
-            results.append(os.path.join('images/content/', file_name))  # Save the path for displaying in the template
-        if content_type in ['text', 'both']:
+
+            web_path = os.path.join('images/content', file_name)
+            # Properly format the path for web usage:
+            web_path = web_path.replace(os.sep, '/')  # Replace backslashes with forward slashes for URL compatibility
+            result = {
+                'image': web_path,
+                'title': submission.title,
+                'content': submission.selftext
+            }
+            results.append(result)
+        elif content_type in ['text', 'both']:
             results.append({
                 'title': submission.title,
                 'content': submission.selftext,
-                'image': None if content_type == 'text' else local_filename
+                'image': None
             })
 
     return results
@@ -2668,8 +2695,6 @@ def stop_schedule(community_id):
     return redirect(url_for('queue_posts', community_id=community_id))
 
 
-import pytz
-import uuid
 @app.route('/schedule_post', methods=['GET', 'POST'])
 def schedule_post():
     communities = Community.query.all()  # Get all communities
@@ -2682,29 +2707,44 @@ def schedule_post():
         user_id = int(request.form['user_id'])
         community_id = int(request.form['community_id'])
         posted_time_str = request.form.get('posted_time')
-        image = request.files['image']
+        image = request.files.get('image')
+        existing_image = request.form.get('existing_image')  # Get existing image if provided
 
-        image_filename = None
-        if image:
+        image_url = None
+        if image and image.filename != '':
             image_filename = secure_filename(image.filename)
-            image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
+            s3_folder = 'posts/'
+            bucket_name = 'netwrkproto'
+            image_url = upload_file_to_s3(image, bucket_name, s3_folder + image_filename)
+        elif existing_image:
+            image_filename = os.path.basename(existing_image)
+            s3_folder = 'posts/'
+            bucket_name = 'netwrkproto'
+            content_type, _ = guess_type(image_filename)  # Determine the content type
+            if content_type is None:
+                content_type = 'application/octet-stream'
+            
+            # Build the full path to the image file
+            full_path = os.path.join(app.root_path, 'static', 'images', 'content', image_filename)
+            
+            # Now open the file with the full path
+            with open(full_path, 'rb') as file:
+                image_url = upload_file_to_s3(file, bucket_name, s3_folder + image_filename, content_type)
+
 
         # Create the post object
         new_post = Post(title=title, content=content, user_id=user_id, community_id=community_id,
-                        image_filename=image_filename)
+                        image_filename=image_url)
 
         if action == 'post_now':
             # Post immediately
-            new_post.posted_time = datetime.utcnow()  # or another appropriate time
+            new_post.posted_time = datetime.utcnow()
             db.session.add(new_post)
             db.session.commit()
             flash('Post made successfully!')
-            return redirect(url_for('schedule_post'))
-
         elif posted_time_str:
             # Schedule the post for a future time
             posted_time = datetime.strptime(posted_time_str, '%Y-%m-%dT%H:%M')
-            # Convert to UTC from EST
             est = pytz.timezone('America/New_York')
             utc = pytz.utc
             posted_time = est.localize(posted_time).astimezone(utc)
@@ -2717,31 +2757,28 @@ def schedule_post():
             db.session.commit()
 
             flash('Post scheduled successfully!')
-            return redirect(url_for('schedule_post'))
         else:
-            # Handle case where no time is provided but schedule button pressed
             flash('No post time provided, posting now.')
-            new_post.posted_time = datetime.utcnow()  # or another appropriate time
+            new_post.posted_time = datetime.utcnow()
             db.session.add(new_post)
             db.session.commit()
-            return redirect(url_for('schedule_post'))
 
-    # Fetch scheduled posts information
+        return redirect(url_for('schedule_post'))
+
     scheduled_posts = []
     jobs = scheduler.get_jobs()
     for job in jobs:
-        if job.id.startswith("post_"):  # Filter jobs by the 'post_' prefix
-            post_info = job.args[0]  # Assuming the first argument is the Post object
+        if job.id.startswith("post_"):
+            post_info = job.args[0]
             scheduled_posts.append({
                 'job_id': job.id,
-                'run_time': job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z'),  # Formatting date time with timezone
+                'run_time': job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z'),
                 'title': post_info.title,
                 'content': post_info.content
-                #'community': post_info.community.name,  # Accessing community name from the community object
-                #'seeder': f"{post_info.user.first_name} {post_info.user.last_name}"  # Assuming User has first_name and last_name fields
             })
 
     return render_template('schedule_post.html', communities=communities, users=users, scheduled_posts=scheduled_posts)
+
 
 
 def post_to_community(post):
@@ -3241,6 +3278,33 @@ def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
 
         return results
 
+
+#subreddit/content manager
+
+@app.route('/subreddits')
+def subreddits():
+    subreddits = Subreddits.query.all()
+    return render_template('subreddits.html', subreddits=subreddits)
+
+@app.route('/add-subreddit', methods=['POST'])
+def add_subreddit():
+    prompt = request.form['prompt']
+    if prompt:
+        new_subreddit = Subreddits(prompt=prompt)
+        db.session.add(new_subreddit)
+        db.session.commit()
+        flash('Subreddit added successfully!')
+    else:
+        flash('Prompt is required to add a new subreddit.')
+    return redirect(url_for('subreddits'))
+
+@app.route('/delete-subreddit/<int:id>', methods=['POST'])
+def delete_subreddit(id):
+    subreddit = Subreddits.query.get_or_404(id)
+    db.session.delete(subreddit)
+    db.session.commit()
+    flash('Subreddit deleted successfully!')
+    return redirect(url_for('subreddits'))
 
 
 

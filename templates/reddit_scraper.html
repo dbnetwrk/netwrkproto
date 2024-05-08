@@ -3,92 +3,128 @@
 {% block content %}
 <div class="container">
     <h2>Reddit Content Scraper</h2>
-<form method="POST" action="{{ url_for('reddit_scraper') }}">
-    <div class="mb-3">
-        <label for="subreddit" class="form-label">Subreddit Name</label>
-        <input type="text" class="form-control" id="subreddit" name="subreddit" value="{{ subreddit_name | default('') }}" required>
-    </div>
-    <div class="mb-3">
-        <label for="content_type" class="form-label">Content Type</label>
-        <select class="form-select" id="content_type" name="content_type">
-            <option value="images" {% if content_type == 'images' %}selected{% endif %}>Images Only</option>
-            <option value="text" {% if content_type == 'text' %}selected{% endif %}>Text Only</option>
-            <option value="both" {% if content_type == 'both' %}selected{% endif %}>Both Images and Text</option>
-        </select>
-    </div>
-    <div class="mb-3">
-        <label for="number_of_posts" class="form-label">Number of Posts</label>
-        <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ number_of_posts | default(5) }}">
-    </div>
-    <div class="mb-3">
-        <label for="sort_option" class="form-label">Sort Option</label>
-        <select class="form-select" id="sort_option" name="sort_option">
-            <option value="hot" {% if sort_option == 'hot' %}selected{% endif %}>Hot</option>
-            <option value="top" {% if sort_option == 'top' %}selected{% endif %}>Top</option>
-            <option value="new" {% if sort_option == 'new' %}selected{% endif %}>New</option>
-        </select>
-    </div>
-    <button type="submit" class="btn btn-primary">Scrape</button>
-</form>
+    <form method="POST" action="{{ url_for('reddit_scraper') }}">
+        <div class="mb-3">
+            <label for="subreddit" class="form-label">Subreddit Name</label>
+            <select class="form-select" id="subreddit" name="subreddit">
+                {% for subreddit in subreddits %}
+                <option value="{{ subreddit.prompt }}" {% if subreddit.prompt == subreddit_name %}selected{% endif %}>
+                    {{ subreddit.prompt }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="content_type" class="form-label">Content Type</label>
+            <select class="form-select" id="content_type" name="content_type">
+                <option value="images" {% if content_type == 'images' %}selected{% endif %}>Images Only</option>
+
+                <!--
+                <option value="text" {% if content_type == 'text' %}selected{% endif %}>Text Only</option>
+                <option value="both" {% if content_type == 'both' %}selected{% endif %}>Both Images and Text</option> -->
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="number_of_posts" class="form-label">Number of Posts</label>
+            <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ number_of_posts | default(5) }}">
+        </div>
+        <div class="mb-3">
+            <label for="sort_option" class="form-label">Sort Option</label>
+            <select class="form-select" id="sort_option" name="sort_option">
+                <option value="new" {% if sort_option == 'new' %}selected{% endif %}>New</option>
+                <option value="hot" {% if sort_option == 'hot' %}selected{% endif %}>Hot</option>
+                <option value="top" {% if sort_option == 'top' %}selected{% endif %}>Top</option>
+                
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Scrape</button>
+    </form>
 
 
-    <div class="row mt-4">
-        {% for result in results %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                {% if result is string and result.endswith('.jpg') %}
-                    <img src="{{ url_for('static', filename=result) }}" class="card-img-top img-fluid">
+<div class="row mt-4">
+    {% for result in results %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <!-- Display image if it exists in the result -->
+            {% if result.image %}
+                <img src="{{ url_for('static', filename=result.image) }}" class="card-img-top img-fluid">
+            {% endif %}
+            <div class="card-body">
+                <!-- Display title and content if they exist in the result -->
+                {% if result.title %}
+                    <h4 class="card-title">{{ result.title }}</h4>
                 {% endif %}
-                <div class="card-body">
-                    {% if result is mapping %}
-                        <h4 class="card-title">{{ result.title }}</h4>
-                        <p class="card-text">{{ result.content }}</p>
-                    {% endif %}
-                    <!-- Button trigger modal -->
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recycleModal{{ loop.index }}">
-                        Recycle
-                    </button>
+                {% if result.content %}
+                    <p class="card-text">{{ result.content }}</p>
+                {% endif %}
+                <!-- Button trigger modal -->
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal{{ loop.index }}">
+                    Schedule Post
+                </button>
 
-                    <!-- Modal -->
-                    <div class="modal fade" id="recycleModal{{ loop.index }}" tabindex="-1" aria-labelledby="recycleModalLabel{{ loop.index }}" aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="recycleModalLabel{{ loop.index }}">Recycle Content</h5>
-                                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
-                                </div>
-                                <div class="modal-body">
-                                    <form method="POST" action="{{ url_for('add_recycled_post_modal') }}">
-                                        <div class="mb-3">
-                                            <label for="title" class="form-label">Title</label>
-                                            <input type="text" class="form-control" name="title" value="{{ result.title if result is mapping else '' }}">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="content" class="form-label">Content</label>
-                                            <textarea class="form-control" name="content">{{ result.content if result is mapping else '' }}</textarea>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="community_id" class="form-label">Select Community</label>
-                                            <select class="form-select" name="community_id">
-                                                {% for community in communities %}
-                                                <option value="{{ community.id }}">{{ community.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <input type="hidden" name="image_filename" value="{{ result if result is string and result.endswith('.jpg') else '' }}">
-                                        <button type="submit" class="btn btn-primary">Submit</button>
-                                    </form>
-                                </div>
+                <!-- Modal -->
+                <div class="modal fade" id="scheduleModal{{ loop.index }}" tabindex="-1" aria-labelledby="scheduleModalLabel{{ loop.index }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="scheduleModalLabel{{ loop.index }}">Schedule Post</h5>
+                                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label for="title" class="form-label">Title</label>
+                                        <input type="text" class="form-control" name="title" value="{{ result.title }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="content" class="form-label">Content</label>
+                                        <textarea class="form-control" name="content">{{ result.content }}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="user_id" class="form-label">Select Seeder</label>
+                                        <select class="form-select" name="user_id">
+                                            {% for user in seeders %}
+                                            <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="community_id" class="form-label">Select Community</label>
+                                        <select class="form-select" name="community_id">
+                                            {% for community in communities %}
+                                            <option value="{{ community.id }}">{{ community.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="posted_time" class="form-label">Schedule Time</label>
+                                        <input type="datetime-local" class="form-control" name="posted_time">
+                                    </div>
+                                    <div class="mb-3">
+                                        <!-- Show an image preview -->
+                                        {% if result.image %}
+                                            <img src="{{ url_for('static', filename=result.image) }}" class="img-fluid mb-2">
+                                        {% endif %}
+                                        <label for="image" class="form-label">Upload Image (re-upload if necessary)</label>
+                                        <input type="file" class="form-control" name="image">
+                                        <!-- Send the existing image path as a hidden field -->
+                                        <input type="hidden" name="existing_image" value="{{ result.image }}">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Submit</button>
+                                </form>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        {% endfor %}
     </div>
+    {% endfor %}
+</div>
+
+
 </div>
 {% endblock %}
 
