@@ -152,19 +152,25 @@ class User(db.Model):
         return self.followed.filter(
             followers.c.followed_id == user.id).count() > 0
 
+from sqlalchemy.orm import backref
+
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
     posted_time = db.Column(db.DateTime, default=datetime.utcnow)
-    upvotes = db.Column(db.Integer, nullable=False, default=0)
-    downvotes = db.Column(db.Integer, nullable=False, default=0)
+    upvotes = db.Column(db.Integer, default=0)
+    downvotes = db.Column(db.Integer, default=0)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     community_id = db.Column(db.Integer, db.ForeignKey('community.id'), nullable=False)
-    image_filename = db.Column(db.String(255), nullable=True)
-    user = db.relationship('User', backref=db.backref('posts', lazy=True))
-    community = db.relationship('Community', backref=db.backref('posts', lazy=True))
+    image_filename = db.Column(db.String(255))
+
+    user = db.relationship('User', backref='posts')
+    community = db.relationship('Community', backref='posts')
+    comments = db.relationship('Comment', backref='post', lazy=True, cascade="all, delete-orphan")
+
+
 
 
 class Comment(db.Model):
@@ -173,16 +179,11 @@ class Comment(db.Model):
     posted_time = db.Column(db.DateTime, default=datetime.utcnow)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    parent_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=True)  # Self-referential foreign key
+    parent_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=True)
 
-    # Relationships
-    post = db.relationship('Post', backref=db.backref('comments', lazy=True))
-    user = db.relationship('User', backref=db.backref('comments', lazy=True))
-    is_burner = db.Column(db.Boolean, default=False, nullable=False)
+    user = db.relationship('User', backref='comments')
+    replies = db.relationship('Comment', backref=backref('parent', remote_side=[id]), lazy='dynamic')
 
-    # Self-referential relationship to enable threading
-    replies = db.relationship('Comment', backref=db.backref('parent', remote_side=[id]), lazy='dynamic')
-    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
 
 class UserAction(db.Model):
@@ -412,6 +413,7 @@ def signup_step1():
     last_name = request.form.get('last_name')
     password = request.form.get('password')
     burner_username = request.form.get('burner_username')
+    location = request.form.get('location', 'Miami')
 
     # Create the user
     user = User(first_name=first_name, last_name=last_name, password=password, burner_username=burner_username)
@@ -455,7 +457,7 @@ def signup_step1():
         for id_, name, profile_pic_url, description, members_count in all_communities_query
     ]
 
-    return render_template('select_communities.html', communities=all_communities_info)
+    return render_template('select_communities.html', communities=all_communities_info, location=location)
 
 
 

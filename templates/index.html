@@ -287,141 +287,88 @@ textarea {
     </section>
     <section class="signup-form">
     <form id="multiStepForm" action="/signup_step1" method="POST">
-        <!-- Introductory Step: Explanation of Community Types -->
-        <div class="step step-0 active">
-            <div class="input-group">
-                <h2>Welcome to Netwrk!</h2>
-                <p>Netwrk offers both non-anonymous and anonymous communities. Start by entering your real name so we can connect you with others.</p>
+    <!-- Step 0: Select your age group -->
+    <div class="step step-0 active">
+        <div class="input-group">
+            <img src="/static/images/genz.png" alt="Generation Z Image" style="display: block; margin: auto; width: 100px; height: auto;">
+            <h1>Select your age group</h1>
+            <small>This helps us personalize your Netwrk experience.</small>
+            <input type="hidden" id="selectedAgeGroup" name="age_group" />
+            <div class="age-group-container">
+                <button type="button" class="age-group" data-value="2005-2012" onclick="selectAgeGroup('2005-2012')">
+                    Born 1996-2004
+                </button>
+                <button type="button" class="age-group" data-value="1997-2004" onclick="selectAgeGroup('1997-2004')">
+                    Born after 2004
+                </button>
             </div>
-            <button type="button" onclick="nextStep()">Start</button>
         </div>
-
-        <!-- Step 1: First Name -->
-        <div class="step step-1">
-            <div class="input-group">
-                <label for="firstName">First Name</label>
-                <input type="text" id="first_name" name="first_name" required>
-            </div>
-            <button type="button" onclick="nextStep()">Next</button>
-        </div>
-        
-        <!-- Step 2: Last Name -->
-        <div class="step step-2">
-            <div class="input-group">
-                <label for="lastName">Last Name</label>
-                <input type="text" id="last_name" name="last_name" required>
-            </div>
-            <button type="button" onclick="nextStep()">Next</button>
-        </div>
-
-        <!-- Step 3: Password -->
-        <div class="step step-3">
-            <div class="input-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="button" onclick="nextStep()">Next</button>
-        </div>
-
-        <!-- Step 4: Explanation for Anonymous Username -->
-        <div class="step step-4">
-            <div class="input-group">
-                <h2>Anonymous Username</h2>
-                <p>Next, create an anonymous username to participate discreetly in our anonymous communities.</p>
-            </div>
-            <button type="button" onclick="nextStep()">Understand & Continue</button>
-        </div>
-
-        <!-- Step 5: Setting Anonymous Username -->
-        <div class="step step-5">
-            <div class="input-group">
-                <label for="burnerUsername">Set your Anonymous Username</label>
-                <input type="text" id="burner_username" name="burner_username" required>
-            </div>
-            <button type="button" onclick="nextStep()">Next</button>
-        </div>
-
-        <div class="step step-6">
-    <div class="input-group">
-        <h1>Select your age group</h1>
-        <small>This helps us personalize your Netwrk experience.</small>
-        <input type="hidden" id="selectedAgeGroup" name="age_group" />
-        <div class="age-group-container">
-            <button type="button" class="age-group" data-value="2005-2012" onclick="selectAgeGroup('2005-2012')">
-                Born after 2004
-            </button>
-            <button type="button" class="age-group" data-value="1997-2004" onclick="selectAgeGroup('1997-2004')">
-                Born 1996-2004
-            </button>
-        </div>
+        <button type="button" onclick="nextStep()">Next</button>
     </div>
-    <button type="submit" disabled>Finish</button>
-</div>
 
-
-    <!--
-
-
-
-    <div class="step step-6">
-    <div class="input-group">
-        <h1>What do you want to see on Netwrk?</h1>
-        <small>Select at least one industry to personalize your Netwrk experience.</small>
-        <ul class="topics-list">
-            {% for topic in topics if topic.interest_category_id == 1 %}
-            <li>
-                <label class="topic-label" style="border: 2px solid {{ topic.color }}; color: black; background-color: white;">
-                    <input type="checkbox" name="industry_topics[]" value="{{ topic.id }}" class="topic-checkbox" onchange="toggleTopicStyle(this)">
-                    <span class="checkmark">
-                        <span class="status-icon"></span>
-                        {% if topic.image_url %}
-                            <img src="{{ url_for('static', filename=topic.image_url) }}" alt="{{ topic.name }}" class="topic-icon">
-                        {% endif %}
-                        {{ topic.name }}
-                    </span>
-                </label>
-            </li>
-            {% endfor %}
-        </ul>
+    <!-- Step 1: Welcome to Netwrk -->
+    <div class="step step-1">
+        <div class="input-group">
+            <h2>Welcome to Netwrk!</h2>
+            <p>Start by entering your real name so we can connect you with others.</p>
+        </div>
+        <button type="button" onclick="nextStep()">Start</button>
     </div>
-    <button type="button" onclick="nextStep()">Next</button>
-</div>
 
-
-
-<div class="step step-7">
-    <div class="input-group">
-        <h1>What do you want to see on Netwrk?</h1>
-        <small>Select at least 2 interests to personalize your Netwrk experience.</small>
-        <ul class="topics-list">
-            {% for topic in topics if topic.interest_category_id == 2 %}
-            <li>
-                <label class="topic-label" style="border: 2px solid {{ topic.color }}; color: black; background-color: white;">
-                    <input type="checkbox" name="general_topics[]" value="{{ topic.id }}" class="topic-checkbox" onchange="toggleTopicStyle(this)">
-                    <span class="checkmark">
-                        <span class="status-icon"></span>
-                        {% if topic.image_url %}
-                            <img src="{{ url_for('static', filename=topic.image_url) }}" alt="{{ topic.name }}" class="topic-icon">
-                        {% endif %}
-                        {{ topic.name }}
-                    </span>
-                </label>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    <button type="submit">Next</button>
-</div>
-
--->
-
-
+    <!-- Step 2: First Name -->
+    <div class="step step-2">
+        <div class="input-group">
+            <label for="firstName">First Name</label>
+            <input type="text" id="first_name" name="first_name" required>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
     </div>
     
-</div>
+    <!-- Step 3: Last Name -->
+    <div class="step step-3">
+        <div class="input-group">
+            <label for="lastName">Last Name</label>
+            <input type="text" id="last_name" name="last_name" required>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
 
+    <!-- Step 4: Password -->
+    <div class="step step-4">
+        <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
 
+    <!-- Step 5: Anonymous Username Explanation -->
+    <div class="step step-5">
+        <div class="input-group">
+            <img src="/static/images/anon.png" alt="Anonymous Image" style="display: block; margin: auto; width: 100px; height: auto;">
+            <h2>Set your Anon</h2>
+            <p>Netwrk has anonymous communities where you can freely share challenges and seek advice. Next, you'll set your anonymous username.</p>
+        </div>
+        <button type="button" onclick="nextStep()">Understand & Continue</button>
+    </div>
 
+    <!-- Step 6: Setting Anonymous Username -->
+    <div class="step step-6">
+        <div class="input-group">
+            <label for="burnerUsername">Set your Anonymous Username</label>
+            
+            <input type="text" id="burner_username" name="burner_username" required>
+        </div>
+        <button type="button" onclick="nextStep()">Next</button>
+    </div>
+
+    <!-- Final Step: Location Hidden Field -->
+    <div class="step step-7">
+        <div class="input-group">
+            <input type="hidden" name="location" value="{{ location }}">
+            <button type="submit">Finish</button>
+        </div>
+    </div>
 </form>
 
 
