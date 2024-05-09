@@ -23,6 +23,9 @@ from flask import request
 import boto3
 import pytz
 import uuid
+import requests
+import praw
+
 load_dotenv()
 
 
@@ -172,6 +175,8 @@ class Post(db.Model):
     community = db.relationship('Community', backref='posts')
     comments = db.relationship('Comment', backref='post', lazy=True, cascade="all, delete-orphan")
 
+    reddit_post_id = db.Column(db.String(255), nullable=True)
+
 
 
 
@@ -287,11 +292,28 @@ class AIPrompt(db.Model):
 class Subreddits(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text, nullable=False)
+    content_type = db.Column(db.String(10), nullable=False)  # New field to store content type
+
 
 
 class AICommentPrompt(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text, nullable=False)
+
+
+
+class ScheduledPost(db.Model):
+    __tablename__ = 'scheduled_posts'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    reddit_post_id = db.Column(db.String(255), nullable=True)
+    scheduled_time = db.Column(db.DateTime, nullable=False)
+    job_id = db.Column(db.String(255), nullable=True)  # Add this line
+
+    def __repr__(self):
+        return '<ScheduledPost {}>'.format(self.title)
+
+
 
 
 industry_images = {
@@ -2515,7 +2537,6 @@ def execute_post_prompt_community(community_id):
 
 
 
-import praw
 
 
 
@@ -2523,8 +2544,13 @@ import praw
 @app.route('/reddit_scraper/<content_type>', methods=['GET', 'POST'])
 @app.route('/reddit_scraper/', defaults={'content_type': 'images'}, methods=['GET', 'POST'])
 def reddit_scraper(content_type):
+
+    if not content_type:
+        content_type = 'images'
+
+    
     communities = Community.query.all()  # Retrieve communities for every request
-    subreddits = Subreddits.query.all()
+    subreddits = Subreddits.query.filter_by(content_type=content_type).all()
     seeders = User.query.filter_by(seeder=True).all()
 
     if request.method == 'POST':
@@ -2554,6 +2580,26 @@ def reddit_scraper(content_type):
 
 
 
+def post_exists(title, reddit_post_id=None):
+    query = db.session.query(Post)
+    if reddit_post_id:
+        query = query.filter(Post.reddit_post_id == reddit_post_id)
+    else:
+        query = query.filter(Post.title == title)
+    
+    exists_in_posts = query.first() is not None
+
+    # Check in scheduled posts
+    sched_query = db.session.query(ScheduledPost)
+    if reddit_post_id:
+        sched_query = sched_query.filter(ScheduledPost.reddit_post_id == reddit_post_id)
+    else:
+        sched_query = sched_query.filter(ScheduledPost.title == title)
+
+    exists_in_scheduled = sched_query.first() is not None
+
+    return exists_in_posts or exists_in_scheduled
+
 
 
 
@@ -2565,7 +2611,6 @@ def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
         user_agent='script:subreddit image downloader:v1.0 (by /u/DoodleChoco6642)'
     )
 
-
     subreddit = reddit.subreddit(subreddit_name)
     fetch_method = {
         'hot': subreddit.hot,
@@ -2575,32 +2620,36 @@ def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
 
     results = []
     for submission in fetch_method(limit=limit):
-        if submission.url.endswith(('jpg', 'jpeg', 'png')) and content_type in ['images', 'both']:
-            file_name = f"{submission.id}.jpg"
-            # Ensure paths are constructed properly:
-            local_filename = os.path.join('static', 'images', 'content', file_name)
-            download_image(submission.url, local_filename)
+        if not post_exists(submission.title, submission.id):
+            if content_type == 'images' and submission.url.endswith(('jpg', 'jpeg', 'png')):
+                file_name = f"{submission.id}.jpg"
+                local_filename = os.path.join('static', 'images', 'content', file_name)
+                download_image(submission.url, local_filename)
 
-            web_path = os.path.join('images/content', file_name)
-            # Properly format the path for web usage:
-            web_path = web_path.replace(os.sep, '/')  # Replace backslashes with forward slashes for URL compatibility
-            result = {
-                'image': web_path,
-                'title': submission.title,
-                'content': submission.selftext
-            }
-            results.append(result)
-        elif content_type in ['text', 'both']:
-            results.append({
-                'title': submission.title,
-                'content': submission.selftext,
-                'image': None
-            })
+                web_path = os.path.join('images/content', file_name)
+                web_path = web_path.replace(os.sep, '/')
+                result = {
+                    'image': web_path,
+                    'title': submission.title,
+                    'content': submission.selftext,
+                    'reddit_post_id': submission.id
+                }
+                results.append(result)
+            elif content_type == 'text' and submission.is_self:
+                if not submission.url.endswith(('jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff')):
+                    results.append({
+                        'title': submission.title,
+                        'content': submission.selftext,
+                        'image': None,  # Ensuring no image is associated
+                        'reddit_post_id': submission.id
+                    })
 
     return results
 
 
-import requests
+
+
+
 
 def download_image(image_url, local_filename):
     """Utility function to download and save an image."""
@@ -2712,7 +2761,8 @@ def schedule_post():
         community_id = int(request.form['community_id'])
         posted_time_str = request.form.get('posted_time')
         image = request.files.get('image')
-        existing_image = request.form.get('existing_image')  # Get existing image if provided
+        existing_image = request.form.get('existing_image')
+        reddit_post_id = request.form.get('reddit_post_id')
 
         image_url = None
         if image and image.filename != '':
@@ -2724,42 +2774,33 @@ def schedule_post():
             image_filename = os.path.basename(existing_image)
             s3_folder = 'posts/'
             bucket_name = 'netwrkproto'
-            content_type, _ = guess_type(image_filename)  # Determine the content type
-            if content_type is None:
-                content_type = 'application/octet-stream'
-            
-            # Build the full path to the image file
+            content_type, _ = guess_type(image_filename)
             full_path = os.path.join(app.root_path, 'static', 'images', 'content', image_filename)
-            
-            # Now open the file with the full path
             with open(full_path, 'rb') as file:
                 image_url = upload_file_to_s3(file, bucket_name, s3_folder + image_filename, content_type)
 
-
-        # Create the post object
-        new_post = Post(title=title, content=content, user_id=user_id, community_id=community_id,
-                        image_filename=image_url)
+        new_post = Post(title=title, content=content, user_id=user_id, community_id=community_id, image_filename=image_url, reddit_post_id=reddit_post_id)
 
         if action == 'post_now':
-            # Post immediately
             new_post.posted_time = datetime.utcnow()
             db.session.add(new_post)
             db.session.commit()
             flash('Post made successfully!')
         elif posted_time_str:
-            # Schedule the post for a future time
             posted_time = datetime.strptime(posted_time_str, '%Y-%m-%dT%H:%M')
             est = pytz.timezone('America/New_York')
             utc = pytz.utc
             posted_time = est.localize(posted_time).astimezone(utc)
-
             new_post.posted_time = posted_time
-
             job_id = "post_" + str(uuid.uuid4())
             scheduler.add_job(post_to_community, 'date', run_date=posted_time, args=[new_post], id=job_id)
-            db.session.add(new_post)
+
+            new_scheduled_post = ScheduledPost(title=title, reddit_post_id=reddit_post_id, scheduled_time=posted_time, job_id=job_id)
+            db.session.add(new_scheduled_post)
             db.session.commit()
 
+
+            
             flash('Post scheduled successfully!')
         else:
             flash('No post time provided, posting now.')
@@ -2785,9 +2826,12 @@ def schedule_post():
 
 
 
+
 def post_to_community(post):
 
     with app.app_context():
+        ScheduledPost.query.filter_by(id=post.id).delete()
+        db.session.commit()
         db.session.add(post)
         db.session.commit()
 
@@ -2965,11 +3009,17 @@ def job_manager():
 @app.route('/delete_job/<string:job_id>', methods=['POST'])
 def delete_job(job_id):
     try:
+        # Remove the job from the scheduler
         scheduler.remove_job(job_id)
-        flash('Job deleted successfully.', 'success')
+        # Also, remove the corresponding scheduled post from the database
+        ScheduledPost.query.filter_by(job_id=job_id).delete()
+        db.session.commit()
+        flash('Job and associated post deleted successfully.', 'success')
     except Exception as e:
+        db.session.rollback()  # Ensure to rollback in case of an exception
         flash(str(e), 'danger')
     return redirect(url_for('job_manager'))
+
 
 
 #Building the prototype tool reddit scraper:
@@ -3293,14 +3343,16 @@ def subreddits():
 @app.route('/add-subreddit', methods=['POST'])
 def add_subreddit():
     prompt = request.form['prompt']
+    content_type = request.form['content_type']  # Capture the content type from the form
     if prompt:
-        new_subreddit = Subreddits(prompt=prompt)
+        new_subreddit = Subreddits(prompt=prompt, content_type=content_type)
         db.session.add(new_subreddit)
         db.session.commit()
         flash('Subreddit added successfully!')
     else:
         flash('Prompt is required to add a new subreddit.')
     return redirect(url_for('subreddits'))
+
 
 @app.route('/delete-subreddit/<int:id>', methods=['POST'])
 def delete_subreddit(id):

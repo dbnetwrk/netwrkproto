@@ -45,7 +45,10 @@
                             <a class="nav-link" href="{{ url_for('upvote_booster_form') }}">Upvote Booster</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('reddit_scraper') }}">Content Scraper</a>
+                            <a class="nav-link" href="{{ url_for('reddit_scraper') }}">Image Scraper</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('reddit_scraper', content_type='text') }}">Text Scraper</a>
                         </li>
 
                         <li class="nav-item">
