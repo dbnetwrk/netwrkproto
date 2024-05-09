@@ -1600,6 +1600,23 @@ def admin_panel():
     return render_template('admin_panel.html')
 
 
+@app.route('/get_seeders_community/<int:community_id>')
+def get_seeders_community(community_id):
+    community = Community.query.get(community_id)
+    if not community:
+        return jsonify({'error': 'Community not found'}), 404
+
+    seeders = [{
+        'id': user.id,
+        'name': f"{user.first_name} {user.last_name}"
+    } for user in community.members if user.seeder]
+
+    return jsonify(seeders)
+
+
+
+
+
 @app.route('/seeders', methods=['GET'])
 def get_seeders():
     # Fetching all seeders and ordering them by id in ascending order
@@ -2538,7 +2555,37 @@ def execute_post_prompt_community(community_id):
 
 
 
+@app.template_filter('truncate_lines')
+def truncate_lines(text, max_lines=7):
+    lines = text.split('<br>')  # Adjust this if your line breaks are different
+    if len(lines) > max_lines:
+        return '<br>'.join(lines[:max_lines]) + '...'
+    return text
 
+
+@app.route('/make_concise', methods=['POST'])
+def make_concise():
+    
+    data = request.get_json()
+    content = data['content']
+    prompt_text = data['prompt_text'] 
+
+    combined_prompt = f"I want you to take this piece of text: {content} and {prompt_text}"
+
+    try:
+        # Assuming you have the OpenAI client setup with the key as shown previously
+        response = client.chat.completions.create(
+            model="gpt-4",  # Adjust model as necessary
+            messages=[
+                {"role": "system", "content": combined_prompt}
+            ]
+        )
+        concise_text = response.choices[0].message.content.strip()
+        
+        return jsonify({'concise_text': concise_text})
+    except Exception as e:
+        print(str(e))
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/reddit_scraper/<content_type>', methods=['GET', 'POST'])
@@ -2548,10 +2595,11 @@ def reddit_scraper(content_type):
     if not content_type:
         content_type = 'images'
 
-    
+
     communities = Community.query.all()  # Retrieve communities for every request
     subreddits = Subreddits.query.filter_by(content_type=content_type).all()
     seeders = User.query.filter_by(seeder=True).all()
+
 
     if request.method == 'POST':
         clear_image_directory()
