@@ -4,39 +4,49 @@
 <div class="container">
     <h2>Manage Subreddits</h2>
     
-    <!-- Form to Add New Subreddit -->
-    <form action="/add-subreddit" method="POST">
-        <div class="form-group">
-            <label for="prompt">Subreddit:</label>
-            <textarea class="form-control" id="prompt" name="prompt" required></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">Add Subreddit</button>
-    </form>
+   <form action="/add-subreddit" method="POST">
+    <div class="form-group">
+        <label for="prompt">Subreddit:</label>
+        <textarea class="form-control" id="prompt" name="prompt" required></textarea>
+    </div>
+    <div class="form-group">
+        <label for="content_type">Content Type:</label>
+        <select class="form-control" id="content_type" name="content_type">
+            <option value="images">Images</option>
+            <option value="text">Text</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Subreddit</button>
+</form>
+
 
     <hr>
 
     <!-- Display Subreddits -->
     <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name (r/)</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for subreddit in subreddits %}
-            <tr>
-                <td>{{ subreddit.id }}</td>
-                <td>{{ subreddit.prompt }}</td>
-                <td>
-                    <form action="/delete-subreddit/{{ subreddit.id }}" method="POST">
-                        <button type="submit" class="btn btn-danger">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name (r/)</th>
+            <th>Content Type</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for subreddit in subreddits %}
+        <tr>
+            <td>{{ subreddit.id }}</td>
+            <td>{{ subreddit.prompt }}</td>
+            <td>{{ subreddit.content_type }}</td>
+            <td>
+                <form action="/delete-subreddit/{{ subreddit.id }}" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
 </div>
 {% endblock %}
