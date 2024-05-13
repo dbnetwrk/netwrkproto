@@ -114,6 +114,9 @@ followers = db.Table('followers',
 
 
 
+
+
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(50), nullable=False)
@@ -312,6 +315,17 @@ class ScheduledPost(db.Model):
 
     def __repr__(self):
         return '<ScheduledPost {}>'.format(self.title)
+
+
+class RedditPost(db.Model):
+    __tablename__ = 'redditpost'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    image_url = db.Column(db.String(255))
+    content = db.Column(db.Text)
+    reddit_post_id = db.Column(db.String(50), unique=True)  # Ensure uniqueness to avoid duplicates
+    subreddit_id = db.Column(db.Integer, db.ForeignKey('subreddits.id'))  # Assuming a FK relationship
+    subreddit_name = db.Column(db.Text)
 
 
 
@@ -2588,6 +2602,35 @@ def make_concise():
         return jsonify({'error': str(e)}), 500
 
 
+def scrape_subreddits():
+    with app.app_context():
+        subreddits = Subreddits.query.filter_by(content_type='images').all()
+        for subreddit in subreddits:
+            results = scrape_reddit_posts_2(subreddit.prompt, 'images', 100, 'new')
+
+#start the thread up
+
+from threading import Thread
+
+
+
+@app.route('/start_scraping')
+def start_scraping():
+    thread = Thread(target=scrape_subreddits)
+    thread.start()
+    return jsonify({'status': 'Scraping started'}), 200
+
+
+
+@app.route('/redfeed')
+def redfeed():
+    # Assuming you want to see only the newest 100 images from all subreddits
+    posts = RedditPost.query.order_by(RedditPost.id.desc()).limit(100).all()
+    return render_template('redfeed.html', posts=posts)
+
+
+
+
 @app.route('/reddit_scraper/<content_type>', methods=['GET', 'POST'])
 @app.route('/reddit_scraper/', defaults={'content_type': 'images'}, methods=['GET', 'POST'])
 def reddit_scraper(content_type):
@@ -2649,9 +2692,6 @@ def post_exists(title, reddit_post_id=None):
     return exists_in_posts or exists_in_scheduled
 
 
-
-
-
 def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
     reddit = praw.Reddit(
         client_id='i-SqiFyPh8Jgk34GFXwLCw',
@@ -2693,6 +2733,58 @@ def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
                     })
 
     return results
+
+
+def scrape_reddit_posts_2(subreddit_name, content_type, limit, sort_option):
+    reddit = praw.Reddit(
+        client_id='i-SqiFyPh8Jgk34GFXwLCw',
+        client_secret='mbAJH8RDW3G3S7L-gLb9HIUwj_on-g',
+        user_agent='script:subreddit image downloader:v1.0 (by /u/DoodleChoco6642)'
+    )
+    subreddit = reddit.subreddit(subreddit_name)
+    fetch_method = {
+        'hot': subreddit.hot,
+        'top': subreddit.top,
+        'new': subreddit.new
+    }.get(sort_option, subreddit.hot)
+
+    results = []
+    for submission in fetch_method(limit=limit):
+        if not RedditPost.query.filter_by(reddit_post_id=submission.id).first():
+            if content_type == 'images' and submission.url.endswith(('jpg', 'jpeg', 'png')):
+                file_name = f"{submission.id}.jpg"
+                local_filename = os.path.join('static', 'images', 'content', file_name)
+                download_image(submission.url, local_filename)
+
+                web_path = os.path.join('images/content', file_name)
+                web_path = web_path.replace(os.sep, '/')
+                reddit_post = RedditPost(
+                    title=submission.title,
+                    content=submission.selftext,
+                    image_url=web_path,
+                    reddit_post_id=submission.id,
+                    subreddit_name=subreddit_name
+                )
+                db.session.add(reddit_post)
+
+                results.append(reddit_post)
+                db.session.commit()
+            elif content_type == 'text' and submission.is_self:
+                if not submission.url.endswith(('jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff')):
+                    reddit_post = RedditPost(
+                        title=submission.title,
+                        content=submission.selftext,
+                        reddit_post_id=submission.id,
+                        subreddit_name=subreddit_name
+                    )
+                    db.session.add(reddit_post)
+                    
+                    results.append(reddit_post)
+                    db.session.commit()
+
+    
+    return results
+
 
 
 
