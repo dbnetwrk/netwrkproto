@@ -1,0 +1,39 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Latest Reddit Posts</h2>
+    <button id="start-scrape-btn" class="btn btn-primary">Start Scraping</button> <!-- Button to trigger scraping -->
+    <div class="row mt-4">
+        {% for post in posts %}
+        <div class="col-md-12 mb-3">
+            <div class="card">
+                <img src="{{ url_for('static', filename=post.image_url) }}" class="card-img-top img-fluid">
+                <div class="card-body">
+                    <h4 class="card-title">{{ post.title }}</h4>
+                    <p>Subreddit: {{ post.subreddit_name}}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#start-scrape-btn').click(function() {
+            $.ajax({
+                url: "{{ url_for('start_scraping') }}",
+                type: 'GET',
+                success: function(response) {
+                    alert('Scraping started!');
+                },
+                error: function(error) {
+                    console.log(error);
+                    alert('Error starting scraping.');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
