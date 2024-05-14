@@ -314,13 +314,7 @@ body, html {
 }
 
 
-.upvote-button {
-  border-radius: 5px 0 0 5px;
-}
 
-.downvote-button {
-  border-radius: 0 5px 5px 0;
-}
 
 .vote-count {
   padding: 5px 10px;

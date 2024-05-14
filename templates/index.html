@@ -359,16 +359,11 @@ textarea {
             
             <input type="text" id="burner_username" name="burner_username" required>
         </div>
-        <button type="button" onclick="nextStep()">Next</button>
+        <input type="hidden" name="location" value="{{ location }}">
+            <button type="submit">Finish</button>
     </div>
 
-    <!-- Final Step: Location Hidden Field -->
-    <div class="step step-7">
-        <div class="input-group">
-            <input type="hidden" name="location" value="{{ location }}">
-            <button type="submit">Finish</button>
-        </div>
-    </div>
+    
 </form>
 
 
