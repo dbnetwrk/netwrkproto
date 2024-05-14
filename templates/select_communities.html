@@ -277,73 +277,58 @@ textarea {
     <div class="container">
         <section class="info">
             <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
-            <p>A professional networking community for Gen Z techies & entrepreneurs in {{ location }} </p>
+            <p>A professional networking community for Gen Z techies & entrepreneurs in {{ location }}</p>
         </section>
         <section class="signup-form">
             <h1>Find people like you</h1>
-        <small>Join at least 3 communities to connect with people around {{ location }} just like you. You'll see their posts on your feed.</small>
+            <small>Join at least 3 communities to connect with people around {{ location }} just like you. You'll see their posts on your feed.</small>
             <form id="community-selection-form" action="{{ url_for('join_communities') }}" method="POST">
-    <div class="topics-list">
-        {% for community in communities %}
-            <div class="card">
-                <div class="card-header">
-                    <h1><img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic"> {{ community.name }}</h1>
+                <div class="topics-list">
+                    {% for community in communities %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h1><img src="{{ url_for('static', filename=community.profile_pic_url) }}" alt="Community Profile Picture" class="community-pic"> {{ community.name }}</h1>
+                        </div>
+                        <div class="card-content">
+                            <p>{{ community.description }}</p>
+                            <p>Members: {{ community.members_count }}</p>
+                            <button type="button" class="join-btn" data-id="{{ community.id }}" data-selected="false">Join</button>
+                            <input type="checkbox" name="selected_communities[]" value="{{ community.id }}" class="hidden-checkbox" hidden>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                <div class="card-content">
-                    <p>{{ community.description }}</p>
-                    <p>Members: {{ community.members_count }}</p><button type="button" class="join-btn" data-id="{{ community.id }}" data-selected="false">Join</button>
-                    <input type="checkbox" name="selected_communities[]" value="{{ community.id }}" class="hidden-checkbox" hidden>
-                    
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-    <button type="submit" class="btn-submit">Let me in</button>
-</form>
-
-
-
+                <button type="submit" class="btn-submit">Let me in</button>
+            </form>
         </section>
     </div>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const joinButtons = document.querySelectorAll('.join-btn');
 
-</body>
+            joinButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const isSelected = this.getAttribute('data-selected') === 'true';
+                    const selectedCount = document.querySelectorAll('.join-btn[data-selected="true"]').length;
 
+                    // Allow selection of more than 3 communities
+                    this.setAttribute('data-selected', !isSelected);
+                    this.textContent = isSelected ? 'Join' : 'Joined'; // Toggle text
+                    this.nextElementSibling.checked = !isSelected; // Toggle checkbox
+                });
+            });
 
-
-
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const joinButtons = document.querySelectorAll('.join-btn');
-    joinButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const isSelected = this.getAttribute('data-selected') === 'true';
-            if (!isSelected && document.querySelectorAll('.join-btn[data-selected="true"]').length >= 3) {
-                alert('You can only select 3 communities.');
-                return;
-            }
-            this.setAttribute('data-selected', !isSelected);
-            this.textContent = isSelected ? 'Join' : 'Joined'; // Toggle text
-            this.nextElementSibling.checked = !isSelected; // Toggle checkbox
+            document.getElementById('community-selection-form').addEventListener('submit', function(event) {
+                const selectedCount = document.querySelectorAll('.join-btn[data-selected="true"]').length;
+                if (selectedCount < 3) {
+                    alert('Please join at least 3 communities.');
+                    event.preventDefault();
+                }
+            });
         });
-    });
-
-    document.getElementById('community-selection-form').addEventListener('submit', function(event) {
-        const selectedCount = document.querySelectorAll('.join-btn[data-selected="true"]').length;
-        if (selectedCount !== 3) {
-            alert('Please join at least 3 communities');
-            event.preventDefault();
-        }
-    });
-});
-</script>
-
-
-
-
-
-
+    </script>
+</body>
 </html>
 
 

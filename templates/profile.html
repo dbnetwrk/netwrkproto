@@ -213,8 +213,8 @@ async function fetchData(section) {
     data.forEach(comment => {
       // Assume each comment includes a post_id to link back to the original post
       content += `<div>
-                    <p>${comment.content}</p>
-                    <p><a href="/post/${comment.id}">View Post</a></p>
+                    
+                    <p><a href="/post/${comment.id}">${comment.content}</a></p>
                   </div>`;
     });
   }
