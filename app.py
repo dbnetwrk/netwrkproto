@@ -190,6 +190,7 @@ class Comment(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=True)
+    is_burner = db.Column(db.Boolean, default=False)
 
     user = db.relationship('User', backref='comments')
     replies = db.relationship('Comment', backref=backref('parent', remote_side=[id]), lazy='dynamic')
@@ -1542,16 +1543,18 @@ def my_messages():
     return render_template('my_messages.html', conversations=conversations_with_participants)
 
 
+
+
 @app.route('/user/<int:user_id>/posts')
 def user_posts(user_id):
     posts = Post.query.filter_by(user_id=user_id).all()
-    posts_data = [{'title': post.title, 'content': post.content, 'posted_time': post.posted_time} for post in posts]
+    posts_data = [{'id': post.id, 'title': post.title, 'content': post.content, 'posted_time': post.posted_time} for post in posts]
     return jsonify(posts_data)
 
 @app.route('/user/<int:user_id>/comments')
 def user_comments(user_id):
     comments = Comment.query.filter_by(user_id=user_id).all()
-    comments_data = [{'content': comment.content, 'posted_time': comment.posted_time} for comment in comments]
+    comments_data = [{'id': comment.post_id, 'content': comment.content, 'posted_time': comment.posted_time} for comment in comments]
     return jsonify(comments_data)
 
 
@@ -1622,7 +1625,8 @@ def get_seeders_community(community_id):
 
     seeders = [{
         'id': user.id,
-        'name': f"{user.first_name} {user.last_name}"
+        'name': f"{user.first_name} {user.last_name}",
+        'profile_picture': user.profile_pic_url
     } for user in community.members if user.seeder]
 
     return jsonify(seeders)
@@ -2589,7 +2593,7 @@ def make_concise():
     try:
         # Assuming you have the OpenAI client setup with the key as shown previously
         response = client.chat.completions.create(
-            model="gpt-4",  # Adjust model as necessary
+            model="gpt-4o",  # Adjust model as necessary
             messages=[
                 {"role": "system", "content": combined_prompt}
             ]
@@ -2638,11 +2642,9 @@ def reddit_scraper(content_type):
     if not content_type:
         content_type = 'images'
 
-
     communities = Community.query.all()  # Retrieve communities for every request
     subreddits = Subreddits.query.filter_by(content_type=content_type).all()
     seeders = User.query.filter_by(seeder=True).all()
-
 
     if request.method == 'POST':
         clear_image_directory()
@@ -2659,7 +2661,10 @@ def reddit_scraper(content_type):
         results = scrape_reddit_posts(subreddit_name, content_type, int(number_of_posts), sort_option)
         if results:
             flash(f"Scraped {len(results)} posts from /r/{subreddit_name} as {content_type}")
-        return render_template('reddit_scraper.html', results=results, content_type=content_type, communities=communities, subreddits=subreddits, seeders=seeders)
+        return render_template('reddit_scraper.html', results=results, content_type=content_type, communities=communities, subreddits=subreddits, seeders=seeders,
+                               subreddit_name=session.get('subreddit_name'),
+                               number_of_posts=session.get('number_of_posts'),
+                               sort_option=session.get('sort_option'))
 
     # Initialize form with session data if available
     return render_template('reddit_scraper.html', communities=communities, subreddits=subreddits, seeders=seeders,
@@ -2667,6 +2672,7 @@ def reddit_scraper(content_type):
                            content_type=content_type,
                            number_of_posts=session.get('number_of_posts'),
                            sort_option=session.get('sort_option'))
+
 
 
 
@@ -3501,6 +3507,20 @@ def delete_subreddit(id):
     db.session.commit()
     flash('Subreddit deleted successfully!')
     return redirect(url_for('subreddits'))
+
+
+@app.route('/get_seeder_info/<user_id>', methods=['GET'])
+def get_seeder_info(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'Seeder not found'}), 404
+
+    return jsonify({
+        'about_me': user.about_me,
+        'profile_picture': user.profile_pic_url  # Assuming the profile pictures are stored in the static folder
+    })
+
+
 
 
 
