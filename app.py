@@ -2450,7 +2450,7 @@ def post_prompt(prompt_id):
     # Here, include the actual call to the AI model, which now uses the enriched prompt
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[{"role": "system", "content": custom_prompt}]
         )
         generated_text = response.choices[0].message.content
@@ -2495,7 +2495,7 @@ def execute_post_prompt(prompt_id):
 
         try:
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[{"role": "system", "content": custom_prompt}]
             )
             generated_text = response.choices[0].message.content
@@ -2548,7 +2548,7 @@ def execute_post_prompt_community(community_id):
 
         try:
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[{"role": "system", "content": custom_prompt}]
             )
             generated_text = response.choices[0].message.content
@@ -3303,6 +3303,7 @@ def randomize_post_dates():
         flash("Invalid date format. Please use YYYY-MM-DD format.")
         return redirect(url_for('show_post_randomizer'))
 
+    # Check that the end date is before today's date
     if end_date >= datetime.utcnow():
         flash("End date must be before today's date.")
         return redirect(url_for('show_post_randomizer'))
@@ -3310,9 +3311,17 @@ def randomize_post_dates():
     # Fetch all posts
     posts = Post.query.all()
     for post in posts:
-        random_days = random.randint(0, (datetime.utcnow() - end_date).days)
-        random_date = datetime.utcnow() - timedelta(days=random_days)
+        # Calculate the total number of seconds between the end date and now
+        total_seconds = int((datetime.utcnow() - end_date).total_seconds())
+        random_seconds = random.randint(0, total_seconds)
+        
+        # Create a new random date within the specified interval
+        random_date = datetime.utcnow() - timedelta(seconds=random_seconds)
+        
+        # Update the post's posted_time
         post.posted_time = random_date
+
+    # Commit changes to the database
     db.session.commit()
 
     flash("Post dates randomized successfully.")
@@ -3444,7 +3453,7 @@ def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
             post_context = f"You're in a conversation with your friend. Your friend just said this: {post.title}\nContent: {post.content}\n\n"
 
             for _ in range(num_comments_per_post):
-                user = User.query.order_by(func.random()).first()
+                user = User.query.filter_by(seeder=True).order_by(func.random()).first()
                 if not user:
                     results.append("No users available for commenting.")
                     continue
@@ -3456,7 +3465,7 @@ def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
                 try:
                     # Call OpenAI's API to generate the comment
                     response = client.chat.completions.create(
-                        model="gpt-3.5-turbo",
+                        model="gpt-4o",
                         messages=[{"role": "system", "content": combined_prompt}]
                     )
                     generated_comment = response.choices[0].message.content.strip()
