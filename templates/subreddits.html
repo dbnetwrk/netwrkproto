@@ -1,52 +1,53 @@
 {% extends "admin_panel_base.html" %}
 
 {% block content %}
-<div class="container">
-    <h2>Manage Subreddits</h2>
-    
-   <form action="/add-subreddit" method="POST">
-    <div class="form-group">
-        <label for="prompt">Subreddit:</label>
-        <textarea class="form-control" id="prompt" name="prompt" required></textarea>
-    </div>
-    <div class="form-group">
-        <label for="content_type">Content Type:</label>
-        <select class="form-control" id="content_type" name="content_type">
-            <option value="images">Images</option>
-            <option value="text">Text</option>
-        </select>
-    </div>
-    <button type="submit" class="btn btn-primary">Add Subreddit</button>
-</form>
+<div class="container mt-4">
+    <h2 class="mb-4">Manage Communities and Subreddits</h2>
 
+    <div class="accordion" id="communityAccordion">
+        {% for community in communities %}
+        <div class="card mb-4">
+            <div class="card-header" id="heading{{ community.id }}">
+                <h3 class="mb-0">
+                    <button class="btn btn-link text-decoration-none text-left" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ community.id }}" aria-expanded="true" aria-controls="collapse{{ community.id }}">
+                        {{ community.name }}
+                    </button>
+                </h3>
+            </div>
 
-    <hr>
+            <div id="collapse{{ community.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ community.id }}" data-bs-parent="#communityAccordion">
+                <div class="card-body">
+                    <form action="/add-subreddit-to-community/{{ community.id }}" method="POST">
+                        <div class="form-group mb-3">
+                            <label for="new_subreddit_prompt{{ community.id }}">Subreddit Name:</label>
+                            <input type="text" class="form-control" id="new_subreddit_prompt{{ community.id }}" name="prompt" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="new_content_type{{ community.id }}">Content Type:</label>
+                            <select class="form-control" id="new_content_type{{ community.id }}" name="content_type">
+                                <option value="images">Images</option>
+                                <option value="text">Text</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Subreddit to {{ community.name }}</button>
+                    </form>
 
-    <!-- Display Subreddits -->
-    <table class="table">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name (r/)</th>
-            <th>Content Type</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for subreddit in subreddits %}
-        <tr>
-            <td>{{ subreddit.id }}</td>
-            <td>{{ subreddit.prompt }}</td>
-            <td>{{ subreddit.content_type }}</td>
-            <td>
-                <form action="/delete-subreddit/{{ subreddit.id }}" method="POST">
-                    <button type="submit" class="btn btn-danger">Delete</button>
-                </form>
-            </td>
-        </tr>
+                    <h4 class="mt-4">Subreddits:</h4>
+                    <ul class="list-group list-group-flush">
+                        {% for subreddit in community.subreddits %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ subreddit.prompt }} ({{ subreddit.content_type }})
+                            <button class="btn btn-danger btn-sm" onclick="location.href='/remove-subreddit-from-community/{{ community.id }}/{{ subreddit.id }}'">Remove</button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
         {% endfor %}
-    </tbody>
-</table>
-
+    </div>
 </div>
 {% endblock %}
+
+
+
