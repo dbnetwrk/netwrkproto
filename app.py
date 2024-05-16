@@ -114,7 +114,10 @@ followers = db.Table('followers',
 
 
 
-
+community_subreddit_association = db.Table('community_subreddit',
+    db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True),
+    db.Column('subreddit_id', db.Integer, db.ForeignKey('subreddits.id'), primary_key=True)
+)
 
 
 class User(db.Model):
@@ -206,17 +209,19 @@ class UserAction(db.Model):
     user = db.relationship('User', backref=db.backref('actions', lazy=True))
 
 class Community(db.Model):
+    __tablename__ = 'community'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     description = db.Column(db.Text, nullable=True)
     profile_pic_url = db.Column(db.String(255), nullable=True, default='/static/images/default_community.png')
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
-    interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
     is_anonymous = db.Column(db.Boolean, default=False, nullable=False)
     color = db.Column(db.String(7), nullable=True)
     header_pic_url = db.Column(db.String(255), nullable=True)
+    
+    creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
+    interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
+    subreddits = db.relationship('Subreddits', secondary=community_subreddit_association, backref=db.backref('communities', lazy='dynamic'))
 
 
 
@@ -294,9 +299,11 @@ class AIPrompt(db.Model):
         return f'<AIPrompt {self.prompt} every {self.interval_minutes} min>'
 
 class Subreddits(db.Model):
+    __tablename__ = 'subreddits'
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text, nullable=False)
-    content_type = db.Column(db.String(10), nullable=False)  # New field to store content type
+    content_type = db.Column(db.String(10), nullable=False)
+    
 
 
 
@@ -3492,13 +3499,14 @@ def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
 
 @app.route('/subreddits')
 def subreddits():
+    communities = Community.query.all()
     subreddits = Subreddits.query.all()
-    return render_template('subreddits.html', subreddits=subreddits)
+    return render_template('subreddits.html', communities=communities, subreddits=subreddits)
 
 @app.route('/add-subreddit', methods=['POST'])
 def add_subreddit():
     prompt = request.form['prompt']
-    content_type = request.form['content_type']  # Capture the content type from the form
+    content_type = request.form['content_type']
     if prompt:
         new_subreddit = Subreddits(prompt=prompt, content_type=content_type)
         db.session.add(new_subreddit)
@@ -3506,6 +3514,28 @@ def add_subreddit():
         flash('Subreddit added successfully!')
     else:
         flash('Prompt is required to add a new subreddit.')
+    return redirect(url_for('subreddits'))
+
+@app.route('/add-subreddit-to-community/<int:community_id>', methods=['POST'])
+def add_subreddit_to_community(community_id):
+    prompt = request.form.get('prompt')
+    content_type = request.form.get('content_type')
+    # Create the subreddit if it does not exist
+    subreddit = Subreddits.query.filter_by(prompt=prompt).first()
+    if not subreddit:
+        subreddit = Subreddits(prompt=prompt, content_type=content_type)
+        db.session.add(subreddit)
+        db.session.commit()
+
+    # Add to community
+    community = Community.query.get(community_id)
+    if community:
+        community.subreddits.append(subreddit)
+        db.session.commit()
+        flash('Subreddit added to community successfully!', 'success')
+    else:
+        flash('Community not found!', 'error')
+
     return redirect(url_for('subreddits'))
 
 
@@ -3516,6 +3546,31 @@ def delete_subreddit(id):
     db.session.commit()
     flash('Subreddit deleted successfully!')
     return redirect(url_for('subreddits'))
+
+
+@app.route('/remove-subreddit-from-community/<int:community_id>/<int:subreddit_id>', methods=['GET'])
+def remove_subreddit_from_community(community_id, subreddit_id):
+    try:
+        # Build a delete statement for the association table
+        delete_statement = community_subreddit_association.delete().where(
+            and_(
+                community_subreddit_association.c.community_id == community_id,
+                community_subreddit_association.c.subreddit_id == subreddit_id
+            )
+        )
+        # Execute the delete statement through the session
+        db.session.execute(delete_statement)
+        db.session.commit()
+        flash('Subreddit removed successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'An error occurred: {str(e)}', 'error')
+        app.logger.error('Error removing subreddit from community', exc_info=True)
+
+    return redirect(url_for('subreddits'))
+
+
+
 
 
 @app.route('/get_seeder_info/<user_id>', methods=['GET'])
