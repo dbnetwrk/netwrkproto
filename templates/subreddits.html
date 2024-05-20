@@ -4,48 +4,31 @@
 <div class="container mt-4">
     <h2 class="mb-4">Manage Communities and Subreddits</h2>
 
-    <div class="accordion" id="communityAccordion">
-        {% for community in communities %}
-        <div class="card mb-4">
-            <div class="card-header" id="heading{{ community.id }}">
-                <h3 class="mb-0">
-                    <button class="btn btn-link text-decoration-none text-left" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ community.id }}" aria-expanded="true" aria-controls="collapse{{ community.id }}">
-                        {{ community.name }}
-                    </button>
-                </h3>
-            </div>
-
-            <div id="collapse{{ community.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ community.id }}" data-bs-parent="#communityAccordion">
-                <div class="card-body">
-                    <form action="/add-subreddit-to-community/{{ community.id }}" method="POST">
-                        <div class="form-group mb-3">
-                            <label for="new_subreddit_prompt{{ community.id }}">Subreddit Name:</label>
-                            <input type="text" class="form-control" id="new_subreddit_prompt{{ community.id }}" name="prompt" required>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="new_content_type{{ community.id }}">Content Type:</label>
-                            <select class="form-control" id="new_content_type{{ community.id }}" name="content_type">
-                                <option value="images">Images</option>
-                                <option value="text">Text</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Add Subreddit to {{ community.name }}</button>
-                    </form>
-
-                    <h4 class="mt-4">Subreddits:</h4>
-                    <ul class="list-group list-group-flush">
-                        {% for subreddit in community.subreddits %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ subreddit.prompt }} ({{ subreddit.content_type }})
-                            <button class="btn btn-danger btn-sm" onclick="location.href='/remove-subreddit-from-community/{{ community.id }}/{{ subreddit.id }}'">Remove</button>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
+    {% for community in communities %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">{{ community.name }}</h3>
         </div>
-        {% endfor %}
+        <div class="card-body">
+            <h4>Subreddits:</h4>
+            <ul class="list-group list-group-flush">
+                {% for subreddit in community.subreddits %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ subreddit.prompt }}
+                    <button class="btn btn-danger btn-sm" onclick="location.href='/remove-subreddit-from-community/{{ community.id }}/{{ subreddit.id }}'">X</button>
+                </li>
+                {% endfor %}
+                <!-- Add Subreddit Form -->
+                <li class="list-group-item">
+                    <form action="/add-subreddit-to-community/{{ community.id }}" method="POST" class="d-flex justify-content-between align-items-center">
+                        <input type="text" class="form-control me-2" name="prompt" placeholder="Enter subreddit name" required>
+                        <button type="submit" class="btn btn-primary">+</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
     </div>
+    {% endfor %}
 </div>
 {% endblock %}
 
