@@ -655,35 +655,58 @@ def show_post(post_id):
 
 
 
+from flask import request
+from datetime import datetime
+from sqlalchemy.orm import aliased
+from sqlalchemy import text, func
+
+
+from sqlalchemy import func
+
 @app.route('/feed')
 def show_feed():
     user_id = session.get('user_id')
     if not user_id:
-        # User is not logged in, redirect to login page
         return redirect(url_for('login'))
 
-    # Fetch posts from communities the user has joined, ordered by recency
-    joined_posts = Post.query.join(
+    filter_type = request.args.get('filter', 'new')  # Default to 'new' if not specified
+    current_time = func.now()
+
+    # Build the base query with comment counts
+    comment_count_subquery = db.session.query(
+        Comment.post_id,
+        func.count('*').label('comment_count')
+    ).group_by(Comment.post_id).subquery()
+
+    # Create alias for easier reference
+    comments = aliased(comment_count_subquery, name='comments')
+
+    # Adjusted query using func.now() for PostgreSQL date arithmetic
+    joined_posts_query = db.session.query(
+        Post, 
+        comments.c.comment_count
+    ).outerjoin(
+        comments, Post.id == comments.c.post_id
+    ).join(
         Community, Post.community_id == Community.id
     ).join(
         user_community_association, user_community_association.c.community_id == Community.id
     ).filter(
         user_community_association.c.user_id == user_id
-    ).order_by(
-        Post.posted_time.desc()
-    ).all()
+    )
 
-    # Fetch top posts from across the entire network by upvotes, excluding already fetched posts
-    top_global_posts = Post.query.filter(
-        ~Post.id.in_([post.id for post in joined_posts])  # Exclude posts already included in joined_posts
-    ).order_by(
-        Post.upvotes.desc()
-    ).limit(30).all()  # Limit to top 10 posts; adjust as needed
+    # Calculate the 'hot' formula
+    if filter_type == 'hot':
+        score = (Post.upvotes - Post.downvotes + 2 * func.coalesce(comments.c.comment_count, 0)) / func.pow(((func.extract('epoch', func.now() - Post.posted_time) / 3600) + 2), 1.5)
+        joined_posts = joined_posts_query.order_by(score.desc()).all()
+    else:  # 'new'
+        joined_posts = joined_posts_query.order_by(Post.posted_time.desc()).all()
 
-    # Combine joined posts with top global posts
-    all_posts = joined_posts + top_global_posts
+    all_posts = [{'post': post, 'comment_count': comment_count} for post, comment_count in joined_posts]
 
-    return render_template("feed.html", posts=all_posts, active_page='feed')
+    return render_template("feed.html", posts=all_posts, active_page='feed', current_filter=filter_type)
+
+
 
 
 
