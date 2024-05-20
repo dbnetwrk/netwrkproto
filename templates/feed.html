@@ -34,7 +34,23 @@
 
 
 
+/* Style for the select element */
+    #filter-select {
+        color: gray; /* Sets the text color to gray */
+        border: none; /* Removes the border */
+        appearance: none; /* Removes default styling */
+        background: transparent; /* Makes the background transparent */
+        background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="gray" d="M5 8L10 13 15 8z"/></svg>'); /* Custom arrow */
+        background-repeat: no-repeat;
+        background-position: right;
+        background-size: 12px;
+        padding-right: 15px; /* Space for the arrow */
+    }
 
+    /* Style for options */
+    #filter-select option {
+        color: black; /* Ensures options are readable */
+    }
 
 
 
@@ -44,59 +60,62 @@
 
     <!-- Add this within your body tag in index.html -->
 
+    <div class="card">
+        <select id="filter-select">
+            <option value="new" {% if current_filter == 'new' %}selected{% endif %}>New</option>
+            <option value="hot" {% if current_filter == 'hot' %}selected{% endif %}>Hot</option>
+        </select>
+    </div>
 
-    {% for post in posts %}
+    {% for entry in posts %}
     <div class="card">
         <div class="card-header">
         <!-- Conditionally display the community's profile picture -->
+            <img src="{{ url_for('static', filename=entry.post.community.profile_pic_url) }}" alt="Community Profile Picture" class='user-profile-pic'>
         
-            <img src="{{ url_for('static', filename=post.community.profile_pic_url) }}" alt="Community Profile Picture" class='user-profile-pic'>
-        
-
         <div class="post-info">
             <!-- Link to the community, displaying its name -->
-            <a href="{{ url_for('view_community', community_id=post.community.id) }}" class="community-name-link">{{ post.community.name }} · {{ post.posted_time|time_ago }}</a>
+            <a href="{{ url_for('view_community', community_id=entry.post.community.id) }}" class="community-name-link">{{ entry.post.community.name }} · {{ entry.post.posted_time|time_ago }}</a>
             <!-- Display user's display name, respecting anonymity -->
-            <small>{% if post.community.is_anonymous %}
-        <!-- In anonymous communities, clicking the name initiates an anonymous message -->
-        <small><a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
-    {% else %}
-        <!-- In regular communities, clicking the name goes to the user's profile -->
-        <small><a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
-    {% endif %}</small>
+            <small>{% if entry.post.community.is_anonymous %}
+                <!-- In anonymous communities, clicking the name initiates an anonymous message -->
+                <small><a href="#" onclick="startAnonymousConversation('{{ entry.post.user.id }}'); return false;">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
+            {% else %}
+                <!-- In regular communities, clicking the name goes to the user's profile -->
+                <small><a href="{{ url_for('profile', user_id=entry.post.user.id) }}">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
+            {% endif %}</small>
         </div>
     </div>
-        <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-title">{{ post.title }}</a>
-        <div class="card-content"><p class="content-preview">{{ post.content|strip_html }}</p>
-
-
-
-            {% if post.image_filename %}
-            <p></p>
-    <img src="{{post.image_filename}}" alt="Post Image">
-{% endif %}
-
-
+        <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-title">{{ entry.post.title }}</a>
+        <div class="card-content">
+            <p class="content-preview">{{ entry.post.content|strip_html }}</p>
+            {% if entry.post.image_filename %}
+                <img src="{{entry.post.image_filename}}" alt="Post Image">
+            {% endif %}
         </div>
         
-
         <div class="card-meta">
         </div>
         <div class="card-actions">
-            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ post.id }}">
-    <i class="fas fa-arrow-up"></i>
-</button>
-<span id="vote-count-{{ post.id }}" class="vote-count">{{ post.upvotes - post.downvotes }}</span>
-<button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ post.id }}">
-    <i class="fas fa-arrow-down"></i>
-</button>
+            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ entry.post.id }}">
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            <span id="vote-count-{{ entry.post.id }}" class="vote-count">{{ entry.post.upvotes - entry.post.downvotes }}</span>
+            <button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ entry.post.id }}">
+                <i class="fas fa-arrow-down"></i>
+            </button>
+            <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-action">
+    {{ entry.comment_count if entry.comment_count is not none else 0 }}
+    {{ 'Comment' if entry.comment_count == 1 else 'Comments' }}
+</a>
+<span class="card-action">Share</span>
 
-            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">Comments</a>
-            <span class="card-action">Share</span>
+
         </div>
     </div>
     {% endfor %}
 </div>
+
 
 <script>
 
@@ -156,6 +175,9 @@ function startAnonymousConversation(userId) {
     }
 }
 
+document.getElementById('filter-select').addEventListener('change', function() {
+    window.location.href = '/feed?filter=' + this.value;
+});
 
 </script>
 
