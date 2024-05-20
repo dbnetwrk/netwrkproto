@@ -302,7 +302,7 @@ class Subreddits(db.Model):
     __tablename__ = 'subreddits'
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text, nullable=False)
-    content_type = db.Column(db.String(10), nullable=False)
+    
     
 
 
@@ -2642,46 +2642,38 @@ def redfeed():
 
 
 
-@app.route('/reddit_scraper/<content_type>', methods=['GET', 'POST'])
-@app.route('/reddit_scraper/', defaults={'content_type': 'images'}, methods=['GET', 'POST'])
-def reddit_scraper(content_type):
-
-    if not content_type:
-        content_type = 'images'
-
-    communities = Community.query.all()  # Retrieve communities for every request
-    subreddits = Subreddits.query.filter_by(content_type=content_type).all()
-    seeders = User.query.filter_by(seeder=True).all()
-
+@app.route('/reddit_scraper/', methods=['GET', 'POST'])
+def reddit_scraper():
+    communities = Community.query.options(joinedload(Community.subreddits)).all()  # Preload subreddits with communities
     if request.method == 'POST':
         clear_image_directory()
-        subreddit_name = request.form.get('subreddit')
-        number_of_posts = request.form.get('number_of_posts', 100)
-        sort_option = request.form.get('sort_option', 'hot')  # 'hot', 'top', 'new', etc.
+        selected_community_id = request.form.get('community_id')
+        subreddit_name = request.form.get('subreddit')  # Direct input of subreddit name
+        number_of_posts = int(request.form.get('number_of_posts', 100))
+        sort_option = request.form.get('sort_option', 'hot')
 
-        # Store form data in session for reuse
-        session['subreddit_name'] = subreddit_name
-        session['content_type'] = content_type
-        session['number_of_posts'] = number_of_posts
-        session['sort_option'] = sort_option
+        session_data = {
+            'subreddit_name': subreddit_name,
+            'number_of_posts': number_of_posts,
+            'sort_option': sort_option,
+            'selected_community_id': selected_community_id
+        }
+        session.update(session_data)
 
-        results = scrape_reddit_posts(subreddit_name, content_type, int(number_of_posts), sort_option)
+        results = []
+        if subreddit_name:
+            results = scrape_reddit_posts(subreddit_name, number_of_posts, sort_option)
+        elif selected_community_id:
+            community = Community.query.get(selected_community_id)
+            for subreddit in community.subreddits:
+                results.extend(scrape_reddit_posts(subreddit.prompt, number_of_posts, sort_option))
+        
         if results:
-            flash(f"Scraped {len(results)} posts from /r/{subreddit_name} as {content_type}")
-        return render_template('reddit_scraper.html', results=results, content_type=content_type, communities=communities, subreddits=subreddits, seeders=seeders,
-                               subreddit_name=session.get('subreddit_name'),
-                               number_of_posts=session.get('number_of_posts'),
-                               sort_option=session.get('sort_option'))
+            flash(f"Scraped {len(results)} posts")
 
-    # Initialize form with session data if available
-    return render_template('reddit_scraper.html', communities=communities, subreddits=subreddits, seeders=seeders,
-                           subreddit_name=session.get('subreddit_name'),
-                           content_type=content_type,
-                           number_of_posts=session.get('number_of_posts'),
-                           sort_option=session.get('sort_option'))
+        return render_template('reddit_scraper.html', results=results, communities=communities, session=session)
 
-
-
+    return render_template('reddit_scraper.html', communities=communities, session=session)
 
 
 def post_exists(title, reddit_post_id=None):
@@ -2705,11 +2697,11 @@ def post_exists(title, reddit_post_id=None):
     return exists_in_posts or exists_in_scheduled
 
 
-def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
+def scrape_reddit_posts(subreddit_name, limit, sort_option):
     reddit = praw.Reddit(
         client_id='i-SqiFyPh8Jgk34GFXwLCw',
         client_secret='mbAJH8RDW3G3S7L-gLb9HIUwj_on-g',
-        user_agent='script:subreddit image downloader:v1.0 (by /u/DoodleChoco6642)'
+        user_agent='script:subreddit image and text downloader:v1.0 (by /u/DoodleChoco6642)'
     )
 
     subreddit = reddit.subreddit(subreddit_name)
@@ -2721,31 +2713,35 @@ def scrape_reddit_posts(subreddit_name, content_type, limit, sort_option):
 
     results = []
     for submission in fetch_method(limit=limit):
-        if not post_exists(submission.title, submission.id):
-            if content_type == 'images' and submission.url.endswith(('jpg', 'jpeg', 'png')):
+        if not post_exists(submission.title, submission.id):  # Ensure you have a function to check for duplicate posts
+            if submission.url.endswith(('jpg', 'jpeg', 'png')) and not submission.is_self:
                 file_name = f"{submission.id}.jpg"
                 local_filename = os.path.join('static', 'images', 'content', file_name)
-                download_image(submission.url, local_filename)
+                download_image(submission.url, local_filename)  # Make sure download_image handles errors properly
 
                 web_path = os.path.join('images/content', file_name)
                 web_path = web_path.replace(os.sep, '/')
                 result = {
+                    'subreddit': subreddit_name,
                     'image': web_path,
                     'title': submission.title,
                     'content': submission.selftext,
                     'reddit_post_id': submission.id
                 }
                 results.append(result)
-            elif content_type == 'text' and submission.is_self:
+            elif submission.is_self:
+                # For text posts, just check it's not one of the image extensions
                 if not submission.url.endswith(('jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff')):
                     results.append({
+                        'subreddit': subreddit_name,
                         'title': submission.title,
                         'content': submission.selftext,
-                        'image': None,  # Ensuring no image is associated
+                        'image': None,  # No image associated with text posts
                         'reddit_post_id': submission.id
                     })
 
     return results
+
 
 
 def scrape_reddit_posts_2(subreddit_name, content_type, limit, sort_option):
@@ -3137,9 +3133,12 @@ def edit_community_admin(community_id):
         community.description = request.form['description']
         if 'profile_pic' in request.files:
             profile_pic = request.files['profile_pic']
-            filename = secure_filename(profile_pic.filename)
-            profile_pic.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            community.profile_pic_url = filename
+            if profile_pic.filename:  # Ensure there is a filename
+                filename = secure_filename(profile_pic.filename)
+                save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)  # Ensure directory exists
+                profile_pic.save(save_path)
+                community.profile_pic_url = os.path.join('uploads', filename)  # Adjust according to your needs
 
         db.session.commit()
         flash('Community updated successfully!')
@@ -3506,9 +3505,9 @@ def subreddits():
 @app.route('/add-subreddit', methods=['POST'])
 def add_subreddit():
     prompt = request.form['prompt']
-    content_type = request.form['content_type']
+    #content_type = request.form['content_type']
     if prompt:
-        new_subreddit = Subreddits(prompt=prompt, content_type=content_type)
+        new_subreddit = Subreddits(prompt=prompt)
         db.session.add(new_subreddit)
         db.session.commit()
         flash('Subreddit added successfully!')
@@ -3519,11 +3518,11 @@ def add_subreddit():
 @app.route('/add-subreddit-to-community/<int:community_id>', methods=['POST'])
 def add_subreddit_to_community(community_id):
     prompt = request.form.get('prompt')
-    content_type = request.form.get('content_type')
+    #content_type = request.form.get('content_type')
     # Create the subreddit if it does not exist
     subreddit = Subreddits.query.filter_by(prompt=prompt).first()
     if not subreddit:
-        subreddit = Subreddits(prompt=prompt, content_type=content_type)
+        subreddit = Subreddits(prompt=prompt)
         db.session.add(subreddit)
         db.session.commit()
 
