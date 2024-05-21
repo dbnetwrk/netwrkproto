@@ -57,8 +57,13 @@
     <i class="fas fa-arrow-down"></i>
 </button>
 
-            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">{{ comments|length }} {{ 'Comment' if comments|length == 1 else 'Comments' }}</a>
-            <span class="card-action">Share</span>
+            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action"><i class="fas fa-comments"></i>
+    {{ comments|length }} 
+    
+</a>
+<span class="card-action"><i class="fas fa-share"></i></span>
+
+           
         </div>
 </div>
 
