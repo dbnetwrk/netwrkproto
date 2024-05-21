@@ -630,13 +630,15 @@ def get_top_20_community_ids():
 
 @app.route('/community/<int:community_id>')
 def view_community(community_id):
-    top_20_community_ids = get_top_20_community_ids()
     community = Community.query.get_or_404(community_id)
     posts = Post.query.filter_by(community_id=community_id).order_by(Post.posted_time.desc()).all()
-    member_count = community.members.count()
-    creator_owns_top_community = community.id in top_20_community_ids
-    return render_template('view_community.html', community=community, posts=posts, member_count = member_count, creator_owns_top_community=creator_owns_top_community)
 
+    posts_with_comments = []
+    for post in posts:
+        comment_count = Comment.query.filter_by(post_id=post.id).count()
+        posts_with_comments.append({'post': post, 'comment_count': comment_count})
+
+    return render_template('view_community.html', community=community, posts=posts_with_comments)
 
 
 @app.route('/post/<int:post_id>')
