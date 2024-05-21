@@ -13,6 +13,9 @@ body, html {
 
 
 
+a, .button {
+    color: #007dcd;
+}
 
 
 .search-form {
@@ -100,7 +103,7 @@ body, html {
     display: flex;
     justify-content: space-around;
     align-items: center;
-    background-color: #ffffff;
+    background-color: #007dcd;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     color: white;
     position: fixed;
@@ -111,7 +114,7 @@ body, html {
 }
 
 .navbar a {
-    color: #7d7d82;
+    color: #ffffff;
 
     text-decoration: none;
     text-transform: uppercase;
@@ -194,7 +197,7 @@ body, html {
     /* Define a CSS variable for border opacity within the scope of .card */
     --tw-border-opacity: 1;
     /* Update the border-color to use the RGB color with opacity */
-    border: 1px solid rgb(233 235 238 / var(--tw-border-opacity));
+    
     
     width: 80%;
     margin-bottom: 20px;
@@ -373,7 +376,7 @@ letter-spacing: .5px;
     margin-bottom: 20px;
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #ccc; /* Just for visibility */
+    
 }
 
 .comment {
@@ -407,7 +410,7 @@ a {
     margin-bottom: 20px;
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #ccc; /* Just for visibility */
+    
 }
 
 .comment-form textarea {

@@ -78,46 +78,46 @@
 {% endif %}
 
     
-        {% for post in posts %}
+        {% for entry in posts %}
 <div class="card">
     <div class="card-header">
         <small>
             {% if not community.is_anonymous %}
-                <img src="{{ post.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic">
+                <img src="{{ entry.post.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic">
             {% endif %}
-            {% if post.community.is_anonymous %}
+            {% if entry.post.community.is_anonymous %}
         <!-- In anonymous communities, clicking the name initiates an anonymous message -->
-        <small><a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
+        <small><a href="#" onclick="startAnonymousConversation('{{ entry.post.user.id }}'); return false;">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
     {% else %}
         <!-- In regular communities, clicking the name goes to the user's profile -->
-        <small><a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
-    {% endif %} · {{post.posted_time|time_ago }}
-            {% if post.user.id == community.created_by %}
+        <small><a href="{{ url_for('profile', user_id=entry.post.user.id) }}">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
+    {% endif %} · {{entry.post.posted_time|time_ago }}
+            {% if entry.post.user.id == community.created_by %}
                 <span class="card-action">Creator</span>
             {% endif %}
         </small>
     </div>
-    <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-title">{{ post.title }}</a>
-    <div class="card-content"><p class="content-preview">{{ post.content|strip_html }}</p>
+    <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-title">{{ entry.post.title }}</a>
+    <div class="card-content"><p class="content-preview">{{ entry.post.content|strip_html }}</p>
 
 
-            {% if post.image_filename %}
+            {% if entry.post.image_filename %}
             <p></p>
-    <img src="{{ post.image_filename }}" alt="Post Image">
+    <img src="{{ entry.post.image_filename }}" alt="Post Image">
 {% endif %}
 
     </div>
     <div class="card-meta"></div>
     <div class="card-actions">
-            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ post.id }}">
+            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ entry.post.id }}">
     <i class="fas fa-arrow-up"></i>
 </button>
-<span id="vote-count-{{ post.id }}" class="vote-count">{{ post.upvotes - post.downvotes }}</span>
-<button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ post.id }}">
+<span id="vote-count-{{ entry.post.id }}" class="vote-count">{{ entry.post.upvotes - entry.post.downvotes }}</span>
+<button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ entry.post.id }}">
     <i class="fas fa-arrow-down"></i>
 </button>
 
-            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">Comments</a>
+            <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-action">{{ entry.comment_count }} {{ 'Comment' if entry.comment_count == 1 else 'Comments' }}</a>
             <span class="card-action">Share</span>
         </div>
 </div>
