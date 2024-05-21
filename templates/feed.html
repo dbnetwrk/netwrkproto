@@ -104,11 +104,11 @@
             <button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ entry.post.id }}">
                 <i class="fas fa-arrow-down"></i>
             </button>
-            <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-action">
+            <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-action"><i class="fas fa-comments"></i>
     {{ entry.comment_count if entry.comment_count is not none else 0 }}
-    {{ 'Comment' if entry.comment_count == 1 else 'Comments' }}
+    
 </a>
-<span class="card-action">Share</span>
+<span class="card-action"><i class="fas fa-share"></i></span>
 
 
         </div>
