@@ -1,7 +1,7 @@
 body, html {
     background-color: #f9f9fb;
     padding-bottom: 0;
-    font-family: 'Poppins', Arial, sans-serif; /* Updated font family */
+    font-family: 'Roboto', Arial, sans-serif; /* Updated font family */
     color: #222222;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
