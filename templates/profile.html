@@ -5,6 +5,14 @@
 {% block content %}
 
 <style>
+
+.profile-action-buttons {
+
+        display:flex;
+
+
+}
+
 .tab {
     display: flex;
     justify-content: space-around;
@@ -22,7 +30,7 @@
 }
 
 .tablinks:hover {
-    background-color: #ddd;
+    color: black;
 }
 
 .tabcontent {
@@ -32,7 +40,8 @@
 }
 
 .tablinks.active {
-    background-color: #ccc;
+    color: black;
+    font-weight: bold;
 }
 
 .tabs-container {
@@ -103,30 +112,34 @@
         {% if session['user_id'] == user.id %}
         <p>Your Anon: {{ user.burner_username }} <a href="{{ url_for('burner_edit') }}">(Edit)</a></p>
         {% endif %}
+        <p> {{ user.about_me }}
     </div>
 
-    <div class="d-flex justify-content-start">
-        {% if session['user_id'] != user.id %}
-        <button id="start-conversation" data-recipient-id="{{ user.id }}" class="card-action">Send Message</button>
+    <div class="profile-action-buttons">
+    {% if session['user_id'] != user.id %}
         {% set is_following_user = current_user.is_following(user) %}
         {% if is_following_user %}
-        <form action="{{ url_for('unfollow', user_id=user.id) }}" method="post" class="d-inline">
-            <button type="submit" class="card-action">Unfollow</button>
-        </form>
+            <form action="{{ url_for('unfollow', user_id=user.id) }}" method="post" class="d-inline">
+                <button type="submit" class="active-button">Unfollow</button>
+            </form>
         {% else %}
-        <form action="{{ url_for('follow', user_id=user.id) }}" method="post" class="d-inline">
-            <button type="submit" class="card-action">Follow</button>
-        </form>
+            <form action="{{ url_for('follow', user_id=user.id) }}" method="post" class="d-inline">
+                <button type="submit" class="active-button">Follow</button>
+            </form>
         {% endif %}
-        {% else %}
+        <button id="start-conversation" data-recipient-id="{{ user.id }}" class="card-action" style="border: 1px solid lightgray; padding: 5px 10px; background-color: white; font-size: 16px;">
+            <i class="fa fa-comment"></i>
+        </button>
+    {% else %}
         <form action="{{ url_for('edit_profile') }}" method="get" class="d-inline">
-            <button type="submit" class="card-action">Edit Profile</button>
+            <button type="submit" class="active-button">Edit Profile</button>
         </form>
         <form action="{{ url_for('logout') }}" method="post" class="d-inline">
             <button type="submit" class="card-action">Logout</button>
         </form>
-        {% endif %}
-    </div>
+    {% endif %}
+</div>
+
 </div>
 
 <br>
