@@ -319,6 +319,29 @@ a, .button {
 }
 
 
+/* Assuming you want the same oval and hover effects for .card-action */
+.secondary-button {
+  text-decoration: none;
+  color: #007dcd;
+  padding: 5px 15px; /* Adjusted padding for oval shape */
+  background-color: #ffffff; /* No fill inside the button */
+  
+  border-radius: 20px; /* Oval shape */
+  border: 1px solid #007dcd;
+}
+
+/* Assuming you want the same oval and hover effects for .card-action */
+.secondary-button:hover {
+  text-decoration: none;
+  color: #ffffff;
+  padding: 5px 15px; /* Adjusted padding for oval shape */
+  background-color: #007dcd; /* No fill inside the button */
+  
+  border-radius: 20px; /* Oval shape */
+  border: 1px solid #ffffff; /* Complete border property */
+}
+
+
 
 
 .btn btn-primary {
