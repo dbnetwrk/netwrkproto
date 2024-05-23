@@ -1739,7 +1739,7 @@ def edit_seeder(id):
         seeder.communities = selected_communities
 
         db.session.commit()
-        return redirect(url_for('admin_panel'))
+        return redirect(url_for('get_seeders'))
 
     return render_template('edit_seeder.html', seeder=seeder, communities=communities)
 
