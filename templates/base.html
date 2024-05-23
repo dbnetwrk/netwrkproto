@@ -7,7 +7,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
-     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"> 
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&display=swap" rel="stylesheet">
+
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
@@ -37,7 +39,7 @@
 }
 
 .drawer {
-    height: 100%; /* Full-screen height */
+    height: 100vh; /* Full-screen height */
     width: 0; /* Width is zero to start with */
     position: fixed; /* Fixed position to stay in place */
     z-index: 1; /* Sit on top */
@@ -45,14 +47,52 @@
     left: 0; /* Align to the left */
     background-color: white; /* Background color */
     overflow-x: hidden; /* Hide horizontal overflow */
-    overflow-y: auto; /* Hide vertical scrollbar by default */
+    overflow-y: auto; /* Allow vertical scrolling */
     transition: 0.5s; /* Smooth transition for opening/closing */
     padding-top: 60px; /* Padding from the top */
+    box-shadow: 1px 1px 10px rgba(0, 0, 0, 0.05);
 }
 
-.drawer:hover {
-    overflow-y: auto; /* Show scrollbar when hovering */
+/* Hide scrollbar by default */
+.drawer::-webkit-scrollbar {
+    width: 0; /* Zero width effectively hides the scrollbar */
+    background: transparent; /* Transparent background */
 }
+
+/* Show and style scrollbar when hovering over the drawer */
+.drawer:hover::-webkit-scrollbar {
+    width: 5px; /* Set the width of the scrollbar */
+    background-color: rgba(0, 0, 0, 0.05); /* Optional: set a background color */
+}
+
+/* Style the draggable part of the scrollbar */
+.drawer:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2); /* Color of the scrollbar handle */
+    border-radius: 10px; /* Roundness of the scrollbar handle */
+}
+
+/* Optionally, style the scrollbar track */
+.drawer:hover::-webkit-scrollbar-track {
+    background-color: transparent; /* Background of the track */
+}
+
+/* Style the scrollbar handle when hovered */
+.drawer:hover::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3); /* Darker handle on hover */
+}
+
+// Add this style in your CSS to handle the overlay appearance
+.drawer-open-overlay::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 0; // Ensure it's below the drawer but above other content
+}
+
 
 /* List of topics */
 .topics-list {
@@ -65,7 +105,7 @@
     padding: 8px 8px 8px 32px;
     text-decoration: none;
     font-size: 15px;
-    color: #818181;
+    color: #000000;
     display: block;
     transition: 0.3s;
 }
@@ -129,8 +169,22 @@ hr {
     margin-bottom: 10px; /* Space below the header */
 }
 
+.logo-section {
+    text-align: center;
+    margin-bottom: 50px;
+    margin-top: -40px;
+}
 
+.navbar-logo-pic {
+    width: 80%; /* Adjust as needed */
+    height: auto;
+}
 
+.community-top-charts {
+
+        padding-bottom: 75px;
+
+}
 </style>
 </head>
 <body>
@@ -140,10 +194,13 @@ hr {
     <!-- Profile Picture and User Links -->
     <div class="profile-section">
         {% if current_user %}
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="navbar-logo-pic">
+            </div>
             <a href="{{ url_for('profile') }}" class="profile-link">
                 <img src="{{ current_user.profile_pic_url | default('https://via.placeholder.com/50', true) }}" alt="Profile Picture" class="navbar-profile-pic">
             </a>
-            <div class="profile-name">{{ current_user.first_name }} {{ current_user.last_name }}</div>
+            <div class="profile-name"><b>{{ current_user.first_name }} {{ current_user.last_name }}</b></div>
         {% else %}
             <a href="{{ url_for('login') }}" class="{{ 'active' if active_page == 'login' else '' }}">
                 <i class="fas fa-sign-in-alt"></i>
@@ -153,9 +210,9 @@ hr {
     </div>
     <!-- Links before the topics -->
     <ul class="topics-list">
-        <li><a href="{{ url_for('show_feed') }}"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="{{ url_for('show_feed') }}"><i class="fas fa-home"></i> Feed</a></li>
         <li><a href="{{ url_for('my_messages') }}"><i class="fas fa-envelope"></i> Messages</a></li>
-        <li><a href="{{ url_for('create_post') }}"><i class="fas fa-plus"></i> Create Post</a></li>
+        <li><a href="{{ url_for('create_post') }}"><i class="fas fa-plus"></i> Create</a></li>
         
         <!-- <li><a href="{{ url_for('user_leaderboard') }}"><i class="fas fa-trophy"></i> Top Users</a></li> -->
         <!--<li><a href="{{ url_for('user_leaderboard') }}"><i class="fas fa-moon"></i> Dark Mode</a></li> -->
@@ -164,7 +221,7 @@ hr {
     <hr>
     <!-- Topics list starts here -->
     <div class="community-top-charts">
-        <h3 class="topics-header">Anonymous</h3>
+        <p class="topics-header">Anonymous</p>
         <ul class="topics-list">
             {% for topic in topics if topic.interest_category_id == 1 %}
             <li>
@@ -177,7 +234,7 @@ hr {
             </li>
             {% endfor %}
         </ul>
-        <h3 class="topics-header">Topics</h3>
+        <p class="topics-header">Topics</p>
         <ul class="topics-list">
             {% for topic in topics if topic.interest_category_id == 2 %}
             <li>
@@ -193,7 +250,6 @@ hr {
     </div>
 </div>
 
-
 <!-- Hamburger menu icon -->
 <a href="javascript:void(0);" class="navbar-icon" onclick="toggleDrawer()">
     <i class="fas fa-bars"></i>
@@ -203,30 +259,68 @@ hr {
 {% endblock %}
 
 <script>
-    function toggleDrawer() {
-        var drawer = document.getElementById("drawer");
-        drawer.classList.toggle('open');
-        drawer.style.width = drawer.classList.contains('open') ? '250px' : '0';
-    }
+function toggleDrawer() {
+    var drawer = document.getElementById("drawer");
+    var isOpen = drawer.classList.contains('open');
+    drawer.style.width = isOpen ? '0' : '250px';
+    drawer.classList.toggle('open');
 
-    function adjustDrawerForScreenSize() {
-        var drawer = document.getElementById("drawer");
-        // Default to sidebar closed on mobile views
-        if (window.innerWidth < 769) {
-            drawer.classList.remove('open');
-            drawer.style.width = '0'; // Hide the sidebar on mobile screens
+    // Manage overlay for mobile views
+    manageOverlay(!isOpen);
+}
+
+// Function to add/remove overlay based on drawer state
+function manageOverlay(addOverlay) {
+    if (window.innerWidth < 769) { // Only apply on mobile screens
+        if (addOverlay) {
+            document.body.classList.add('drawer-open-overlay');
         } else {
-            drawer.classList.add('open');
-            drawer.style.width = '250px'; // Show the sidebar on wider screens
+            document.body.classList.remove('drawer-open-overlay');
         }
     }
+}
 
-    // Listen for window resize events
-    window.addEventListener('resize', adjustDrawerForScreenSize);
+// Close the drawer when clicking outside of it on mobile
+document.addEventListener('click', function(event) {
+    var drawer = document.getElementById("drawer");
+    if (event.target.closest('.drawer') || event.target.closest('.navbar-icon')) {
+        return; // Do nothing if the click is on the drawer or its toggle button
+    }
+    if (drawer.classList.contains('open') && window.innerWidth < 769) {
+        toggleDrawer(); // Close the drawer
+    }
+});
 
-    // Initial adjustment on page load
-    document.addEventListener('DOMContentLoaded', adjustDrawerForScreenSize);
+// Listen for window resize events to potentially remove the overlay
+window.addEventListener('resize', function() {
+    if (window.innerWidth >= 769 && document.body.classList.contains('drawer-open-overlay')) {
+        document.body.classList.remove('drawer-open-overlay');
+        var drawer = document.getElementById("drawer");
+        drawer.style.width = '250px'; // Ensure the drawer stays open on non-mobile screens
+        drawer.classList.add('open');
+    }
+});
+
+
+function adjustDrawerForScreenSize() {
+    var drawer = document.getElementById("drawer");
+    // Default to sidebar closed on mobile views
+    if (window.innerWidth < 769) {
+        drawer.classList.remove('open');
+        drawer.style.width = '0'; // Hide the sidebar on mobile screens
+    } else {
+        drawer.classList.add('open');
+        drawer.style.width = '250px'; // Show the sidebar on wider screens
+    }
+}
+
+// Listen for window resize events
+window.addEventListener('resize', adjustDrawerForScreenSize);
+
+// Initial adjustment on page load
+document.addEventListener('DOMContentLoaded', adjustDrawerForScreenSize);
 </script>
 </body>
 </html>
+
 

@@ -54,17 +54,40 @@
 
 
 
+.filter-tabs {
+    display: flex;
+    justify-content: right;
+    margin-bottom: 5px;
+    width: 80%;
+
+}
+
+.filter-tab {
+    text-decoration: none;
+    color: #bbb;
+    font-weight: normal;
+    padding: 10px 20px;
+    transition: color 0.3s, font-weight 0.3s;
+}
+
+.filter-tab.active {
+    color: black;
+    font-weight: bold;
+}
+
+.filter-tab:hover {
+    color: #777;
+}
+
 </style>
 
 <div class="feed-container">
 
     <!-- Add this within your body tag in index.html -->
 
-    <div class="card">
-        <select id="filter-select">
-            <option value="new" {% if current_filter == 'new' %}selected{% endif %}>New</option>
-            <option value="hot" {% if current_filter == 'hot' %}selected{% endif %}>Hot</option>
-        </select>
+    <div class="filter-tabs">
+        <a href="/feed?filter=new" class="filter-tab {% if current_filter == 'new' %}active{% endif %}">New</a>
+        <a href="/feed?filter=hot" class="filter-tab {% if current_filter == 'hot' %}active{% endif %}">Hot</a>
     </div>
 
     {% for entry in posts %}
