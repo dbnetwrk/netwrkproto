@@ -3644,8 +3644,9 @@ def idea_factory():
         # Modify text content using OpenAI
         for post in results:
             if post['image'] is None:  # Process only text posts
-                modified_content = modify_text_with_openai(post['content'], professional_context)
-                post['content'] = modified_content
+                full_text = f"Title: {post.get('title', '')}\n\n{post['content']}"
+                modified_content = modify_text_with_openai(full_text, professional_context)
+                post['ai_content'] = modified_content
 
         text_results = [post for post in results if post['image'] is None]
 
@@ -3658,15 +3659,37 @@ def idea_factory():
 
 
 def modify_text_with_openai(text, professional_context):
-    context_suffix = "in a professional context." if professional_context else "make it very different from the original post"
+    context_suffix = "in a professional context." if professional_context else "make it completely different from the original post"
     print(context_suffix)
     prompt = (
     f"Take this Reddit post and extract the general, underlying theme from it: \n\n"
     f"{text}\n\n"
-    f"and then below that, generate an example post that follows the theme, but {context_suffix}"
-    "format your response clearly with the extracted main theme and then the two paragraph example post"
+    f"and then below that, generate an example post that follows the theme, but {context_suffix}. "
+    "Pretend you are a young adult. The example post needs to follow these guidelines for making it more personable and viral:\n\n"
+    f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
+    "It doesn’t feel scripted or generic.\n"
+    f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
+    "about the person's situation or viewpoint.\n"
+    f"Emotional Engagement: The post connects on an emotional level, whether it's sharing joy, struggles, doubts, "
+    "or achievements. This helps create a bond with readers.\n"
+    f"Storytelling: Personal posts often incorporate elements of storytelling, which is also a key aspect of virality. "
+    "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable.\n"
+    f"Relevance: These posts are relevant to the interests and needs of the community. In a professional or young "
+    "adult setting, topics might include career challenges, educational experiences, personal development, or "
+    "balancing life and work.\n"
+    f"Interactive: Personal posts invite interaction by asking questions or seeking advice, thereby fostering a "
+    "community dialogue.\n"
+    f"Reflective: They often reflect on personal experiences or lessons learned, which can provide valuable insights "
+    "to others in similar situations.\n\n"
+    f"Virality Principles:\n"
+    f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image.\n"
+    f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers.\n"
+    f"3. Emotion: Aim to elicit strong emotions like awe, excitement, amusement, anger, or anxiety which are linked to higher sharing rates.\n"
+    f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
+    f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others.\n"
+    f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
+    f"Format your response clearly with the extracted main theme and then the example post which is at most two paragraphs."
 )
-
     print(prompt)
     try:
         response = client.chat.completions.create(
@@ -3676,7 +3699,7 @@ def modify_text_with_openai(text, professional_context):
             ]
         )
         modified_text = response.choices[0].message.content.strip()  # Capitalize all letters
-        final_output = f"Original Post:\n{text}\n\nGenerated Content:\n{modified_text}"
+        final_output = f"{modified_text}"
         return final_output
     except Exception as e:
         print(f"Failed to modify text: {str(e)}")
