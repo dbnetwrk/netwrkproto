@@ -3610,6 +3610,81 @@ def get_seeder_info(user_id):
 
 
 
+## IDEA FACTORY ##
+
+
+@app.route('/idea_factory/', methods=['GET', 'POST'])
+def idea_factory():
+    communities = Community.query.options(joinedload(Community.subreddits)).all()
+    if request.method == 'POST':
+        clear_image_directory()
+        selected_community_id = request.form.get('community_id')
+        subreddit_name = request.form.get('subreddit')
+        number_of_posts = int(request.form.get('number_of_posts', 100))
+        sort_option = request.form.get('sort_option', 'hot')
+        professional_context = 'professional_context' in request.form  # Check if checkbox is checked
+
+        session_data = {
+            'subreddit_name': subreddit_name,
+            'number_of_posts': number_of_posts,
+            'sort_option': sort_option,
+            'selected_community_id': selected_community_id,
+            'professional_context': professional_context
+        }
+        session.update(session_data)
+
+        results = []
+        if subreddit_name:
+            results = scrape_reddit_posts(subreddit_name, number_of_posts, sort_option)
+        elif selected_community_id:
+            community = Community.query.get(selected_community_id)
+            for subreddit in community.subreddits:
+                results.extend(scrape_reddit_posts(subreddit.prompt, number_of_posts, sort_option))
+
+        # Modify text content using OpenAI
+        for post in results:
+            if post['image'] is None:  # Process only text posts
+                modified_content = modify_text_with_openai(post['content'], professional_context)
+                post['content'] = modified_content
+
+        text_results = [post for post in results if post['image'] is None]
+
+        if text_results:
+            flash(f"Scraped and processed {len(text_results)} text posts")
+
+        return render_template('idea_factory.html', results=text_results, communities=communities, session=session)
+
+    return render_template('idea_factory.html', communities=communities, session=session)
+
+
+def modify_text_with_openai(text, professional_context):
+    context_suffix = "in a professional context." if professional_context else "make it very different from the original post"
+    print(context_suffix)
+    prompt = (
+    f"Take this Reddit post and extract the general, underlying theme from it: \n\n"
+    f"{text}\n\n"
+    f"and then below that, generate an example post that follows the theme, but {context_suffix}"
+    "format your response clearly with the extracted main theme and then the two paragraph example post"
+)
+
+    print(prompt)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Use the appropriate model
+            messages=[
+                {"role": "system", "content": prompt}
+            ]
+        )
+        modified_text = response.choices[0].message.content.strip()  # Capitalize all letters
+        final_output = f"Original Post:\n{text}\n\nGenerated Content:\n{modified_text}"
+        return final_output
+    except Exception as e:
+        print(f"Failed to modify text: {str(e)}")
+        return text  # Return the original text if modification fails
+
+
+
+
 
 
 if __name__ == '__main__':
