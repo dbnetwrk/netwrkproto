@@ -1,0 +1,275 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Netwrk Idea Factory</h2>
+    <p>Welcome to the Netwrk Idea Factory. This is where ideas are born.</p>
+    <form method="POST" action="{{ url_for('idea_factory') }}">
+        <div class="mb-3">
+            <label for="community" class="form-label">Select a Community:</label>
+            <select class="form-select" id="community" name="community_id">
+                <option value="">--Choose a Community--</option>
+                {% for community in communities %}
+                <option value="{{ community.id }}" {% if session.get('selected_community_id') == community.id %}selected{% endif %}>
+                    {{ community.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="subreddit" class="form-label">Or, Enter a Subreddit Name:</label>
+            <input type="text" class="form-control" id="subreddit" name="subreddit" value="{{ session.get('subreddit_name') }}" placeholder="Subreddit name">
+        </div>
+
+        <div class="mb-3">
+            <label for="number_of_posts" class="form-label">Number of Posts Per Subreddit</label>
+            <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ session.get('number_of_posts', 100) }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="sort_option" class="form-label">Sort Option</label>
+            <select class="form-select" id="sort_option" name="sort_option">
+                <option value="new" {% if session.get('sort_option') == 'new' %}selected{% endif %}>New</option>
+                <option value="hot" {% if session.get('sort_option') == 'hot' %}selected{% endif %}>Hot</option>
+                <option value="top" {% if session.get('sort_option') == 'top' %}selected{% endif %}>Top</option>
+                <option value="rising" {% if session.get('sort_option') == 'rising' %}selected{% endif %}>Rising</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="professional_context" name="professional_context" {% if session.get('professional_context') %}checked{% endif %}>
+                <label class="form-check-label" for="professional_context">
+                    Professional Context
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Scrape</button>
+    </form>
+
+    <div class="row mt-2">
+        {% for result in results %}
+        <div class="col-12 mb-3" id="postCard{{ loop.index }}">
+            <div class="card">
+                {% if result.image %}
+                <img src="{{ url_for('static', filename=result.image) }}" class="card-img-top img-fluid">
+                {% endif %}
+                <div class="card-body">
+                    <p class="card-subtitle text-muted">{{ result.subreddit }}</p>
+                    {% if result.title %}
+                    <h4 class="card-title">{{ result.title }}</h4>
+                    {% endif %}
+                    {% if result.content %}
+                    <p class="card-text">{{ result.content | truncate_lines | safe }}</p>
+                    {% endif %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal{{ loop.index }}">
+                        Schedule Post
+                    </button>
+
+                    <div class="modal fade" id="scheduleModal{{ loop.index }}" tabindex="-1" aria-labelledby="scheduleModalLabel{{ loop.index }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="scheduleModalLabel{{ loop.index }}">Schedule Post</h5>
+                                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data" data-index="{{ loop.index }}">
+                                        {% if result.image %}
+                                        <img src="{{ url_for('static', filename=result.image) }}" class="card-img-top img-fluid">
+                                        <input type="hidden" name="existing_image" value="{{ result.image }}">
+                                        {% endif %}
+                                        <div class="mb-3">
+                                            <label for="community_id" class="form-label">Select Community</label>
+                                            <select class="form-select" name="community_id" id="community_id{{ loop.index }}" onchange="updateSeeders(this.value, {{ loop.index }})">
+                                                {% for community in communities %}
+                                                <option value="{{ community.id }}">{{ community.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="user_id" class="form-label">Select Seeder</label>
+                                            <div class="dropdown">
+                                                <button class="btn btn-secondary dropdown-toggle" type="button" id="userDropdown{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    Select Seeder
+                                                </button>
+                                                <ul class="dropdown-menu" aria-labelledby="userDropdown{{ loop.index }}" id="userDropdownMenu{{ loop.index }}" style="max-height: 200px; overflow-y: auto;">
+                                                    <!-- Seeder options will be populated by JavaScript -->
+                                                </ul>
+                                            </div>
+                                            <input type="hidden" id="user_id{{ loop.index }}" name="user_id">
+                                        </div>
+                                        <div class="mb-3" id="seederInfo{{ loop.index }}">
+                                            <img id="profilePicture{{ loop.index }}" src="" alt="Seeder Profile Picture" class="img-fluid mb-3" style="max-width: 150px; display: none;">
+                                            <p><strong>About the Seeder:</strong> <span id="aboutSeeder{{ loop.index }}"></span></p>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="title" class="form-label">Title</label>
+                                            <input type="text" class="form-control" name="title" value="{{ result.title }}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="content" class="form-label">Content</label>
+                                            <textarea class="form-control" id="content{{ loop.index }}" name="content">{{ result.content }}</textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            {% if not result.image %}
+                                            <small>I want you to take this piece of text {content} and...</small>
+                                            <input type="text" class="form-control" id="customPrompt{{ loop.index }}" placeholder="Enter your custom prompt here">
+                                            <button type="button" class="btn btn-secondary" onclick="makeConcise({{ loop.index }})">AI</button>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="posted_time" class="form-label">Schedule Time</label>
+                                            <input type="datetime-local" class="form-control" name="posted_time">
+                                        </div>
+                                        <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
+                                        <button type="submit" class="btn btn-primary">Submit</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.0/js/bootstrap.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    $('form[data-index]').on('submit', function(e) {
+        e.preventDefault();
+        var form = $(this);
+        var postIndex = form.data('index');
+
+        $.ajax({
+            type: "POST",
+            url: form.attr('action'),
+            data: form.serialize(),
+            success: function(data) {
+                $('#scheduleModal' + postIndex).modal('hide');
+                alert('Post Scheduled Successfully');
+                $('#postCard' + postIndex).remove();
+            }
+        });
+    });
+});
+
+function makeConcise(index) {
+    var promptText = document.getElementById('customPrompt' + index).value;
+    var content = document.getElementById('content' + index).value;
+
+    var request = new XMLHttpRequest();
+    request.open('POST', '{{ url_for("make_concise") }}', true);
+    request.setRequestHeader('Content-Type', 'application/json');
+    request.onload = function() {
+        if (request.status >= 200 && request.status < 400) {
+            var resp = JSON.parse(request.responseText);
+            document.getElementById('content' + index).value = resp.concise_text;
+        } else {
+            console.error('Error on server');
+        }
+    };
+    request.onerror = function() {
+        console.error('Error connecting');
+    };
+    request.send(JSON.stringify({ content: content, prompt_text: promptText }));
+}
+
+function updateSeeders(communityId, index) {
+    fetch(`/get_seeders_community/${communityId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error(data.error);
+                return;
+            }
+            const userDropdownMenu = document.getElementById('userDropdownMenu' + index);
+            userDropdownMenu.innerHTML = '';
+            data.forEach(seeder => {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `
+                    <a class="dropdown-item d-flex align-items-center" href="#" onclick="selectSeeder(${seeder.id}, '${seeder.name}', ${index})">
+                        <img src="${seeder.profile_picture}" alt="${seeder.name}" class="seeder-img">
+                        <span>${seeder.name}</span>
+                    </a>`;
+                userDropdownMenu.appendChild(listItem);
+            });
+        })
+        .catch(error => console.error('Error fetching seeders:', error));
+}
+
+function selectSeeder(userId, userName, index) {
+    document.getElementById('user_id' + index).value = userId;
+    document.getElementById('userDropdown' + index).textContent = userName;
+    fetchSeederInfo(userId, index);
+}
+
+function fetchSeederInfo(userId, index) {
+    if (!userId) return;
+    var aboutDiv = document.getElementById('aboutSeeder' + index);
+    var profilePic = document.getElementById('profilePicture' + index);
+    if (!aboutDiv) return;
+
+    fetch(`/get_seeder_info/${userId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to fetch');
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                console.error(data.error);
+                aboutDiv.innerText = 'No information available';
+                profilePic.style.display = 'none';
+                return;
+            }
+            aboutDiv.innerText = data.about_me || 'No information provided';
+            if (data.profile_picture) {
+                profilePic.src = data.profile_picture;
+                profilePic.style.display = 'block';
+            } else {
+                profilePic.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching seeder info:', error);
+            aboutDiv.innerText = 'Error loading information';
+            profilePic.style.display = 'none';
+        });
+}
+</script>
+
+<style>
+.card-subtitle {
+    font-size: 0.8rem;
+    color: gray;
+}
+
+.dropdown-item.d-flex {
+    display: flex;
+    align-items: center;
+}
+
+.seeder-img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.dropdown-menu {
+    max-height: 200px; /* Set the max height of the dropdown */
+    overflow-y: auto;  /* Enable vertical scrolling */
+}
+</style>
+
+{% endblock %}
