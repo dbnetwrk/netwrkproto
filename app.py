@@ -3622,7 +3622,9 @@ def idea_factory():
         subreddit_name = request.form.get('subreddit')
         number_of_posts = int(request.form.get('number_of_posts', 100))
         sort_option = request.form.get('sort_option', 'hot')
-        professional_context = 'professional_context' in request.form  # Check if checkbox is checked
+        professional_context = request.form.get('community_id_context')
+        if professional_context:
+            professional_context = Community.query.get(professional_context).name
 
         session_data = {
             'subreddit_name': subreddit_name,
@@ -3659,13 +3661,14 @@ def idea_factory():
 
 
 def modify_text_with_openai(text, professional_context):
-    context_suffix = "in a professional context." if professional_context else "make it completely different from the original post"
+    context_suffix = f"for the {professional_context} community" if professional_context else "make it different from the original post by changing all details"
+
     print(context_suffix)
     prompt = (
     f"Take this Reddit post and extract the general, underlying theme from it: \n\n"
     f"{text}\n\n"
-    f"and then below that, generate an example post that follows the theme, but {context_suffix}. "
-    "Pretend you are a young adult. The example post needs to follow these guidelines for making it more personable and viral:\n\n"
+    f"and then below that, generate a new post that follows the theme, but {context_suffix}. "
+    "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
     f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
     "It doesn’t feel scripted or generic.\n"
     f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
@@ -3690,7 +3693,6 @@ def modify_text_with_openai(text, professional_context):
     f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
     f"Format your response clearly with the extracted main theme and then the example post which is at most two paragraphs."
 )
-    print(prompt)
     try:
         response = client.chat.completions.create(
             model="gpt-4o",  # Use the appropriate model
