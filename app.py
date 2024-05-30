@@ -3691,22 +3691,19 @@ def modify_text_with_openai(text, professional_context):
     f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
     f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others.\n"
     f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
-    f"Format your response clearly with the new post which is at most two paragraphs."
+    f"Format your response clearly with only the new post, which is at most two paragraphs"
 )
 
-
-    additional_prompt = f"{prompt} and then below the new post give me a concise list of specific and actionable virality tips on what I could add to the new post based on it's content and context and on the virality principles that I just gave you. Focus on including exact examples, real-world applications, and directly relatable suggestions that can be immediately implemented. Only give me the tips, nothing else."
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",  # Use the appropriate model
             messages=[
-                {"role": "system", "content": additional_prompt}
+                {"role": "system", "content": prompt}
             ]
         )
-        modified_text = response.choices[0].message.content.strip()  # Capitalize all letters
-        final_output = f"{modified_text}"
-        return final_output
+        text = response.choices[0].message.content.strip()
+        return text
     except Exception as e:
         print(f"Failed to modify text: {str(e)}")
         return text  # Return the original text if modification fails
