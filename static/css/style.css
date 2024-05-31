@@ -363,6 +363,7 @@ a, .button {
 
 
 
+
 .vote-count {
   padding: 5px 10px;
   border-radius: 0;
@@ -416,7 +417,7 @@ letter-spacing: .5px;
 
 .comments-section {
     background-color: white;
-    width: 80%;
+    width: 70%;
     margin-bottom: 20px;
     padding: 20px;
     border-radius: 8px;
@@ -450,7 +451,7 @@ a {
 
 .comment-form {
     background-color: white;
-    width: 80%;
+    width: 70%;
     margin-bottom: 20px;
     padding: 20px;
     border-radius: 8px;
@@ -645,7 +646,7 @@ button:hover {
 .community-item {
     background-color: white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    width: 80%;
+    width: 70%;
     margin-bottom: 20px;
     padding: 20px;
     border-radius: 8px;

@@ -347,7 +347,7 @@ textarea {
         <div class="input-group">
             <img src="/static/images/anon.png" alt="Anonymous Image" style="display: block; margin: auto; width: 100px; height: auto;">
             <h2>Set your Alias</h2>
-            <p>Netwrk has communities where everyone uses an alias to freely share challenges and advice. Next, you'll set your alias for those communities</p>
+            <p>On Netwrk, you can post and comment using an alias to freely express yourself. Next, you'll set your alias</p>
         </div>
         <button type="button" onclick="nextStep()">Understand & Continue</button>
     </div>
@@ -357,7 +357,9 @@ textarea {
         <div class="input-group">
             <label for="burnerUsername">Set your Alias</label>
             
-            <input type="text" id="burner_username" name="burner_username" required>
+            <input type="text" id="burner_username" name="burner_username" required oninput="validateAlias(this)">
+            <span id="alias-error"></span>
+
         </div>
         <input type="hidden" name="location" value="{{ location }}">
             <button type="submit">Finish</button>
@@ -393,6 +395,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+
+function validateAlias(input) {
+    const burnerInput = input;
+    const errorDisplay = document.getElementById('alias-error'); // Assume an error display element exists or create it.
+    const submitButton = document.querySelector('.step-6 button[type="submit"]');
+
+    // Check if the value contains spaces
+    if (burnerInput.value.includes(' ')) {
+        burnerInput.classList.add('error');
+        errorDisplay.textContent = "Alias cannot contain spaces.";
+        if (submitButton) submitButton.disabled = true;
+    } else {
+        burnerInput.classList.remove('error');
+        errorDisplay.textContent = ""; // Clear the error message
+        if (submitButton) submitButton.disabled = false; // Re-enable the submit button
+    }
+}
 
 
 

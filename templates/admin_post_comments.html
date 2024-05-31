@@ -96,6 +96,11 @@ div.feed-container {
         
         <!-- Submit Button -->
         <button type="submit" class="btn btn-primary">Post Comment</button>
+        <div class="form-group">
+    <label>
+        <input type="checkbox" name="post_as_burner" value="true"> Use Alias
+    </label>
+</div>
     </form>
 </div>
 {% from "comment_template.html" import render_comment %}
