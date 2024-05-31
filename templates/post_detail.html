@@ -3,115 +3,109 @@
 {% block title %}{{ post.title }}{% endblock %}
 
 {% block content %}
-
 <style>
+    .community-name-link {
+        text-decoration: none; /* Removes the underline */
+        color: inherit; /* Optional: ensures the link uses the parent's text color */
+    }
 
-.community-name-link {
-    text-decoration: none; /* Removes the underline */
-    color: inherit; /* Optional: ensures the link uses the parent's text color */
-}
+
 
 
 </style>
 
 <div class="feed-container">
     <div class="card">
-    <div class="card-header">
-        <!-- Conditionally display the community's profile picture -->
-        
+        <div class="card-header">
             <img src="{{ url_for('static', filename=post.community.profile_pic_url) }}" alt="Community Profile Picture" class='user-profile-pic'>
-        
-
-        <div class="post-info">
-            <!-- Link to the community, displaying its name -->
-            <a href="{{ url_for('view_community', community_id=post.community.id) }}" class="community-name-link">{{ post.community.name }} · {{ post.posted_time|time_ago }}</a>
-            <!-- Display user's display name, respecting anonymity -->
-            <small>{% if post.community.is_anonymous %}
-        <!-- In anonymous communities, clicking the name initiates an anonymous message -->
-        <small><a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
-    {% else %}
-        <!-- In regular communities, clicking the name goes to the user's profile -->
-        <small><a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.display_name(post.community.is_anonymous) }}</a></small>
-    {% endif %}</small>
+            <div class="post-info">
+                <a href="{{ url_for('view_community', community_id=post.community.id) }}" class="community-name-link">{{ post.community.name }} · {{ post.posted_time|time_ago }}</a>
+                <!-- Adjust the display of the user's name based on post.is_burner -->
+                <small>
+                    {% if post.is_burner %}
+                        <a href="#" onclick="startAnonymousConversation('{{ post.user.id }}'); return false;">{{ post.user.burner_username }}</a>
+                    {% else %}
+                        <a href="{{ url_for('profile', user_id=post.user.id) }}">{{ post.user.first_name }} {{ post.user.last_name }}</a>
+                    {% endif %}
+                </small>
+            </div>
         </div>
-    </div>
-    <h2>{{ post.title }}</h2>
-    <div class="card-content">{{ post.content|safe }}
-
-
-
+        <h2>{{ post.title }}</h2>
+        <div class="card-content">
+            {{ post.content|safe }}
             {% if post.image_filename %}
-            <p></p>
-    <img src="{{ post.image_filename }}" alt="Post Image">
-{% endif %}
-
-
-    </div>
-    <div class="card-meta"></div>
-    <div class="card-actions">
-            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ post.id }}">
-    <i class="fas fa-arrow-up"></i>
-</button>
-<span id="vote-count-{{ post.id }}" class="vote-count">{{ post.upvotes - post.downvotes }}</span>
-<button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ post.id }}">
-    <i class="fas fa-arrow-down"></i>
-</button>
-
-            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action"><i class="fas fa-comments"></i>
-    {{ comments|length }} 
-    
-</a>
-<span class="card-action"><i class="fas fa-share"></i></span>
-
-           
+                <p></p>
+                <img src="{{ post.image_filename }}" alt="Post Image">
+            {% endif %}
         </div>
-</div>
+        <div class="card-meta"></div>
+        <div class="card-actions">
+            <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ post.id }}">
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            <span id="vote-count-{{ post.id }}" class="vote-count">{{ post.upvotes - post.downvotes }}</span>
+            <button class="vote-button downvote-button" aria-label="downvote" data-post-id="{{ post.id }}">
+                <i class="fas fa-arrow-down"></i>
+            </button>
+            <a href="{{ url_for('show_post', post_id=post.id) }}" class="card-action">
+                <i class="fas fa-comments"></i> {{ comments|length }}
+            </a>
+            <span class="card-action"><i class="fas fa-share"></i></span>
+        </div>
+    </div>
 
     <!-- This form remains for posting new top-level comments -->
+    <!-- Comment Form Section -->
+<!-- Comment Form Section -->
 <div class="comment-form">
-    <h3>Commenting as {{ current_user.display_name(post.community.is_anonymous) }}</h3>
     <form action="{{ url_for('submit_comment', post_id=post.id) }}" method="POST">
+        <label for="identitySelect">Comment as:
+            <select name="post_as_burner" id="identitySelect" onchange="updateDisplayName(this.value);">
+                <option value="false">{{ current_user.first_name }} {{ current_user.last_name }}</option>
+                <option value="true" selected>{{ current_user.burner_username }}</option>
+            </select>
+        </label>
         <textarea name="comment_content" required></textarea>
         <div class="form-footer">
-            <button type="submit" class = "active-button">Post Comment</button>
+            <button type="submit" class="active-button">Post Comment</button>
         </div>
     </form>
 </div>
 
-{% from "comment_template.html" import render_comment %}
-<div class="comments-section">
-    {% for comment in comments %}
-        {% if comment.parent_id is none %}
-            {{ render_comment(comment) }}
-        {% endif %}
-    {% endfor %}
+
+
+    {% from "comment_template.html" import render_comment %}
+    <div class="comments-section">
+        {% for comment in comments %}
+            {% if comment.parent_id is none %}
+                {{ render_comment(comment) }}
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Example reply form for each comment -->
+    <!-- You would dynamically display this form when a user clicks a "Reply" button -->
+    <div class="reply-form" style="display:none;">
+        <form action="{{ url_for('submit_comment', post_id=post.id) }}" method="POST">
+            <input type="hidden" name="parent_id" value="{{ parent_comment_id }}"> <!-- Set this dynamically -->
+            <textarea name="comment_content" required></textarea>
+            <div class="form-footer">
+                <button type="submit">Post Reply</button>
+            </div>
+        </form>
+    </div>
 </div>
-
-
-
-
-
-
-<!-- Example reply form for each comment -->
-<!-- You would dynamically display this form when a user clicks a "Reply" button -->
-<div class="reply-form" style="display:none;">
-    <form action="{{ url_for('submit_comment', post_id=post.id) }}" method="POST">
-        <input type="hidden" name="parent_id" value="{{ parent_comment_id }}"> <!-- Set this dynamically -->
-        <textarea name="comment_content" required></textarea>
-        <div class="form-footer">
-            <button type="submit">Post Reply</button>
-        </div>
-    </form>
-</div>
-
-</div>
-
-
-
 
 
 
 <script>
+
+
+function updateDisplayName(choice) {
+    var displayName = choice === 'false' ? "{{ current_user.first_name }} {{ current_user.last_name }}" : "{{ current_user.burner_username }}";
+    var displayText = 'Commenting as ' + displayName;
+    document.querySelector('.comment-form h3').textContent = displayText;
+}
 
 
 

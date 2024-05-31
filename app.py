@@ -176,12 +176,13 @@ class Post(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     community_id = db.Column(db.Integer, db.ForeignKey('community.id'), nullable=False)
     image_filename = db.Column(db.String(255))
+    is_burner = db.Column(db.Boolean, default=False)  # Added to handle identity choice for posts
 
     user = db.relationship('User', backref='posts')
     community = db.relationship('Community', backref='posts')
     comments = db.relationship('Comment', backref='post', lazy=True, cascade="all, delete-orphan")
-
     reddit_post_id = db.Column(db.String(255), nullable=True)
+
 
 
 
@@ -778,10 +779,9 @@ def submit_comment(post_id):
     user_id = session['user_id']
     user = User.query.get(user_id)
     comment_content = request.form.get('comment_content')
-    parent_id = request.form.get('parent_id', None)  # Get the parent_id if provided
-    post_as_burner = 'post_as_burner' in request.form  # Check if checkbox is checked
+    parent_id = request.form.get('parent_id', None)
+    post_as_burner = request.form.get('post_as_burner', 'false') == 'true'  # Correctly parse as boolean
     
-    # Validation checks
     if not comment_content:
         flash('Comment cannot be empty.', 'error')
         return redirect(url_for('show_post', post_id=post_id))
@@ -790,14 +790,13 @@ def submit_comment(post_id):
         flash('Burner username is required to post as burner.', 'error')
         return redirect(url_for('show_post', post_id=post_id))
     
-    # Create the new comment, considering parent_id for replies
-    new_comment = Comment(content=comment_content, user_id=user_id, post_id=post_id, parent_id=parent_id if parent_id else None, is_burner=post_as_burner)
-    
+    new_comment = Comment(content=comment_content, user_id=user_id, post_id=post_id, parent_id=parent_id, is_burner=post_as_burner)
     db.session.add(new_comment)
     db.session.commit()
     
     flash('Comment posted successfully.', 'success')
     return redirect(url_for('show_post', post_id=post_id))
+
 
 
 from flask import render_template, request, redirect, url_for, flash, session
@@ -1007,14 +1006,14 @@ def create_post():
     if request.method == 'POST':
         title = request.form.get('title')
         content = request.form.get('content')
+        post_as_burner = request.form.get('post_as_burner') == 'true'  # Capture the identity choice
         image = request.files.get('image')
         image_url = None  # Default to None if no image is uploaded
 
         if image and allowed_file(image.filename):
-            print("okay so we know there's an image")
             image_filename = secure_filename(image.filename)
             s3_folder = 'posts/'  # Define the folder path in S3
-            bucket_name = 'netwrkproto'  # Your S3 bucket name
+            bucket_name = 'yourbucketname'  # Your S3 bucket name
 
             # Upload image directly to S3 and retrieve the URL
             image_url = upload_file_to_s3(image, bucket_name, s3_folder + image_filename)
@@ -1025,6 +1024,7 @@ def create_post():
             content=content,
             community_id=community_id,
             user_id=user_id,
+            is_burner=post_as_burner,  # Set the is_burner attribute based on the form
             posted_time=datetime.utcnow(),
             upvotes=0,
             downvotes=0,
@@ -1579,13 +1579,13 @@ def my_messages():
 
 @app.route('/user/<int:user_id>/posts')
 def user_posts(user_id):
-    posts = Post.query.filter_by(user_id=user_id).all()
+    posts = Post.query.filter_by(user_id=user_id, is_burner=False).all()
     posts_data = [{'id': post.id, 'title': post.title, 'content': post.content, 'posted_time': post.posted_time} for post in posts]
     return jsonify(posts_data)
 
 @app.route('/user/<int:user_id>/comments')
 def user_comments(user_id):
-    comments = Comment.query.filter_by(user_id=user_id).all()
+    comments = Comment.query.filter_by(user_id=user_id, is_burner=False).all()
     comments_data = [{'id': comment.post_id, 'content': comment.content, 'posted_time': comment.posted_time} for comment in comments]
     return jsonify(comments_data)
 
@@ -2937,6 +2937,7 @@ def schedule_post():
         image = request.files.get('image')
         existing_image = request.form.get('existing_image')
         reddit_post_id = request.form.get('reddit_post_id')
+        post_as_burner = 'post_as_burner' in request.form
 
         image_url = None
         if image and image.filename != '':
@@ -2953,7 +2954,15 @@ def schedule_post():
             with open(full_path, 'rb') as file:
                 image_url = upload_file_to_s3(file, bucket_name, s3_folder + image_filename, content_type)
 
-        new_post = Post(title=title, content=content, user_id=user_id, community_id=community_id, image_filename=image_url, reddit_post_id=reddit_post_id)
+        new_post = Post(
+            title=title,
+            content=content,
+            user_id=user_id,
+            community_id=community_id,
+            is_burner=post_as_burner,  # Set based on checkbox
+            image_filename=image_url,
+            reddit_post_id=reddit_post_id
+        )
 
         if action == 'post_now':
             new_post.posted_time = datetime.utcnow()
@@ -3082,12 +3091,13 @@ def admin_submit_comment(post_id):
     content = request.form.get('comment_content')
     user_id = request.form.get('user_id')  # Seeder's user ID chosen by admin
     parent_id = request.form.get('parent_id', type=int)  # Optional, for replies
+    post_as_burner = 'post_as_burner' in request.form
 
     if not content or not user_id:
         flash('Comment content and seeder selection are required.', 'error')
         return redirect(url_for('admin_post_comments', post_id=post_id))
 
-    comment = Comment(content=content, post_id=post_id, user_id=user_id, parent_id=parent_id)
+    comment = Comment(content=content, post_id=post_id, user_id=user_id, parent_id=parent_id, is_burner=post_as_burner)
     db.session.add(comment)
     db.session.commit()
     flash('Comment posted successfully.', 'success')
@@ -3464,6 +3474,8 @@ def start_seed_job():
     flash('Comment generation started!')
     return redirect(url_for('ai_comment_prompts'))
 
+from random import choice, randint
+
 def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
     with app.app_context():
         prompts = AICommentPrompt.query.all()
@@ -3480,43 +3492,43 @@ def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
         results = []
 
         for post in posts:
-            # Include post title and content in the AI prompt
             post_context = f"You're in a conversation with your friend. Your friend just said this: {post.title}\nContent: {post.content}\n\n"
 
             for _ in range(num_comments_per_post):
-                user = User.query.filter_by(seeder=True).order_by(func.random()).first()
+                user = User.query.filter(User.seeder == True).order_by(func.random()).first()
                 if not user:
                     results.append("No users available for commenting.")
                     continue
 
-                # Choose a random prompt and append post details
                 prompt_text = choice(prompts).prompt
                 combined_prompt = f"{post_context} {prompt_text}"
 
                 try:
-                    # Call OpenAI's API to generate the comment
                     response = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[{"role": "system", "content": combined_prompt}]
                     )
                     generated_comment = response.choices[0].message.content.strip()
 
-                    # Create a new comment object and save it to the database
+                    # Randomly choose the is_burner value
+                    is_burner = bool(randint(0, 1))
+
                     new_comment = Comment(
                         content=generated_comment,
                         user_id=user.id,
                         post_id=post.id,
                         posted_time=datetime.utcnow(),
-                        is_burner=False
+                        is_burner=is_burner  # Use the randomly chosen boolean value
                     )
                     db.session.add(new_comment)
                     db.session.commit()
 
-                    results.append(f"Generated and posted comment successfully for post {post.id} in community {post.community.name}")
+                    results.append(f"Generated and posted comment successfully for post {post.id} with is_burner set to {is_burner} in community {post.community.name}")
                 except Exception as e:
                     results.append(f"Failed to generate comment for post {post.id} in community {post.community.name}: {str(e)}")
 
         return results
+
 
 
 #subreddit/content manager

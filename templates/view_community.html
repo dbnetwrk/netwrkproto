@@ -83,35 +83,35 @@
 {% endif %}
 
     
-        {% for entry in posts %}
+{% for entry in posts %}
 <div class="card">
     <div class="card-header">
         <small>
-            {% if not community.is_anonymous %}
+            <!-- Display the profile picture based on burner status -->
+            {% if entry.post.is_burner %}
+                <!-- Display a default anonymous profile picture -->
+                <img src="{{ url_for('static', filename='images/anonymous_profile.png') }}" alt="Anonymous Profile" class="user-profile-pic">
+                <small><a href="#" onclick="startAnonymousConversation('{{ entry.post.user.id }}'); return false;">{{ entry.post.user.burner_username }}</a></small>
+            {% else %}
+                <!-- Display the user's actual profile picture -->
                 <img src="{{ entry.post.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic">
-            {% endif %}
-            {% if entry.post.community.is_anonymous %}
-        <!-- In anonymous communities, clicking the name initiates an anonymous message -->
-        <small><a href="#" onclick="startAnonymousConversation('{{ entry.post.user.id }}'); return false;">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
-    {% else %}
-        <!-- In regular communities, clicking the name goes to the user's profile -->
-        <small><a href="{{ url_for('profile', user_id=entry.post.user.id) }}">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
-    {% endif %} · {{entry.post.posted_time|time_ago }}
+                <small><a href="{{ url_for('profile', user_id=entry.post.user.id) }}">{{ entry.post.user.first_name }} {{ entry.post.user.last_name }}</a></small>
+            {% endif %} · {{entry.post.posted_time|time_ago }}
+            <!-- Show 'Creator' label if the user is the community creator -->
             {% if entry.post.user.id == community.created_by %}
                 <span class="card-action">Creator</span>
             {% endif %}
         </small>
     </div>
     <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-title">{{ entry.post.title }}</a>
-    <div class="card-content"><p class="content-preview">{{ entry.post.content|strip_html }}</p>
-
-
-            {% if entry.post.image_filename %}
-            <p></p>
-    <img src="{{ entry.post.image_filename }}" alt="Post Image">
-{% endif %}
-
+    <div class="card-content">
+        <p class="content-preview">{{ entry.post.content|strip_html }}</p>
+        <!-- Display post image if available -->
+        {% if entry.post.image_filename %}
+            <img src="{{ entry.post.image_filename }}" alt="Post Image">
+        {% endif %}
     </div>
+
     <div class="card-meta"></div>
     <div class="card-actions">
             <button class="vote-button upvote-button" aria-label="upvote" data-post-id="{{ entry.post.id }}">

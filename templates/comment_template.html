@@ -1,10 +1,13 @@
 {% macro render_comment(comment, margin_left=0) %}
 <div class="comment" {% if margin_left > 0 %}style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: {{ margin_left }}px; position: relative;"{% endif %}>
     <small>
-        {% if not comment.post.community.is_anonymous %}
+        {% if comment.is_burner %}
+            <img src="{{ url_for('static', filename='images/anonymous_profile.png') }}" alt="Anonymous Profile" class="user-profile-pic">
+            {{ comment.user.burner_username }} · {{ comment.posted_time|time_ago }}
+        {% else %}
             <img src="{{ comment.user.profile_pic_url }}" alt="Profile Picture" class="user-profile-pic">
+            {{ comment.user.first_name }} {{ comment.user.last_name }} · {{ comment.posted_time|time_ago }}
         {% endif %}
-        {{ comment.user.display_name(comment.post.community.is_anonymous) }} · {{ comment.posted_time|time_ago }}
     </small>
     <p>{{ comment.content }}</p>
     <button class="reply-button" data-comment-id="{{ comment.id }}">Reply</button>
@@ -17,13 +20,14 @@
     <div class="replies" style="display: none;" data-comment-id="{{ comment.id }}">
         {% for reply in comment.replies %}
             <div class ="reply">
-
-            {{ render_comment(reply, margin_left + 20) }}</div>
+                {{ render_comment(reply, margin_left + 20) }}
+            </div>
         {% endfor %}
     </div>
     {% endif %}
 </div>
 {% endmacro %}
+
 
 
 

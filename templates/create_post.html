@@ -1,15 +1,28 @@
 {% extends "base.html" %}
 
 {% block content %}
+
+<style>
+
+
+
+
+</style>
+
 <div class="feed-container">
     <div class="comment-form">
     <h2>Create a New Post</h2>
     <form method="POST" enctype="multipart/form-data">
         <!-- Identity Status Placeholder -->
-        <div id="identityStatus" class="form-group"
-     data-anon-name="{{ current_user.display_name(true) }}"
-     data-regular-name="{{ current_user.display_name(false) }}">
-</div>
+       
+<label for="identity">Post As:
+                
+    <select name="post_as_burner" id="identity">
+        <option value="false">{{ current_user.first_name }} {{ current_user.last_name }}</option>
+        <option value="true">{{ current_user.burner_username }}</option>
+    </select>
+</label>
+
 
         <div class="form-group">
             <label for="title">Title</label>

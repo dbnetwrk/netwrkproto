@@ -93,22 +93,21 @@
     {% for entry in posts %}
     <div class="card">
         <div class="card-header">
-        <!-- Conditionally display the community's profile picture -->
             <img src="{{ url_for('static', filename=entry.post.community.profile_pic_url) }}" alt="Community Profile Picture" class='user-profile-pic'>
-        
-        <div class="post-info">
-            <!-- Link to the community, displaying its name -->
-            <a href="{{ url_for('view_community', community_id=entry.post.community.id) }}" class="community-name-link">{{ entry.post.community.name }} · {{ entry.post.posted_time|time_ago }}</a>
-            <!-- Display user's display name, respecting anonymity -->
-            <small>{% if entry.post.community.is_anonymous %}
-                <!-- In anonymous communities, clicking the name initiates an anonymous message -->
-                <small><a href="#" onclick="startAnonymousConversation('{{ entry.post.user.id }}'); return false;">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
-            {% else %}
-                <!-- In regular communities, clicking the name goes to the user's profile -->
-                <small><a href="{{ url_for('profile', user_id=entry.post.user.id) }}">{{ entry.post.user.display_name(entry.post.community.is_anonymous) }}</a></small>
-            {% endif %}</small>
+            <div class="post-info">
+                <!-- Adjusted to check post.is_burner instead of community.is_anonymous -->
+                <a href="{{ url_for('view_community', community_id=entry.post.community.id) }}" class="community-name-link">{{ entry.post.community.name }} · {{ entry.post.posted_time|time_ago }}</a>
+                <small>
+                    {% if entry.post.is_burner %}
+                        <!-- Clicking the name initiates an anonymous message if post.is_burner is true -->
+                        <a href="#" onclick="startAnonymousConversation('{{ entry.post.user.id }}'); return false;">{{ entry.post.user.burner_username }}</a>
+                    {% else %}
+                        <!-- Link goes to the user's profile if not posting as burner -->
+                        <a href="{{ url_for('profile', user_id=entry.post.user.id) }}">{{ entry.post.user.first_name }} {{ entry.post.user.last_name }}</a>
+                    {% endif %}
+                </small>
+            </div>
         </div>
-    </div>
         <a href="{{ url_for('show_post', post_id=entry.post.id) }}" class="card-title">{{ entry.post.title }}</a>
         <div class="card-content">
             <p class="content-preview">{{ entry.post.content|strip_html }}</p>
