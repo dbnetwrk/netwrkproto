@@ -3634,9 +3634,7 @@ def idea_factory():
         subreddit_name = request.form.get('subreddit')
         number_of_posts = int(request.form.get('number_of_posts', 100))
         sort_option = request.form.get('sort_option', 'hot')
-        professional_context = request.form.get('community_id_context')
-        if professional_context:
-            professional_context = Community.query.get(professional_context).name
+        professional_context = request.form.get('community_context')
 
         session_data = {
             'subreddit_name': subreddit_name,
@@ -3673,7 +3671,7 @@ def idea_factory():
 
 
 def modify_text_with_openai(text, professional_context):
-    context_suffix = f"for the {professional_context} community" if professional_context else "make it different from the original post by changing all details"
+    context_suffix = f"{professional_context}" if professional_context else "make it different from the original post by changing all details"
 
     print(context_suffix)
     prompt = (
