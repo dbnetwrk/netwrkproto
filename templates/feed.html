@@ -56,8 +56,8 @@
 
 .filter-tabs {
     display: flex;
-    justify-content: right;
-    margin-bottom: 5px;
+    justify-content: center;
+    margin-bottom: 20px;
     width: 80%;
 
 }
@@ -79,6 +79,27 @@
     color: #777;
 }
 
+
+.filter-tabs select {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: white;
+    cursor: pointer;
+}
+
+.filter-tabs select:focus {
+    outline: none;
+    border-color: #666;
+}
+
+
+@media (max-width: 768px) {
+    .filter-tabs{
+        margin-top: -40px; /* Remove margin-left on mobile screens */
+        
+    }
+
 </style>
 
 <div class="feed-container">
@@ -86,9 +107,12 @@
     <!-- Add this within your body tag in index.html -->
 
     <div class="filter-tabs">
-        <a href="/feed?filter=new" class="filter-tab {% if current_filter == 'new' %}active{% endif %}">New</a>
-        <a href="/feed?filter=hot" class="filter-tab {% if current_filter == 'hot' %}active{% endif %}">Hot</a>
-    </div>
+    
+    <select id="filter" onchange="window.location.href='/feed?filter=' + this.value">
+        <option value="new" {% if current_filter == 'new' %}selected{% endif %}>New</option>
+        <option value="hot" {% if current_filter == 'hot' %}selected{% endif %}>Hot</option>
+    </select>
+</div>
 
     {% for entry in posts %}
     <div class="card">
