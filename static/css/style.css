@@ -181,14 +181,7 @@ a, .button {
     
 }
 
-/* Mobile screen adjustments */
-@media (max-width: 768px) {
-    .feed-container {
-        margin-left: 0; /* Remove margin-left on mobile screens */
-        width: 100%; /* Optional: You might want to use the full width on mobile */
-        
-    }
-}
+
 
 .card {
     background-color: #ffffff;
@@ -204,6 +197,8 @@ a, .button {
     transition: box-shadow 0.3s ease-in-out; /* Smooth transition for the box-shadow */
     box-shadow: 1px 1px 10px rgba(0, 0, 0, 0.05);
 }
+
+
 
 
 
@@ -848,3 +843,37 @@ button:hover {
 }
 
 
+/* Mobile screen adjustments */
+@media (max-width: 768px) {
+    .feed-container {
+        margin-left: 0; /* Remove margin-left on mobile screens */
+        width: 100%; /* Optional: You might want to use the full width on mobile */
+        
+    }
+
+    .card {
+
+        width: 90%;
+
+
+    }
+
+    .comments-section{
+
+        width: 90%;
+    }
+
+    .comment-form{
+
+        width: 90%;
+
+    }
+
+    .community-item{
+
+        width: 90%;
+    }
+    
+
+    
+}

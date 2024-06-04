@@ -38,16 +38,10 @@
         </div>
 
         <div class="mb-3">
-            <label for="community" class="form-label">Select Context</label>
-            <select class="form-select" id="community" name="community_id_context">
-                <option value="">--Choose a Community--</option>
-                {% for community in communities %}
-                <option value="{{ community.id }}" {% if session.get('selected_community_id') == community.id %}selected{% endif %}>
-                    {{ community.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
+    <label for="community_context" class="form-label">Enter Context:</label>
+    <input type="text" class="form-control" id="community_context" name="community_context" value="{{ session.get('community_context') }}" placeholder="Enter context">
+</div>
+
 
         <button type="submit" class="btn btn-primary">Scrape</button>
     </form>
