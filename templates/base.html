@@ -232,21 +232,20 @@ hr {
     <hr>
     <!-- Topics list starts here -->
     <div class="community-top-charts">
-        
-        <p class="topics-header">Topics</p>
-        <ul class="topics-list">
-            {% for topic in topics if topic.interest_category_id == 2 %}
-            <li>
-                <a href="{{ url_for('view_community', community_id=topic.community_id) }}" style="--topic-color: {{ topic.color }}; color: {{ topic.color }};" class="topic-link">
-                    {% if topic.image_url %}
-                        <img src="{{ url_for('static', filename=topic.image_url) }}" alt="{{ topic.name }}" class="topic-icon">
-                    {% endif %}
-                    {{ topic.name }}
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
+    <p class="topics-header">Topics</p>
+    <ul class="topics-list">
+        {% for topic in topics | selectattr("interest_category_id", "equalto", 2) | sort(attribute='name') %}
+        <li>
+            <a href="{{ url_for('view_community', community_id=topic.community_id) }}" style="--topic-color: {{ topic.color }}; color: {{ topic.color }};" class="topic-link">
+                {% if topic.image_url %}
+                    <img src="{{ url_for('static', filename=topic.image_url) }}" alt="{{ topic.name }}" class="topic-icon">
+                {% endif %}
+                {{ topic.name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
 </div>
 
 <!-- Hamburger menu icon -->
