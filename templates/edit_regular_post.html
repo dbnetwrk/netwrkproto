@@ -12,6 +12,11 @@
             <label for="content" class="form-label">Content</label>
             <textarea class="form-control" id="content" name="content" rows="5" required>{{ post.content }}</textarea>
         </div>
+
+        <div class="mb-3">
+            <label for="community_id" class="form-label">Community ID</label>
+            <input type="text" class="form-control" id="community_id" name="community_id" value="{{ post.community_id }}" required>
+        </div>
         
         <!-- If your posts include images, you can uncomment and adapt this section -->
          <div class="mb-3">

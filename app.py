@@ -3059,6 +3059,7 @@ def edit_regular_post(post_id):
         # Update post details based on form inputs
         post.title = request.form['title']
         post.content = request.form['content']
+        post.community_id = request.form['community_id']
         db.session.commit()
         flash('Post updated successfully.', 'success')
         return redirect(url_for('manage_posts'))
@@ -3331,10 +3332,6 @@ def upvote_randomizer():
 
 
 #post randomizer for prototype:
-
-
-
-
 @app.route('/randomize_post_dates', methods=['POST'])
 def randomize_post_dates():
     end_date_str = request.form.get('end_date')
@@ -3356,16 +3353,25 @@ def randomize_post_dates():
         total_seconds = int((datetime.utcnow() - end_date).total_seconds())
         random_seconds = random.randint(0, total_seconds)
         
-        # Create a new random date within the specified interval
-        random_date = datetime.utcnow() - timedelta(seconds=random_seconds)
+        # Create a new random date within the specified interval for the post
+        random_post_date = datetime.utcnow() - timedelta(seconds=random_seconds)
         
         # Update the post's posted_time
-        post.posted_time = random_date
+        post.posted_time = random_post_date
+
+        # Update comment dates to ensure they are on or after the new post date
+        for comment in post.comments:
+            # Ensure comment date is not before the new post date
+            if comment.posted_time < random_post_date:
+                # Randomize the comment date within a range from the post date to now
+                comment_seconds = random.randint(0, total_seconds - random_seconds)
+                random_comment_date = random_post_date + timedelta(seconds=comment_seconds)
+                comment.posted_time = random_comment_date
 
     # Commit changes to the database
     db.session.commit()
 
-    flash("Post dates randomized successfully.")
+    flash("Post and comment dates randomized successfully.")
     return redirect(url_for('show_post_randomizer'))
 
 @app.route('/show_post_randomizer')
@@ -3701,7 +3707,7 @@ def modify_text_with_openai(text, professional_context):
     f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
     f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others.\n"
     f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
-    f"Format your response clearly with only the new post, which is at most two paragraphs"
+    f"Format your response clearly with only the new post, which is at most two paragraphs, and use 8th grade verbiage"
 )
 
 
