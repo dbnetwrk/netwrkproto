@@ -183,6 +183,11 @@ class Post(db.Model):
     comments = db.relationship('Comment', backref='post', lazy=True, cascade="all, delete-orphan")
     reddit_post_id = db.Column(db.String(255), nullable=True)
 
+    edited = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+
+
 
 
 
@@ -198,6 +203,9 @@ class Comment(db.Model):
 
     user = db.relationship('User', backref='comments')
     replies = db.relationship('Comment', backref=backref('parent', remote_side=[id]), lazy='dynamic')
+
+    edited = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
 
 
 
@@ -650,8 +658,8 @@ def show_post(post_id):
         return redirect(url_for('login'))
     user = User.query.get(user_id)
 
-    post = Post.query.get_or_404(post_id)
-    comments = Comment.query.filter_by(post_id=post.id).order_by(Comment.posted_time.desc()).all()
+    post = Post.query.filter_by(id=post_id, is_deleted=False).first_or_404()
+    comments = Comment.query.filter_by(post_id=post_id, is_deleted=False).all()
     return render_template('post_detail.html', post=post, comments=comments, user=user)
 
 
@@ -1617,19 +1625,7 @@ def edit_burner_username():
     return redirect(url_for('profile', user_id=user_id))
 
 
-@app.route('/delete_comment/<int:comment_id>', methods=['POST'])
-def delete_comment(comment_id):
-    comment = Comment.query.get_or_404(comment_id)
-    
-    # Check if the current user is the comment's owner or has the right to delete it
-    if comment.user_id == current_user.id:
-        comment.is_deleted = True
-        db.session.commit()
-        flash('Your comment has been deleted.', 'success')
-    else:
-        flash('You do not have permission to delete this comment.', 'error')
-    
-    return redirect(url_for('profile'))
+
 
 
 
@@ -3725,7 +3721,70 @@ def modify_text_with_openai(text, professional_context):
         return text  # Return the original text if modification fails
 
 
+## EDIT AND DELETE COMMENT ##
 
+
+# Edit Post
+@app.route('/edit_post_user/<int:post_id>', methods=['GET', 'POST'])
+def edit_post_user(post_id):
+    post = Post.query.get_or_404(post_id)
+    if post.user_id != current_user.id:
+        flash('You do not have permission to edit this post.')
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        if datetime.utcnow() - post.posted_time < timedelta(minutes=15):
+            post.title = request.form['title']
+            post.content = request.form['content']
+            post.edited = True
+            db.session.commit()
+            flash('Post edited successfully!')
+        else:
+            flash('Editing time has expired.')
+        return redirect(url_for('show_post', post_id=post.id))
+    return render_template('edit_post_user.html', post=post)
+
+# Delete Post
+@app.route('/delete_post_user/<int:post_id>', methods=['POST'])
+def delete_post_user(post_id):
+    post = Post.query.get_or_404(post_id)
+    if post.user_id != current_user.id:
+        flash('You do not have permission to delete this post.')
+        return redirect(url_for('index'))
+    post.is_deleted = True
+    db.session.commit()
+    flash('Post deleted successfully!')
+    return redirect(url_for('show_feed'))
+
+# Edit Comment
+@app.route('/edit_comment/<int:comment_id>', methods=['GET', 'POST'])
+def edit_comment(comment_id):
+    session_user_id = session.get('user_id')
+    comment = Comment.query.get_or_404(comment_id)
+    if comment.user_id != session_user_id:
+        flash('You do not have permission to edit this comment.')
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        if datetime.utcnow() - comment.posted_time < timedelta(minutes=15):
+            comment.content = request.form['content']
+            comment.edited = True
+            db.session.commit()
+            flash('Comment edited successfully!')
+        else:
+            flash('Editing time has expired.')
+        return redirect(url_for('show_post', post_id=comment.post_id))
+    return render_template('edit_comment_user.html', comment=comment)
+
+# Delete Comment
+@app.route('/delete_comment/<int:comment_id>', methods=['POST'])
+def delete_comment(comment_id):
+    comment = Comment.query.get_or_404(comment_id)
+    if comment.user_id != current_user.id:
+        flash('You do not have permission to delete this comment.')
+        return redirect(url_for('index'))
+    comment.is_deleted = True
+    db.session.commit()
+    flash('Comment deleted successfully!')
+    return redirect(url_for('show_post', post_id=comment.post_id))
 
 
 
