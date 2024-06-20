@@ -58,6 +58,16 @@ body, html {
 
 .input-group {
     margin-bottom: 20px;
+    text-align: center; /* Center text within the input group */
+}
+
+.input-group h1 {
+    margin-bottom: 10px; /* Add some space between the heading and the small text */
+}
+
+.input-group small {
+    display: block; /* Ensure small text is block-level for proper spacing */
+    margin-bottom: 20px; /* Add some space below the small text */
 }
 
 
@@ -76,14 +86,14 @@ button {
     width: calc(100% - 20px); /* Adjust button width to ensure it fits within the form */
     padding: 10px;
     border: none;
-    background-color: #0A66C2;
+    background-color: #007dcd;
     color: white;
     border-radius: 10px;
     cursor: pointer;
 }
 
 button:hover {
-    background-color: #45a049;
+    background-color: #A0D955;
     color: white;
 }
 
@@ -254,26 +264,33 @@ textarea {
 
 .age-group-container {
     display: flex;
-    justify-content: space-around;
+    justify-content: center; /* Center buttons horizontally */
+    gap: 20px; /* Space between each button */
     padding: 20px 0;
 }
 
 .age-group {
     padding: 20px 40px;
-    border: 1px solid #007dcd; /* Light grey border */
     border-radius: 10px; /* Rounded corners */
     background-color: #f8f8f8; /* Light grey background */
     color: #333; /* Dark text color */
     font-size: 16px;
     cursor: pointer;
     transition: all 0.3s ease;
+    border: 1px solid transparent; /* Initial border for transition */
+}
+
+.age-group:hover {
+    border-color: #ccc; /* Light border color on hover */
+    background-color: #007dcd;
 }
 
 .age-group.active {
-    border-color: #32CD49; /* Change border color when active */
-    background-color: #fff; /* White background when active */
-    color: #333; /* Dark text color when active */
+     /* Change border color when active */
+    background-color: #007dcd; /* White background when active */
+    color: #ffffff; /* Dark text color when active */
 }
+
 
 
 
