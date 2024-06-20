@@ -6,6 +6,7 @@
     <title>Sign Up - Netwrk</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}">
 
 <link rel="stylesheet" href="static/css/style.css">
 
@@ -14,8 +15,7 @@
 
 body, html {
     object-fit: fill;
-  background-color: #000d14;
-  background-image: url("https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655b0f1c8fbbaaf6dd0be0ad_Frame%206.png");
+  background-color: rgba(0, 125, 205, 1);
   background-position: 50%;
   background-size: cover;
   padding-bottom: 0;
@@ -48,7 +48,7 @@ body, html {
     background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* White glow */
+    
 }
 
 .signup-form h2 {
@@ -282,8 +282,8 @@ textarea {
 <body>
     <div class="container">
         <section class="info">
-        <img src="https://assets-global.website-files.com/655b01d3a75bf32516a29d96/655e275a4518537470b8fd91_Logo-1b.png" alt="GreenSprout Logo" class="logo">
-        <p>A community designed to help {{ location }}'s Gen Z grow personally and professionally</p>
+        <img src="/static/images/Netwrk-Logo-03.png" alt="Netwrk Logo" class="logo">
+        <p>A self-development social network that helps {{ location }}'s Gen Z grow personally and professionally</p>
     </section>
     <section class="signup-form">
     <form id="multiStepForm" action="/signup_step1" method="POST">
