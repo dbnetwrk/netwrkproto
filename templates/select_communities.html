@@ -284,7 +284,7 @@ textarea {
         </section>
         <section class="signup-form">
             <h1>Find people like you</h1>
-            <small>Join at least 3 communities to connect with people around {{ location }} just like you. You'll see their posts on your feed.</small>
+            <small>Join at least three communities to personalize your feed. You'll still have access to all available communities on the platform.</small>
             <form id="community-selection-form" action="{{ url_for('join_communities') }}" method="POST">
                 <div class="topics-list">
                     {% for community in communities %}
