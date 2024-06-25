@@ -345,6 +345,18 @@ class RedditPost(db.Model):
     subreddit_name = db.Column(db.Text)
 
 
+class Vault(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    community_id = db.Column(db.Integer, db.ForeignKey('community.id'))
+    reddit_post_id = db.Column(db.String(255))
+    # Add any other fields you might need
+
+    def __repr__(self):
+        return '<Vault %r>' % self.title
+
+
 
 
 industry_images = {
@@ -3785,6 +3797,24 @@ def delete_comment(comment_id):
     db.session.commit()
     flash('Comment deleted successfully!')
     return redirect(url_for('show_post', post_id=comment.post_id))
+
+
+
+@app.route('/vault_post', methods=['POST'])
+def vault_post():
+    title = request.form['title']
+    content = request.form['content']
+    community_id = request.form['community_id']
+    reddit_post_id = request.form['reddit_post_id']
+
+    # Create an instance of the Vault model
+    new_vault_entry = Vault(title=title, content=content, community_id=community_id, reddit_post_id=reddit_post_id)
+    db.session.add(new_vault_entry)
+    db.session.commit()
+
+    # Redirect or return success message
+    return redirect(url_for('idea_factory'))  # Adjust if needed
+
 
 
 
