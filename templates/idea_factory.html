@@ -66,6 +66,50 @@
                         Schedule Post
                     </button>
 
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#vaultModal{{ loop.index }}">
+    Vault
+</button>
+
+                    <div class="modal fade" id="vaultModal{{ loop.index }}" tabindex="-1" aria-labelledby="vaultModalLabel{{ loop.index }}" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vaultModalLabel{{ loop.index }}">Vault Post</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('vault_post') }}" class="vault-form" data-index="{{ loop.index }}">
+                    <!-- Similar input fields as in the schedule modal -->
+                    <div class="mb-3">
+                        <p>{{ result.ai_content }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control" name="title">
+                    </div>
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Content</label>
+                        <textarea class="form-control" name="content"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="community_id" class="form-label">Select Community</label>
+                        <select class="form-select" name="community_id">
+                            {% for community in communities %}
+                            <option value="{{ community.id }}">{{ community.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
+                    <button type="submit" class="btn btn-secondary">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
                     <div class="modal fade" id="scheduleModal{{ loop.index }}" tabindex="-1" aria-labelledby="scheduleModalLabel{{ loop.index }}" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
@@ -76,7 +120,7 @@
                                     </button>
                                 </div>
                                 <div class="modal-body">
-                                    <form method="POST" action="{{ url_for('schedule_post') }}" enctype="multipart/form-data" data-index="{{ loop.index }}">
+                                    <form method="POST" action="{{ url_for('schedule_post') }}" class="schedule-form" enctype="multipart/form-data" data-index="{{ loop.index }}">
                                         {% if result.image %}
                                         <img src="{{ url_for('static', filename=result.image) }}" class="card-img-top img-fluid">
                                         <input type="hidden" name="existing_image" value="{{ result.image }}">
@@ -150,7 +194,7 @@
 
 <script>
 $(document).ready(function() {
-    $('form[data-index]').on('submit', function(e) {
+    $('.schedule-form').on('submit', function(e) {
         e.preventDefault();
         var form = $(this);
         var postIndex = form.data('index');
@@ -166,7 +210,30 @@ $(document).ready(function() {
             }
         });
     });
+
+    $('.vault-form').on('submit', function(e) {
+        e.preventDefault();
+        var form = $(this);
+        var postIndex = form.data('index');
+        var modalId = '#vaultModal' + postIndex;
+
+        $.ajax({
+            type: "POST",
+            url: form.attr('action'),
+            data: form.serialize(),
+            success: function(data) {
+                $(modalId).modal('hide');
+                alert('Post Vaulted Successfully');
+                $('#postCard' + postIndex).fadeOut(); // Or update the UI in another way
+            },
+            error: function(xhr, status, error) {
+                alert('Error vaulting post: ' + error);
+            }
+        });
+    });
 });
+
+
 
 
 
@@ -231,6 +298,11 @@ function fetchSeederInfo(userId, index) {
             profilePic.style.display = 'none';
         });
 }
+
+
+
+
+
 </script>
 
 <style>
