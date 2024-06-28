@@ -1,0 +1,42 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Dropdown for selecting community -->
+    <div class="mb-3">
+        <label for="communitySelect" class="form-label">Select Community:</label>
+        <select class="form-select" id="communitySelect" onchange="filterCommunity()">
+            <option value="">All Communities ({{ total_vaults }})</option>
+            {% for community in communities %}
+            <option value="{{ community.id }}">{{ community.name }} ({{ community.vault_count }})</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Display Vault posts -->
+    <div id="vaultPosts" class="row">
+        {% for vault in vaults %}
+        <div class="col-12 col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ vault.title }}</h5>
+                    <p class="card-text">{{ vault.content }}</p>
+                    <p class="card-text"><small class="text-muted">Created: {{ vault.created_at.strftime('%Y-%m-%d %H:%M') }}</small></p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function filterCommunity() {
+    var communityId = document.getElementById('communitySelect').value;
+    var url = new URL(window.location.href);
+    url.searchParams.set('community_id', communityId);
+    window.location.href = url.href; // Redirect with the selected community_id as a query parameter
+}
+</script>
+
+{% endblock %}
+

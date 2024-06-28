@@ -1,0 +1,54 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+
+    <h2>Add Pre-Invite Entry</h2>
+    <form action="{{ url_for('pre_invites') }}" method="post" class="mb-3">
+        <div class="mb-3">
+            <label for="full_name" class="form-label">Full Name</label>
+            <input type="text" class="form-control" id="full_name" name="full_name" required>
+        </div>
+        <div class="mb-3">
+            <label for="social_media" class="form-label">Social Media</label>
+            <input type="text" class="form-control" id="social_media" name="social_media">
+        </div>
+        <div class="mb-3">
+            <label for="phone_number" class="form-label">Phone Number</label>
+            <input type="text" class="form-control" id="phone_number" name="phone_number">
+        </div>
+        <div class="mb-3">
+            <label for="school" class="form-label">School</label>
+            <input type="text" class="form-control" id="school" name="school">
+        </div>
+        <button type="submit" class="btn btn-primary">Add Entry</button>
+    </form>
+
+    <h2>Pre-Invite List</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Full Name</th>
+                <th>Social Media</th>
+                <th>Phone Number</th>
+                <th>School</th>
+                <th>Date Added</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry.full_name }}</td>
+                <td>{{ entry.social_media }}</td>
+                <td>{{ entry.phone_number }}</td>
+                <td>{{ entry.school }}</td>
+                <td>{{ entry.date_added.strftime('%Y-%m-%d') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    
+</div>
+{% endblock %}

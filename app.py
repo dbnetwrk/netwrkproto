@@ -351,11 +351,31 @@ class Vault(db.Model):
     content = db.Column(db.Text, nullable=False)
     community_id = db.Column(db.Integer, db.ForeignKey('community.id'))
     reddit_post_id = db.Column(db.String(255))
-    # Add any other fields you might need
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Adding a timestamp
 
     def __repr__(self):
         return '<Vault %r>' % self.title
 
+
+
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    options = db.relationship('Option', backref='category', lazy=True)
+
+class Option(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+
+
+class PreInvite(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    social_media = db.Column(db.String(150))
+    phone_number = db.Column(db.String(50))
+    school = db.Column(db.String(150))
+    date_added = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 
@@ -3815,6 +3835,86 @@ def vault_post():
     # Redirect or return success message
     return redirect(url_for('idea_factory'))  # Adjust if needed
 
+
+
+@app.route('/vault_interface')
+def vault_interface():
+    community_id = request.args.get('community_id')
+    if community_id:
+        vaults = Vault.query.filter_by(community_id=community_id).all()
+    else:
+        vaults = Vault.query.all()
+    communities = db.session.query(
+        Community.id,
+        Community.name,
+        db.session.query(func.count(Vault.id)).filter(Vault.community_id == Community.id).label('vault_count')
+    ).group_by(Community.id).all()
+    return render_template('vault_interface.html', vaults=vaults, communities=communities)
+
+
+@app.context_processor
+def inject_vault_count():
+    total_vaults = Vault.query.count()  # Assuming Vault is your model name
+    return dict(total_vaults=total_vaults)
+
+
+#person generator
+
+
+@app.route('/add_category', methods=['POST'])
+def add_category():
+    category_name = request.form['category_name']
+    new_category = Category(name=category_name)
+    db.session.add(new_category)
+    db.session.commit()
+    return redirect(url_for('person_generator'))
+
+@app.route('/add_option', methods=['POST'])
+def add_option():
+    option_name = request.form['option_name']
+    category_id = request.form['category_id']
+    new_option = Option(name=option_name, category_id=category_id)
+    db.session.add(new_option)
+    db.session.commit()
+    return redirect(url_for('person_generator'))
+
+
+import random
+
+@app.route('/person_generator', methods=['GET', 'POST'])
+def person_generator():
+    categories = Category.query.all()
+    random_profile = {}
+    for category in categories:
+        if category.options:
+            option = random.choice(category.options)
+            random_profile[category.name] = option.name
+    return render_template('person_generator.html', profile=random_profile, categories=categories)
+
+
+
+#preinvite list
+
+@app.route('/pre_invites', methods=['GET', 'POST'])
+def pre_invites():
+    if request.method == 'POST':
+        new_entry = PreInvite(
+            full_name=request.form['full_name'],
+            social_media=request.form['social_media'],
+            phone_number=request.form['phone_number'],
+            school=request.form['school']
+        )
+        db.session.add(new_entry)
+        db.session.commit()
+        return redirect(url_for('pre_invites'))
+
+    entries = PreInvite.query.all()
+    return render_template('pre_invites.html', entries=entries)
+
+@app.context_processor
+def inject_invite_count():
+    total_invites = PreInvite.query.count()  # Count all entries in the pre_invite table
+    return {'total_invites': total_invites}
 
 
 

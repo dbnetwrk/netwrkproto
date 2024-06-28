@@ -1,0 +1,74 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Generated Person Profile</h1>
+    <form method="post" action="{{ url_for('person_generator') }}" class="mb-4">
+        <button type="submit" class="btn btn-primary">Generate Random Person</button>
+    </form>
+    <div class="row mb-4">
+        {% for category, option in profile.items() %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card mb-2">
+                <div class="card-body">
+                    <h5 class="card-title">{{ category }}</h5>
+                    <p class="card-text">{{ option }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Comma-separated list of the selected options -->
+    <div class="mb-3">
+        <h4>Copy this profile:</h4>
+        <p id="profile-text">{{ profile.values()|join(', ') }}, taken with iphone --ar 4:5 --style raw --v 6.0 --no Smartphone, Text, anime</p>
+        <button class="btn btn-outline-secondary" onclick="copyToClipboard()">Copy to Clipboard</button>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Add Category</h2>
+            <form action="{{ url_for('add_category') }}" method="post" class="mb-4">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="category_name" placeholder="Category Name" required>
+                </div>
+                <button type="submit" class="btn btn-success">Add Category</button>
+            </form>
+        </div>
+        <div class="col-md-6">
+            <h2>Add Option to Category</h2>
+            <form action="{{ url_for('add_option') }}" method="post">
+                <div class="mb-3">
+                    <select name="category_id" class="form-select">
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="option_name" placeholder="Option Name" required>
+                </div>
+                <button type="submit" class="btn btn-success">Add Option</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Display all categories and their options -->
+    <h2 class="mt-4">Current Categories and Options</h2>
+    {% for category in categories %}
+    <div class="card my-2">
+        <div class="card-header">
+            {{ category.name }}
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for option in category.options %}
+            <li class="list-group-item">{{ option.name }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+
