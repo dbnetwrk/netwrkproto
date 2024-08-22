@@ -11,29 +11,28 @@
             <input type="text" class="form-control" id="full_name" name="full_name" required>
         </div>
         <div class="mb-3">
-            <label for="social_media" class="form-label">Social Media</label>
+            <label for="social_media" class="form-label">Contact Info</label>
             <input type="text" class="form-control" id="social_media" name="social_media">
         </div>
-        <div class="mb-3">
-            <label for="phone_number" class="form-label">Phone Number</label>
-            <input type="text" class="form-control" id="phone_number" name="phone_number">
-        </div>
-        <div class="mb-3">
-            <label for="school" class="form-label">School</label>
-            <input type="text" class="form-control" id="school" name="school">
-        </div>
+        
+        
         <button type="submit" class="btn btn-primary">Add Entry</button>
     </form>
 
-    <h2>Pre-Invite List</h2>
-    <table class="table">
+<h2>Pre-Invite List</h2>
+<p>Total Entries: {{ total_entries }} </p>
+<p>Total Contacted: {{ total_contacted }}</p>
+<p>Total Committed: {{ total_committed }}</p>
+     <table class="table">
         <thead>
             <tr>
                 <th>Full Name</th>
-                <th>Social Media</th>
-                <th>Phone Number</th>
-                <th>School</th>
+                <th>Contact Info</th>
                 <th>Date Added</th>
+                <th>Contacted</th>
+                <th>Committed</th>
+                <th>Notes</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -41,14 +40,49 @@
             <tr>
                 <td>{{ entry.full_name }}</td>
                 <td>{{ entry.social_media }}</td>
-                <td>{{ entry.phone_number }}</td>
-                <td>{{ entry.school }}</td>
                 <td>{{ entry.date_added.strftime('%Y-%m-%d') }}</td>
+                <td colspan="3">
+                    <form action="{{ url_for('update_pre_invite', invite_id=entry.id) }}" method="post">
+                        <input type="checkbox" name="contacted" {{ 'checked' if entry.contacted else '' }}> Contacted
+                        <input type="checkbox" name="committed" {{ 'checked' if entry.committed else '' }}> Committed
+                        <input type="checkbox" name="followed_up" {{ 'checked' if entry.followed_up else '' }}> Followed Up  <!-- New Checkbox -->
+                        <input type="text" name="notes" value="{{ entry.notes or '' }}" class="form-control">
+                        <button type="submit" class="btn btn-info">Save Changes</button>
+                    </form>
+                </td>
+                <td>
+                    <form action="{{ url_for('delete_pre_invite', invite_id=entry.id) }}" method="post">
+                        {% if csrf_token %}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% endif %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa fa-trash"></i> Delete
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-
-    
 </div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    if (sessionStorage.scrollPosition) {
+        window.scrollTo(0, sessionStorage.scrollPosition);
+        sessionStorage.removeItem("scrollPosition");  // Clear after loading
+    }
+
+    document.querySelectorAll('form').forEach(form => {
+        form.onsubmit = function() {
+            sessionStorage.scrollPosition = window.scrollY;
+        };
+    });
+});
+</script>
+
+
+
+
 {% endblock %}

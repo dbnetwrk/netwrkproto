@@ -1,0 +1,37 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Feed Manager</h1>
+    <form action="{{ url_for('feed_manager') }}" method="post" class="needs-validation" novalidate>
+        <div class="mb-3">
+            <label for="k_value" class="form-label">K Value (Decay Factor):</label>
+            <input type="number" class="form-control" id="k_value" name="k_value" step="0.01" value="{{ settings.k_value }}" required>
+            <div class="invalid-feedback">
+                Please provide a valid K value.
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="w_value" class="form-label">W Value (Weight for Comments):</label>
+            <input type="number" class="form-control" id="w_value" name="w_value" step="0.01" value="{{ settings.w_value }}" required>
+            <div class="invalid-feedback">
+                Please provide a valid W value.
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="feed_type" class="form-label">Default Feed Setting:</label>
+            <select class="form-select" id="feed_type" name="feed_type">
+                <option value="hot" {% if settings.feed_type == 'hot' %}selected{% endif %}>Hot</option>
+                <option value="new" {% if settings.feed_type == 'new' %}selected{% endif %}>New</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+
+    <div class="mt-4">
+        <h3>Current Formula</h3>
+        <p class="lead">((Reactions + 1) * (Comments * {{ settings.w_value }} + 1)) / (Time Since Posted in Hours)^{{ settings.k_value }}</p>
+    </div>
+</div>
+{% endblock %}
+

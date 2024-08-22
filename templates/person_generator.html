@@ -54,7 +54,7 @@
         </div>
     </div>
 
-    <!-- Display all categories and their options -->
+   <!-- Display all categories and their options with delete buttons -->
     <h2 class="mt-4">Current Categories and Options</h2>
     {% for category in categories %}
     <div class="card my-2">
@@ -63,7 +63,12 @@
         </div>
         <ul class="list-group list-group-flush">
             {% for option in category.options %}
-            <li class="list-group-item">{{ option.name }}</li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ option.name }}
+                <form action="{{ url_for('delete_option', option_id=option.id) }}" method="post">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+            </li>
             {% endfor %}
         </ul>
     </div>

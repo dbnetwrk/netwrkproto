@@ -351,10 +351,12 @@ class Vault(db.Model):
     content = db.Column(db.Text, nullable=False)
     community_id = db.Column(db.Integer, db.ForeignKey('community.id'))
     reddit_post_id = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Adding a timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))  # ForeignKey to OfficialSeeder
 
     def __repr__(self):
         return '<Vault %r>' % self.title
+
 
 
 
@@ -373,9 +375,27 @@ class PreInvite(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(150), nullable=False)
     social_media = db.Column(db.String(150))
-    phone_number = db.Column(db.String(50))
-    school = db.Column(db.String(150))
+    linkedin = db.Column(db.String(150))
+    email = db.Column(db.String(150))
     date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    contacted = db.Column(db.Boolean, default=False)
+    committed = db.Column(db.Boolean, default=False)
+    followed_up = db.Column(db.Boolean, default=False)
+    notes = db.Column(db.Text)
+
+
+
+class OfficialSeeder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    profile_picture = db.Column(db.String(255))  # Assuming URL or path
+    alias = db.Column(db.String(150))
+    facts = db.relationship('Fact', backref='official_seeder', lazy=True)
+
+class Fact(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fact_text = db.Column(db.Text, nullable=False)
+    seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))
 
 
 
@@ -740,7 +760,8 @@ def show_feed():
 
     # Calculate the 'hot' formula
     if filter_type == 'hot':
-        score = (Post.upvotes - Post.downvotes + 2 * func.coalesce(comments.c.comment_count, 0)) / func.pow(((func.extract('epoch', func.now() - Post.posted_time) / 3600) + 2), 1.5)
+        score = (Post.upvotes - Post.downvotes + 1 * (func.coalesce(comments.c.comment_count, 0) + 1)) / func.pow(((func.extract('epoch', func.now() - Post.posted_time) / 3600) + 1), 5)
+        print(score)
         joined_posts = joined_posts_query.order_by(score.desc()).all()
     else:  # 'new'
         joined_posts = joined_posts_query.order_by(Post.posted_time.desc()).all()
@@ -3662,6 +3683,7 @@ def get_seeder_info(user_id):
 @app.route('/idea_factory/', methods=['GET', 'POST'])
 def idea_factory():
     communities = Community.query.options(joinedload(Community.subreddits)).all()
+    seeders = OfficialSeeder.query.all()
     if request.method == 'POST':
         clear_image_directory()
         selected_community_id = request.form.get('community_id')
@@ -3699,9 +3721,9 @@ def idea_factory():
         if text_results:
             flash(f"Scraped and processed {len(text_results)} text posts")
 
-        return render_template('idea_factory.html', results=text_results, communities=communities, session=session)
+        return render_template('idea_factory.html', results=text_results, communities=communities, session=session, seeders=seeders)
 
-    return render_template('idea_factory.html', communities=communities, session=session)
+    return render_template('idea_factory.html', communities=communities, session=session, seeders=seeders)
 
 
 def modify_text_with_openai(text, professional_context):
@@ -3714,28 +3736,28 @@ def modify_text_with_openai(text, professional_context):
     f"and then below that, generate a new post that follows the theme, but {context_suffix}. "
     "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
     f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
-    "It doesn’t feel scripted or generic.\n"
+    "It doesn’t feel scripted or generic. Use placeholders like [Your Feeling] for emotions. \n"
     f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
-    "about the person's situation or viewpoint.\n"
+    "about the person's situation or viewpoint. Use placeholders like [Restaurant] or [Location].\n"
     f"Emotional Engagement: The post connects on an emotional level, whether it's sharing joy, struggles, doubts, "
-    "or achievements. This helps create a bond with readers.\n"
+    "or achievements. This helps create a bond with readers. Use placeholders like [Experience].\n"
     f"Storytelling: Personal posts often incorporate elements of storytelling, which is also a key aspect of virality. "
-    "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable.\n"
+    "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable. Use placeholders like [Significant Place] or [Event]\n"
     f"Relevance: These posts are relevant to the interests and needs of the community. In a professional or young "
     "adult setting, topics might include career challenges, educational experiences, personal development, or "
-    "balancing life and work.\n"
+    "balancing life and work. Use placeholders like [City Area].\n"
     f"Interactive: Personal posts invite interaction by asking questions or seeking advice, thereby fostering a "
-    "community dialogue.\n"
+    "community dialogue. \n"
     f"Reflective: They often reflect on personal experiences or lessons learned, which can provide valuable insights "
-    "to others in similar situations.\n\n"
+    "to others in similar situations. \n\n"
     f"Virality Principles:\n"
-    f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image.\n"
-    f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers.\n"
+    f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image. Use placeholders like [Trending Topic]\n"
+    f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers. Use placeholders like [Brand]\n"
     f"3. Emotion: Aim to elicit strong emotions like awe, excitement, amusement, anger, or anxiety which are linked to higher sharing rates.\n"
     f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
     f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others.\n"
     f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
-    f"Format your response clearly with only the new post, which is at most two paragraphs, and use 8th grade verbiage"
+    f"Format your response clearly with only the new post, which is at most two paragraphs, and use 8th grade verbiage, and ensure all specific details are left as placeholders for personal customization later."
 )
 
 
@@ -3819,6 +3841,8 @@ def delete_comment(comment_id):
     return redirect(url_for('show_post', post_id=comment.post_id))
 
 
+#Da Vault
+
 
 @app.route('/vault_post', methods=['POST'])
 def vault_post():
@@ -3826,14 +3850,20 @@ def vault_post():
     content = request.form['content']
     community_id = request.form['community_id']
     reddit_post_id = request.form['reddit_post_id']
+    seeder_id = request.form['seeder_id']  # Get seeder ID from form
 
     # Create an instance of the Vault model
-    new_vault_entry = Vault(title=title, content=content, community_id=community_id, reddit_post_id=reddit_post_id)
+    new_vault_entry = Vault(
+        title=title, 
+        content=content, 
+        community_id=community_id, 
+        reddit_post_id=reddit_post_id,
+        seeder_id=seeder_id  # Set the OfficialSeeder ID
+    )
     db.session.add(new_vault_entry)
     db.session.commit()
 
-    # Redirect or return success message
-    return redirect(url_for('idea_factory'))  # Adjust if needed
+    return redirect(url_for('idea_factory'))
 
 
 
@@ -3858,6 +3888,25 @@ def inject_vault_count():
     return dict(total_vaults=total_vaults)
 
 
+@app.route('/edit-vault/<int:vault_id>', methods=['GET'])
+def edit_vault(vault_id):
+    vault = Vault.query.get_or_404(vault_id)
+    communities = Community.query.all()  # Assuming Community is your community model
+    return render_template('edit_vault.html', vault=vault, communities=communities)
+
+
+@app.route('/update-vault/<int:vault_id>', methods=['POST'])
+def update_vault(vault_id):
+    vault = Vault.query.get_or_404(vault_id)
+    vault.title = request.form['title']
+    vault.content = request.form['content']
+    vault.community_id = request.form['community']  # Update community_id based on user selection
+    db.session.commit()
+    return redirect(url_for('vault_interface'))
+
+
+
+
 #person generator
 
 
@@ -3879,6 +3928,16 @@ def add_option():
     return redirect(url_for('person_generator'))
 
 
+@app.route('/delete_option/<int:option_id>', methods=['POST'])
+def delete_option(option_id):
+    option = Option.query.get(option_id)
+    if option:
+        db.session.delete(option)
+        db.session.commit()
+    return redirect(url_for('person_generator'))
+
+
+
 import random
 
 @app.route('/person_generator', methods=['GET', 'POST'])
@@ -3893,29 +3952,124 @@ def person_generator():
 
 
 
-#preinvite list
-
 @app.route('/pre_invites', methods=['GET', 'POST'])
 def pre_invites():
     if request.method == 'POST':
         new_entry = PreInvite(
             full_name=request.form['full_name'],
-            social_media=request.form['social_media'],
-            phone_number=request.form['phone_number'],
-            school=request.form['school']
+            social_media=request.form['social_media']
         )
         db.session.add(new_entry)
         db.session.commit()
         return redirect(url_for('pre_invites'))
 
-    entries = PreInvite.query.all()
-    return render_template('pre_invites.html', entries=entries)
+    entries = PreInvite.query.order_by(PreInvite.committed, PreInvite.followed_up, PreInvite.contacted, PreInvite.date_added.desc()).all()
+    total_entries = PreInvite.query.count() 
+    total_committed = PreInvite.query.filter(PreInvite.committed == True).count()  # Counting committed entries
+    total_contacted = PreInvite.query.filter(PreInvite.contacted == True).count()  # Counting contacted entries
+    return render_template('pre_invites.html', entries=entries, total_committed=total_committed, total_contacted=total_contacted, total_entries=total_entries)
+
+
+@app.route('/update_pre_invite/<int:invite_id>', methods=['POST'])
+def update_pre_invite(invite_id):
+    invite = PreInvite.query.get_or_404(invite_id)
+    invite.contacted = 'contacted' in request.form
+    invite.committed = 'committed' in request.form
+    invite.followed_up = 'followed_up' in request.form  # Handle the new checkbox
+    invite.notes = request.form.get('notes', '')
+    db.session.commit()
+    return redirect(url_for('pre_invites'))
+
+
+
+@app.route('/delete_pre_invite/<int:invite_id>', methods=['POST'])
+def delete_pre_invite(invite_id):
+    entry = PreInvite.query.get_or_404(invite_id)
+    db.session.delete(entry)
+    db.session.commit()
+    flash('Pre-invite deleted successfully.', 'success')  # Optional: flash message for successful deletion
+    return redirect(url_for('pre_invites'))
+
+
+
+@app.context_processor
+def inject_seeder_number():
+    total_seeders = OfficialSeeder.query.count() 
+    return {'total_seeders': total_seeders}
+
 
 @app.context_processor
 def inject_invite_count():
-    total_invites = PreInvite.query.count()  # Count all entries in the pre_invite table
+    total_invites = PreInvite.query.filter_by(committed=True).count()  # Filter for committed=True
     return {'total_invites': total_invites}
 
+
+from flask import Flask, render_template, request, redirect, url_for
+
+
+@app.route('/add_official_seeder', methods=['GET', 'POST'])
+def add_official_seeder():
+    if request.method == 'POST':
+        # Handle the form submission
+        full_name = request.form['full_name']
+        file = request.files['profile_picture']
+        alias = request.form.get('alias')
+        facts = request.form.getlist('facts')
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            specific_folder = 'static/images/profile_pics'
+            file_path = os.path.join(specific_folder, filename)
+            os.makedirs(specific_folder, exist_ok=True)
+            file.save(file_path)
+            # Normalize the path for URL usage
+            normalized_path = os.path.join('images/profile_pics', filename).replace('\\', '/')
+            profile_picture_url = url_for('static', filename=normalized_path)
+        else:
+            profile_picture_url = None  # Handle case where no file is uploaded or invalid file type
+
+        seeder = OfficialSeeder(full_name=full_name, profile_picture=profile_picture_url, alias=alias)
+        db.session.add(seeder)
+        db.session.commit()
+
+        for fact in facts:
+            if fact:
+                new_fact = Fact(fact_text=fact, seeder_id=seeder.id)
+                db.session.add(new_fact)
+
+        db.session.commit()
+
+    seeders = OfficialSeeder.query.all()
+    return render_template('official_seeder.html', seeders=seeders)
+
+
+@app.route('/add_fact_to_seeder', methods=['POST'])
+def add_fact_to_seeder():
+    data = request.get_json()
+    seeder_id = data['seeder_id']
+    fact_text = data['fact_text']
+    
+    new_fact = Fact(fact_text=fact_text, seeder_id=seeder_id)
+    db.session.add(new_fact)
+    db.session.commit()
+
+    return jsonify(success=True)
+
+
+settings = {
+    "k_value": 1.5,
+    "w_value": 2,
+    "feed_type": "hot"
+}
+
+@app.route('/feed_manager', methods=['GET', 'POST'])
+def feed_manager():
+    global settings
+    if request.method == 'POST':
+        settings['k_value'] = float(request.form.get('k_value', 1.5))
+        settings['w_value'] = float(request.form.get('w_value', 2))
+        settings['feed_type'] = request.form.get('feed_type', 'hot')
+    return render_template('feed_manager.html', settings=settings)
 
 
 if __name__ == '__main__':

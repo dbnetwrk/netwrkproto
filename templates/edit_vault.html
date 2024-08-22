@@ -1,0 +1,28 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Vault Post</h2>
+    <form action="{{ url_for('update_vault', vault_id=vault.id) }}" method="post">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ vault.title }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea class="form-control" id="content" name="content" rows="5" required>{{ vault.content }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="community" class="form-label">Select Community</label>
+            <select class="form-select" id="community" name="community">
+                {% for community in communities %}
+                <option value="{{ community.id }}" {% if community.id == vault.community_id %}selected{% endif %}>
+                    {{ community.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-success">Update</button>
+    </form>
+</div>
+{% endblock %}
