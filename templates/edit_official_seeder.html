@@ -1,0 +1,24 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Official Seeder</h2>
+    <form action="{{ url_for('edit_official_seeder', seeder_id=seeder.id) }}" method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="full_name" class="form-label">Full Name</label>
+            <input type="text" class="form-control" id="full_name" name="full_name" value="{{ seeder.full_name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="profile_picture" class="form-label">Profile Picture</label>
+            <input type="file" class="form-control" id="profile_picture" name="profile_picture">
+            {% if seeder.profile_picture %}
+            <img src="{{ seeder.profile_picture }}" alt="Current Profile Picture" style="width: 100px; height: 100px;">
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="alias" class="form-label">Alias</label>
+            <input type="text" class="form-control" id="alias" name="alias" value="{{ seeder.alias }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Seeder</button>
+    </form>
+</div>
+{% endblock %}

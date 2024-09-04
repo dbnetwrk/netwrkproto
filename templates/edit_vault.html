@@ -22,7 +22,19 @@
                 {% endfor %}
             </select>
         </div>
+        <!-- Seeder selection dropdown -->
+        <div class="mb-3">
+            <label for="seeder_id" class="form-label">Select Seeder</label>
+            <select class="form-select" id="seeder_id" name="seeder_id">
+                {% for seeder in seeders %}
+                <option value="{{ seeder.id }}" {% if seeder.id == vault.seeder_id %}selected{% endif %}>
+                    {{ seeder.full_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
         <button type="submit" class="btn btn-success">Update</button>
     </form>
 </div>
 {% endblock %}
+

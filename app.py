@@ -196,14 +196,15 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
     posted_time = db.Column(db.DateTime, default=datetime.utcnow)
-    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True)
+    vault_id = db.Column(db.Integer, db.ForeignKey('vault.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    official_seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'), nullable=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=True)
     is_burner = db.Column(db.Boolean, default=False)
-
     user = db.relationship('User', backref='comments')
+    official_seeder = db.relationship('OfficialSeeder', backref='comments')
     replies = db.relationship('Comment', backref=backref('parent', remote_side=[id]), lazy='dynamic')
-
     edited = db.Column(db.Boolean, default=False)
     is_deleted = db.Column(db.Boolean, default=False)
 
@@ -319,6 +320,7 @@ class Subreddits(db.Model):
 class AICommentPrompt(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text, nullable=False)
+    prompt_type = db.Column(db.String(20), nullable=False)
 
 
 
@@ -345,6 +347,8 @@ class RedditPost(db.Model):
     subreddit_name = db.Column(db.Text)
 
 
+from sqlalchemy.orm import relationship
+
 class Vault(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
@@ -352,10 +356,16 @@ class Vault(db.Model):
     community_id = db.Column(db.Integer, db.ForeignKey('community.id'))
     reddit_post_id = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))  # ForeignKey to OfficialSeeder
+    seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))
+    is_posted = db.Column(db.Boolean, default=False)  # New column to track if the vault has been posted
+
+    official_seeder = relationship('OfficialSeeder', backref='vaults')
+    comments = db.relationship('Comment', backref='vault', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return '<Vault %r>' % self.title
+
+
 
 
 
@@ -390,6 +400,7 @@ class OfficialSeeder(db.Model):
     full_name = db.Column(db.String(150), nullable=False)
     profile_picture = db.Column(db.String(255))  # Assuming URL or path
     alias = db.Column(db.String(150))
+    types_lowercase = db.Column(db.Boolean, default=False)
     facts = db.relationship('Fact', backref='official_seeder', lazy=True)
 
 class Fact(db.Model):
@@ -3461,45 +3472,40 @@ def show_delete_page():
 @app.route('/ai_comment_prompts')
 def ai_comment_prompts():
     prompts = AICommentPrompt.query.all()
-    communities = Community.query.all()  # Assuming you have a model called Community
+    communities = Community.query.all()
     return render_template('ai_comment_prompts.html', prompts=prompts, communities=communities)
-
-
-
 
 @app.route('/add_ai_comment_prompt', methods=['POST'])
 def add_ai_comment_prompt():
     prompt_text = request.form.get('prompt')
-    if prompt_text:
-        new_prompt = AICommentPrompt(prompt=prompt_text)
+    prompt_type = request.form.get('prompt_type')
+    if prompt_text and prompt_type:
+        new_prompt = AICommentPrompt(prompt=prompt_text, prompt_type=prompt_type)
         db.session.add(new_prompt)
         db.session.commit()
         flash('New prompt added successfully.')
     else:
-        flash('Prompt text is required.')
+        flash('Prompt text and type are required.')
     return redirect(url_for('ai_comment_prompts'))
-
 
 @app.route('/edit_ai_comment_prompt/<int:id>', methods=['GET'])
 def edit_ai_comment_prompt(id):
     prompt = AICommentPrompt.query.get_or_404(id)
     return render_template('edit_ai_comment_prompt.html', prompt=prompt)
 
-
-
 @app.route('/update_ai_comment_prompt/<int:id>', methods=['POST'])
 def update_ai_comment_prompt(id):
     prompt = AICommentPrompt.query.get_or_404(id)
     prompt_text = request.form.get('prompt_text')
-    if prompt_text:
+    prompt_type = request.form.get('prompt_type')
+    if prompt_text and prompt_type:
         prompt.prompt = prompt_text
+        prompt.prompt_type = prompt_type
         db.session.commit()
         flash('Prompt updated successfully.')
     else:
-        flash('Prompt text is required.')
+        flash('Prompt text and type are required.')
     return redirect(url_for('ai_comment_prompts'))
-
-
 
 @app.route('/delete_ai_comment_prompt/<int:id>', methods=['POST'])
 def delete_ai_comment_prompt(id):
@@ -3515,74 +3521,129 @@ from threading import Thread
 
 @app.route('/start_seed_job', methods=['POST'])
 def start_seed_job():
-    num_comments_per_post = request.form.get('num_comments_per_post', type=int)
-    community_id = request.form.get('community_id')
-
-    if num_comments_per_post is None or num_comments_per_post <= 0:
-        flash('Please enter a valid number of comments per post.')
+    content_type = request.form.get('content_type')
+    
+    if content_type not in ['post', 'vault']:
+        flash('Invalid content type selected.')
         return redirect(url_for('ai_comment_prompts'))
-
+    
     # Start the job in a background thread
-    thread = Thread(target=generate_comments_for_all_posts, args=(num_comments_per_post, community_id))
+    thread = Thread(target=generate_comments_for_all_items, args=(content_type,))
     thread.start()
-
+    
     flash('Comment generation started!')
     return redirect(url_for('ai_comment_prompts'))
 
-from random import choice, randint
+import logging
+from sqlalchemy.exc import SQLAlchemyError
 
-def generate_comments_for_all_posts(num_comments_per_post, community_id=None):
+def generate_comments_for_all_items(content_type='post'):
     with app.app_context():
-        prompts = AICommentPrompt.query.all()
-        if community_id:
-            posts = Post.query.filter(Post.community_id == community_id).all()
+        top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level').all()
+        reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply').all()
+        
+        if content_type == 'post':
+            ItemModel = Post
+            items = ItemModel.query.all()
+        elif content_type == 'vault':
+            ItemModel = Vault
+            items = ItemModel.query.filter_by(is_posted=False).all()
         else:
-            posts = Post.query.all()
-
-        if not posts:
-            return "No posts available."
-        if not prompts:
+            logging.error("Invalid content type.")
+            return "Invalid content type."
+        
+        if not items:
+            logging.warning(f"No {content_type}s available.")
+            return f"No {content_type}s available."
+        if not top_level_prompts or not reply_prompts:
+            logging.warning("No prompts available.")
             return "No prompts available."
-
+        
         results = []
-
-        for post in posts:
-            post_context = f"You're in a conversation with your friend. Your friend just said this: {post.title}\nContent: {post.content}\n\n"
-
-            for _ in range(num_comments_per_post):
-                user = User.query.filter(User.seeder == True).order_by(func.random()).first()
-                if not user:
-                    results.append("No users available for commenting.")
+        
+        for item in items:
+            item_context = f"You're in a conversation with your friend. Your friend just said this: {item.title}\nContent: {item.content}\n\n"
+            
+            for prompt in top_level_prompts:
+                if content_type == 'post':
+                    commenter = User.query.filter(User.seeder == True, User.id != item.user_id).order_by(func.random()).first()
+                else:  # vault
+                    commenter = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id).order_by(func.random()).first()
+                
+                if not commenter:
+                    logging.warning(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
+                    results.append(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
                     continue
-
-                prompt_text = choice(prompts).prompt
-                combined_prompt = f"{post_context} {prompt_text}"
-
+                
+                combined_prompt = f"{item_context} {prompt.prompt}"
+                
                 try:
                     response = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[{"role": "system", "content": combined_prompt}]
                     )
                     generated_comment = response.choices[0].message.content.strip()
-
-                    # Randomly choose the is_burner value
-                    is_burner = bool(randint(0, 1))
-
+                    
+                    # Convert to lowercase if the commenter types in lowercase
+                    if content_type == 'vault' and commenter.types_lowercase:
+                        generated_comment = generated_comment.lower()
+                    
                     new_comment = Comment(
                         content=generated_comment,
-                        user_id=user.id,
-                        post_id=post.id,
+                        user_id=commenter.id if content_type == 'post' else None,
+                        official_seeder_id=commenter.id if content_type == 'vault' else None,
+                        post_id=item.id if content_type == 'post' else None,
+                        vault_id=item.id if content_type == 'vault' else None,
                         posted_time=datetime.utcnow(),
-                        is_burner=is_burner  # Use the randomly chosen boolean value
+                        is_burner=False
                     )
                     db.session.add(new_comment)
-                    db.session.commit()
-
-                    results.append(f"Generated and posted comment successfully for post {post.id} with is_burner set to {is_burner} in community {post.community.name}")
+                    db.session.flush()  # This assigns an ID to new_comment
+                    
+                    # Generate a reply from the original creator
+                    reply_prompt = random.choice(reply_prompts)
+                    reply_context = f"Your friend just said this: {generated_comment}\n\n"
+                    combined_reply_prompt = f"{reply_context} {reply_prompt.prompt}"
+                    
+                    reply_response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "system", "content": combined_reply_prompt}]
+                    )
+                    generated_reply = reply_response.choices[0].message.content.strip()
+                    
+                    # Convert reply to lowercase if the original poster types in lowercase
+                    if content_type == 'vault':
+                        original_seeder = OfficialSeeder.query.get(item.seeder_id)
+                        if original_seeder and original_seeder.types_lowercase:
+                            generated_reply = generated_reply.lower()
+                    
+                    new_reply = Comment(
+                        content=generated_reply,
+                        user_id=item.user_id if content_type == 'post' else None,
+                        official_seeder_id=item.seeder_id if content_type == 'vault' else None,
+                        post_id=item.id if content_type == 'post' else None,
+                        vault_id=item.id if content_type == 'vault' else None,
+                        posted_time=datetime.utcnow(),
+                        is_burner=False,
+                        parent_id=new_comment.id
+                    )
+                    db.session.add(new_reply)
+                    
+                    try:
+                        db.session.commit()
+                        logging.info(f"Comment and reply added successfully for {content_type} {item.id}")
+                        results.append(f"Generated and posted comment and reply successfully for {content_type} {item.id}")
+                    except SQLAlchemyError as db_error:
+                        db.session.rollback()
+                        logging.error(f"Database error when adding comment and reply: {str(db_error)}")
+                        results.append(f"Failed to add comment and reply to database for {content_type} {item.id}: {str(db_error)}")
                 except Exception as e:
-                    results.append(f"Failed to generate comment for post {post.id} in community {post.community.name}: {str(e)}")
-
+                    logging.error(f"Error generating comment or reply: {str(e)}")
+                    results.append(f"Failed to generate comment or reply for {content_type} {item.id}: {str(e)}")
+        
         return results
+
+
 
 
 
@@ -3683,7 +3744,7 @@ def get_seeder_info(user_id):
 @app.route('/idea_factory/', methods=['GET', 'POST'])
 def idea_factory():
     communities = Community.query.options(joinedload(Community.subreddits)).all()
-    seeders = OfficialSeeder.query.all()
+    seeders = OfficialSeeder.query.order_by(OfficialSeeder.full_name).all()  # Sort seeders alphabetically by full name
     if request.method == 'POST':
         clear_image_directory()
         selected_community_id = request.form.get('community_id')
@@ -3736,28 +3797,28 @@ def modify_text_with_openai(text, professional_context):
     f"and then below that, generate a new post that follows the theme, but {context_suffix}. "
     "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
     f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
-    "It doesn’t feel scripted or generic. Use placeholders like [Your Feeling] for emotions. \n"
+    "It doesn’t feel scripted or generic.\n"
     f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
-    "about the person's situation or viewpoint. Use placeholders like [Restaurant] or [Location].\n"
+    "about the person's situation or viewpoint.\n"
     f"Emotional Engagement: The post connects on an emotional level, whether it's sharing joy, struggles, doubts, "
-    "or achievements. This helps create a bond with readers. Use placeholders like [Experience].\n"
+    "or achievements. This helps create a bond with readers. \n"
     f"Storytelling: Personal posts often incorporate elements of storytelling, which is also a key aspect of virality. "
-    "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable. Use placeholders like [Significant Place] or [Event]\n"
+    "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable. \n"
     f"Relevance: These posts are relevant to the interests and needs of the community. In a professional or young "
     "adult setting, topics might include career challenges, educational experiences, personal development, or "
-    "balancing life and work. Use placeholders like [City Area].\n"
+    "balancing life and work.\n"
     f"Interactive: Personal posts invite interaction by asking questions or seeking advice, thereby fostering a "
     "community dialogue. \n"
     f"Reflective: They often reflect on personal experiences or lessons learned, which can provide valuable insights "
     "to others in similar situations. \n\n"
     f"Virality Principles:\n"
-    f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image. Use placeholders like [Trending Topic]\n"
-    f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers. Use placeholders like [Brand]\n"
+    f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image. \n"
+    f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers. \n"
     f"3. Emotion: Aim to elicit strong emotions like awe, excitement, amusement, anger, or anxiety which are linked to higher sharing rates.\n"
     f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
     f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others.\n"
     f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
-    f"Format your response clearly with only the new post, which is at most two paragraphs, and use 8th grade verbiage, and ensure all specific details are left as placeholders for personal customization later."
+    f"Format your response clearly with only the new post, which is at most two paragraphs, and use 8th grade verbiage."
 )
 
 
@@ -3846,53 +3907,129 @@ def delete_comment(comment_id):
 
 @app.route('/vault_post', methods=['POST'])
 def vault_post():
-    title = request.form['title']
-    content = request.form['content']
-    community_id = request.form['community_id']
-    reddit_post_id = request.form['reddit_post_id']
-    seeder_id = request.form['seeder_id']  # Get seeder ID from form
+    try:
+        title = request.form['title']
+        content = request.form['content']
+        community_id = request.form['community_id']
+        seeder_id = request.form['seeder_id']
+        reddit_post_id = request.form['reddit_post_id']
 
-    # Create an instance of the Vault model
-    new_vault_entry = Vault(
-        title=title, 
-        content=content, 
-        community_id=community_id, 
-        reddit_post_id=reddit_post_id,
-        seeder_id=seeder_id  # Set the OfficialSeeder ID
-    )
-    db.session.add(new_vault_entry)
-    db.session.commit()
+        # Check if we're creating a new seeder
+        if 'new_seeder_name' in request.form and request.form['new_seeder_name']:
+            new_seeder = OfficialSeeder(
+                full_name=request.form['new_seeder_name'],
+                alias=request.form.get('new_seeder_alias'),
+                 types_lowercase=request.form.get('new_seeder_types_lowercase') == 'on'
+            )
+            
+            # Handle profile picture upload
+            if 'new_seeder_profile_picture' in request.files:
+                file = request.files['new_seeder_profile_picture']
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    file_path = os.path.join('static/images/profile_pics', filename)
+                    file.save(file_path)
+                    new_seeder.profile_picture = url_for('static', filename=f'images/profile_pics/{filename}')
+            db.session.add(new_seeder)
+            db.session.flush()  # This assigns an ID to new_seeder
+            # Add facts
+            if 'new_seeder_facts' in request.form:
+                facts = request.form['new_seeder_facts'].split('\n')
+                for fact in facts:
+                    if fact.strip():
+                        new_fact = Fact(fact_text=fact.strip(), seeder_id=new_seeder.id)
+                        db.session.add(new_fact)
+            seeder_id = new_seeder.id
 
-    return redirect(url_for('idea_factory'))
+        # Get the seeder and check if they type in lowercase
+        seeder = OfficialSeeder.query.get(seeder_id)
+        if seeder and seeder.types_lowercase:
+            title = title.lower()
+            content = content.lower()
+
+        # Create and save the vault
+        new_vault = Vault(
+            title=title,
+            content=content,
+            community_id=community_id,
+            seeder_id=seeder_id,
+            reddit_post_id=reddit_post_id
+        )
+        db.session.add(new_vault)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Post vaulted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
 
 
+from sqlalchemy.orm import joinedload
 
 @app.route('/vault_interface')
 def vault_interface():
     community_id = request.args.get('community_id')
     if community_id:
-        vaults = Vault.query.filter_by(community_id=community_id).all()
+        vaults = Vault.query.options(
+            joinedload(Vault.official_seeder),
+            joinedload(Vault.comments).joinedload(Comment.user)
+        ).filter_by(community_id=community_id).order_by(Vault.is_posted, Vault.created_at.desc()).all()
     else:
-        vaults = Vault.query.all()
+        vaults = Vault.query.options(
+            joinedload(Vault.official_seeder),
+            joinedload(Vault.comments).joinedload(Comment.user)
+        ).order_by(Vault.is_posted, Vault.created_at.desc()).all()
+    
     communities = db.session.query(
         Community.id,
         Community.name,
         db.session.query(func.count(Vault.id)).filter(Vault.community_id == Community.id).label('vault_count')
     ).group_by(Community.id).all()
+    
     return render_template('vault_interface.html', vaults=vaults, communities=communities)
+
+
+@app.route('/delete_vault/<int:vault_id>', methods=['POST'])
+def delete_vault(vault_id):
+    try:
+        vault = Vault.query.get_or_404(vault_id)
+        
+        # Delete associated comments first
+        Comment.query.filter_by(vault_id=vault_id).delete()
+        
+        # Now delete the vault
+        db.session.delete(vault)
+        db.session.commit()
+        
+        return jsonify({"success": True, "message": "Vault deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+
+@app.route('/mark_vault_as_posted/<int:vault_id>', methods=['POST'])
+def mark_vault_as_posted(vault_id):
+    vault = Vault.query.get_or_404(vault_id)
+    vault.is_posted = True
+    db.session.commit()
+    return jsonify(success=True)
+
 
 
 @app.context_processor
 def inject_vault_count():
-    total_vaults = Vault.query.count()  # Assuming Vault is your model name
+    # Filter to count only vaults where `is_posted` is False
+    total_vaults = Vault.query.filter_by(is_posted=False).count()
     return dict(total_vaults=total_vaults)
 
 
 @app.route('/edit-vault/<int:vault_id>', methods=['GET'])
 def edit_vault(vault_id):
     vault = Vault.query.get_or_404(vault_id)
-    communities = Community.query.all()  # Assuming Community is your community model
-    return render_template('edit_vault.html', vault=vault, communities=communities)
+    communities = Community.query.all()
+    seeders = OfficialSeeder.query.all()  # Fetch all seeders
+    return render_template('edit_vault.html', vault=vault, communities=communities, seeders=seeders)
+
 
 
 @app.route('/update-vault/<int:vault_id>', methods=['POST'])
@@ -3901,8 +4038,11 @@ def update_vault(vault_id):
     vault.title = request.form['title']
     vault.content = request.form['content']
     vault.community_id = request.form['community']  # Update community_id based on user selection
+    vault.seeder_id = request.form['seeder_id']  # Update seeder_id based on user selection
+
     db.session.commit()
     return redirect(url_for('vault_interface'))
+
 
 
 
@@ -4014,8 +4154,8 @@ def add_official_seeder():
         full_name = request.form['full_name']
         file = request.files['profile_picture']
         alias = request.form.get('alias')
-        facts = request.form.getlist('facts')
-
+        types_lowercase = 'types_lowercase' in request.form
+        
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             specific_folder = 'static/images/profile_pics'
@@ -4027,20 +4167,61 @@ def add_official_seeder():
             profile_picture_url = url_for('static', filename=normalized_path)
         else:
             profile_picture_url = None  # Handle case where no file is uploaded or invalid file type
-
-        seeder = OfficialSeeder(full_name=full_name, profile_picture=profile_picture_url, alias=alias)
+        
+        seeder = OfficialSeeder(
+            full_name=full_name, 
+            profile_picture=profile_picture_url, 
+            alias=alias,
+            types_lowercase=types_lowercase
+        )
         db.session.add(seeder)
         db.session.commit()
+    
+    # Query seeders with their vault count
+    seeders_with_vault_count = db.session.query(
+        OfficialSeeder,
+        func.count(Vault.id).label('vault_count')
+    ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
 
-        for fact in facts:
-            if fact:
-                new_fact = Fact(fact_text=fact, seeder_id=seeder.id)
-                db.session.add(new_fact)
+    return render_template('official_seeder.html', seeders=seeders_with_vault_count)
 
+
+@app.route('/edit_official_seeder/<int:seeder_id>', methods=['GET', 'POST'])
+def edit_official_seeder(seeder_id):
+    seeder = OfficialSeeder.query.get_or_404(seeder_id)
+    if request.method == 'POST':
+        seeder.full_name = request.form['full_name']
+        seeder.alias = request.form.get('alias')
+        
+        file = request.files.get('profile_picture')
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            specific_folder = 'static/images/profile_pics'
+            file_path = os.path.join(specific_folder, filename)
+            os.makedirs(specific_folder, exist_ok=True)
+            file.save(file_path)
+            normalized_path = os.path.join('images/profile_pics', filename).replace('\\', '/')
+            seeder.profile_picture = url_for('static', filename=normalized_path)
+        
         db.session.commit()
+        flash('Seeder updated successfully', 'success')
+        return redirect(url_for('add_official_seeder'))
+    
+    return render_template('edit_official_seeder.html', seeder=seeder)
 
-    seeders = OfficialSeeder.query.all()
-    return render_template('official_seeder.html', seeders=seeders)
+@app.route('/delete_official_seeder/<int:seeder_id>', methods=['POST'])
+def delete_official_seeder(seeder_id):
+    seeder = OfficialSeeder.query.get_or_404(seeder_id)
+    try:
+        # Delete associated facts
+        Fact.query.filter_by(seeder_id=seeder_id).delete()
+        # Delete the seeder
+        db.session.delete(seeder)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Seeder deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route('/add_fact_to_seeder', methods=['POST'])
@@ -4070,6 +4251,20 @@ def feed_manager():
         settings['w_value'] = float(request.form.get('w_value', 2))
         settings['feed_type'] = request.form.get('feed_type', 'hot')
     return render_template('feed_manager.html', settings=settings)
+
+
+
+@app.route('/view_seeder_vaults/<int:seeder_id>')
+def view_seeder_vaults(seeder_id):
+    seeder = OfficialSeeder.query.get_or_404(seeder_id)
+    vaults = Vault.query.filter_by(seeder_id=seeder_id).all()
+    return render_template('view_seeder_vaults.html', vaults=vaults, seeder=seeder)
+
+
+@app.route('/community-edit')
+def community_edit():
+    # You can pass any other data your template might need here
+    return render_template('community_edit.html')
 
 
 if __name__ == '__main__':

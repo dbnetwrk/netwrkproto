@@ -16,73 +16,80 @@
             <label for="alias" class="form-label">Alias</label>
             <input type="text" class="form-control" id="alias" name="alias">
         </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="types_lowercase" name="types_lowercase">
+            <label class="form-check-label" for="types_lowercase">Types in lowercase</label>
+        </div>
         <button type="submit" class="btn btn-primary">Add Entry</button>
     </form>
 
     <h2>Official Seeder List</h2>
     <table class="table">
-        <thead>
-            <tr>
-                <th>Full Name</th>
-                <th>Profile Picture</th>
-                <th>Alias</th>
-                <th>Facts</th>
-                <th>Add Fact</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for seeder in seeders %}
-            <tr>
-                <td>{{ seeder.full_name }}</td>
-                <td><img src="{{ seeder.profile_picture }}" alt="Profile Picture" style="width: 50px; height: 50px;"></td>
-                <td>{{ seeder.alias }}</td>
-                <td>
-                    <ul>
-                        {% for fact in seeder.facts %}
-                        <li>{{ fact.fact_text }}</li>
-                        {% endfor %}
-                    </ul>
-                </td>
-                <td>
-                    <input type="text" class="form-control mb-2" placeholder="New Fact" id="fact{{ seeder.id }}">
-                    <button type="button" class="btn btn-secondary" onclick="addFact({{ seeder.id }})">Add Fact</button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
+    <thead>
+        <tr>
+            <th>Alias</th>
+            <th>Full Name</th>
+            <th>Profile Picture</th>
+            <th>Types Lowercase</th>
+            <th>Number of Vaults</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for seeder, vault_count in seeders %}
+        <tr>
+            <td>{{ seeder.alias or 'N/A' }}</td>
+            <td>{{ seeder.full_name }}</td>
+            <td><img src="{{ seeder.profile_picture }}" alt="Profile Picture" style="width: 50px; height: 50px;"></td>
+            <td>
+                <span class="badge {% if seeder.types_lowercase %}bg-success{% else %}bg-danger{% endif %}">
+                    {% if seeder.types_lowercase %}Yes{% else %}No{% endif %}
+                </span>
+            </td>
+            <td>{{ vault_count }}</td>
+            <td>
+                <a href="{{ url_for('view_seeder_vaults', seeder_id=seeder.id) }}" class="btn btn-info">View Vaults</a>
+                <button type="button" class="btn btn-primary" onclick="editSeeder({{ seeder.id }})">Edit</button>
+                <button type="button" class="btn btn-danger" onclick="deleteSeeder({{ seeder.id }})">Delete</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
     </table>
 </div>
 
+<style>
+    .badge {
+        font-size: 1em;
+        padding: 0.5em;
+    }
+</style>
+
 <script>
-function addFact(seederId) {
-    const factInput = document.getElementById('fact' + seederId);
-    const factText = factInput.value;
-    if (factText.trim() !== '') {
-        // Send a POST request to the server
-        fetch('{{ url_for("add_fact_to_seeder") }}', {
+function editSeeder(seederId) {
+    window.location.href = `/edit_official_seeder/${seederId}`;
+}
+
+function deleteSeeder(seederId) {
+    if (confirm('Are you sure you want to delete this seeder?')) {
+        fetch(`/delete_official_seeder/${seederId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ seeder_id: seederId, fact_text: factText })
+            }
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Append new fact to the list
-                const factsList = factInput.parentNode.previousElementSibling.firstElementChild;
-                const newFactItem = document.createElement('li');
-                newFactItem.textContent = factText;
-                factsList.appendChild(newFactItem);
-                factInput.value = ''; // Clear the input
+                alert('Seeder deleted successfully');
+                location.reload();
             } else {
-                alert('Failed to add fact: ' + data.error);
+                alert('Failed to delete seeder: ' + data.error);
             }
         });
     }
 }
 </script>
-
 {% endblock %}
 
 

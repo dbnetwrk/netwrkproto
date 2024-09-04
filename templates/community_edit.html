@@ -1,0 +1,92 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Community Members</h2>
+    <div class="row mb-3 font-weight-bold">
+        <div class="col-sm-2">Community</div>
+        <div class="col-sm-3">Real Members</div>
+        <div class="col-sm-3">Displayed Members</div>
+        <div class="col-sm-2">Action</div>
+    </div>
+    <!-- Home Community -->
+    <div class="row mb-2">
+        <div class="col-sm-2">Home</div>
+        <div class="col-sm-3">
+            <input type="text" readonly class="form-control-plaintext" value="71">
+        </div>
+        <div class="col-sm-3">
+            <input type="number" class="form-control" value="200">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    <!-- Career Community -->
+    <div class="row mb-2">
+        <div class="col-sm-2">Career</div>
+        <div class="col-sm-3">
+            <input type="text" readonly class="form-control-plaintext" value="70">
+        </div>
+        <div class="col-sm-3">
+            <input type="number" class="form-control" value="100">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    <!-- Additional communities follow the same pattern -->
+    <!-- Relationships -->
+    <div class="row mb-2">
+        <div class="col-sm-2">Relationships</div>
+        <div class="col-sm-3">
+            <input type="text" readonly class="form-control-plaintext" value="67">
+        </div>
+        <div class="col-sm-3">
+            <input type="number" class="form-control" value="150">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    <!-- Wellness -->
+    <div class="row mb-2">
+        <div class="col-sm-2">Health</div>
+        <div class="col-sm-3">
+            <input type="text" readonly class="form-control-plaintext" value="62">
+        </div>
+        <div class="col-sm-3">
+            <input type="number" class="form-control" value="110">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    <!-- Pics -->
+    <div class="row mb-2">
+        <div class="col-sm-2">Pics</div>
+        <div class="col-sm-3">
+            <input type="text" readonly class="form-control-plaintext" value="51">
+        </div>
+        <div class="col-sm-3">
+            <input type="number" class="form-control" value="250">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    <!-- Places -->
+    <div class="row mb-2">
+        <div class="col-sm-2">Places</div>
+        <div class="col-sm-3">
+            <input type="text" readonly class="form-control-plaintext" value="47">
+        </div>
+        <div class="col-sm-3">
+            <input type="number" class="form-control" value="180">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

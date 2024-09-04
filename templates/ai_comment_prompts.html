@@ -1,43 +1,41 @@
 {% extends "admin_panel_base.html" %}
-
 {% block content %}
 <div class="container">
     <h2>AI Comment Prompts</h2>
     
-    
-
-    <!-- Form to Start Seed Job -->
-<form method="POST" action="{{ url_for('start_seed_job') }}" class="mb-3">
-    <div class="input-group mb-3">
-        <input type="number" name="num_comments_per_post" class="form-control" placeholder="Number of comments per post" required>
-        <select name="community_id" class="form-control">
-            <option value="">All Communities</option>
-            {% for community in communities %}
-            <option value="{{ community.id }}">{{ community.name }}</option>
-            {% endfor %}
-        </select>
-        <div class="input-group-append">
-            <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
+    <form method="POST" action="{{ url_for('start_seed_job') }}" class="mb-3">
+        <div class="input-group mb-3">
+            <select name="content_type" class="form-control" required>
+                <option value="vault">Vaults</option>
+                <option value="post">Posts</option>
+            </select>
+            <div class="input-group-append">
+                <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
+            </div>
         </div>
-    </div>
-</form>
-
+    </form>
     
     <!-- Form to Add New Prompt -->
     <form method="POST" action="{{ url_for('add_ai_comment_prompt') }}" class="mb-3">
         <div class="input-group">
             <input type="text" name="prompt" class="form-control" placeholder="Enter new prompt" required>
+            <select name="prompt_type" class="form-control" required>
+                <option value="top_level">Top Level Comment</option>
+                <option value="reply">Reply</option>
+            </select>
             <div class="input-group-append">
                 <button class="btn btn-outline-primary" type="submit">Add Prompt</button>
             </div>
         </div>
     </form>
-
+    
     <!-- List Existing Prompts -->
-    {% for prompt in prompts %}
+    <h3>Top Level Comment Prompts</h3>
+    {% for prompt in prompts if prompt.prompt_type == 'top_level' %}
     <div class="card mb-2">
         <div class="card-body">
             {{ prompt.prompt }}
+            <span class="badge bg-primary">Top Level</span>
             <!-- Actions -->
             <a href="{{ url_for('edit_ai_comment_prompt', id=prompt.id) }}" class="btn btn-secondary btn-sm">Edit</a>
             <form method="POST" action="{{ url_for('delete_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
@@ -46,12 +44,25 @@
         </div>
     </div>
     {% else %}
-    <p>No prompts found.</p>
+    <p>No top level prompts found.</p>
+    {% endfor %}
+
+    <h3>Reply Prompts</h3>
+    {% for prompt in prompts if prompt.prompt_type == 'reply' %}
+    <div class="card mb-2">
+        <div class="card-body">
+            {{ prompt.prompt }}
+            <span class="badge bg-secondary">Reply</span>
+            <!-- Actions -->
+            <a href="{{ url_for('edit_ai_comment_prompt', id=prompt.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+            <form method="POST" action="{{ url_for('delete_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
+                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');">Delete</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <p>No reply prompts found.</p>
     {% endfor %}
 </div>
-
-
-
-
 {% endblock %}
 
