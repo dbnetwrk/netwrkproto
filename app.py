@@ -362,6 +362,8 @@ class Vault(db.Model):
     official_seeder = relationship('OfficialSeeder', backref='vaults')
     comments = db.relationship('Comment', backref='vault', lazy=True, cascade="all, delete-orphan")
 
+    scheduled_at = db.Column(db.DateTime, nullable=True)
+
     def __repr__(self):
         return '<Vault %r>' % self.title
 
@@ -3547,14 +3549,14 @@ def generate_comments_for_all_items(content_type='post'):
             items = ItemModel.query.all()
         elif content_type == 'vault':
             ItemModel = Vault
-            items = ItemModel.query.filter_by(is_posted=False).all()
+            items = ItemModel.query.filter(Vault.scheduled_at == None).all()  # Changed this line
         else:
             logging.error("Invalid content type.")
             return "Invalid content type."
         
         if not items:
-            logging.warning(f"No {content_type}s available.")
-            return f"No {content_type}s available."
+            logging.warning(f"No unscheduled {content_type}s available.")
+            return f"No unscheduled {content_type}s available."
         if not top_level_prompts or not reply_prompts:
             logging.warning("No prompts available.")
             return "No prompts available."
@@ -3578,13 +3580,13 @@ def generate_comments_for_all_items(content_type='post'):
                 combined_prompt = f"{item_context} {prompt.prompt}"
                 
                 try:
+                    # First comment
                     response = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[{"role": "system", "content": combined_prompt}]
                     )
                     generated_comment = response.choices[0].message.content.strip()
                     
-                    # Convert to lowercase if the commenter types in lowercase
                     if content_type == 'vault' and commenter.types_lowercase:
                         generated_comment = generated_comment.lower()
                     
@@ -3600,9 +3602,9 @@ def generate_comments_for_all_items(content_type='post'):
                     db.session.add(new_comment)
                     db.session.flush()  # This assigns an ID to new_comment
                     
-                    # Generate a reply from the original creator
+                    # Second comment (reply from original creator)
                     reply_prompt = random.choice(reply_prompts)
-                    reply_context = f"Your friend just said this: {generated_comment}\n\n"
+                    reply_context = f"Your friend just said this: {generated_comment}, which is a reply to you saying this {item.title}\nContent: {item.content}\n\n"
                     combined_reply_prompt = f"{reply_context} {reply_prompt.prompt}"
                     
                     reply_response = client.chat.completions.create(
@@ -3611,7 +3613,6 @@ def generate_comments_for_all_items(content_type='post'):
                     )
                     generated_reply = reply_response.choices[0].message.content.strip()
                     
-                    # Convert reply to lowercase if the original poster types in lowercase
                     if content_type == 'vault':
                         original_seeder = OfficialSeeder.query.get(item.seeder_id)
                         if original_seeder and original_seeder.types_lowercase:
@@ -3628,18 +3629,49 @@ def generate_comments_for_all_items(content_type='post'):
                         parent_id=new_comment.id
                     )
                     db.session.add(new_reply)
+                    db.session.flush()  # This assigns an ID to new_reply
+                    
+                    # Third comment (reply from original commenter)
+                    third_reply_prompt = random.choice(reply_prompts)
+                    third_reply_context = f"""Here's the conversation so far:
+                    Original post: {item.title}\nContent: {item.content}
+                    Your first comment: {generated_comment}
+                    Their reply: {generated_reply}
+                    Now, \n\n"""
+                    combined_third_reply_prompt = f"{third_reply_context} {third_reply_prompt.prompt}"
+                    
+                    third_reply_response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "system", "content": combined_third_reply_prompt}]
+                    )
+                    generated_third_reply = third_reply_response.choices[0].message.content.strip()
+                    
+                    if content_type == 'vault' and commenter.types_lowercase:
+                        generated_third_reply = generated_third_reply.lower()
+                    
+                    new_third_reply = Comment(
+                        content=generated_third_reply,
+                        user_id=commenter.id if content_type == 'post' else None,
+                        official_seeder_id=commenter.id if content_type == 'vault' else None,
+                        post_id=item.id if content_type == 'post' else None,
+                        vault_id=item.id if content_type == 'vault' else None,
+                        posted_time=datetime.utcnow(),
+                        is_burner=False,
+                        parent_id=new_reply.id
+                    )
+                    db.session.add(new_third_reply)
                     
                     try:
                         db.session.commit()
-                        logging.info(f"Comment and reply added successfully for {content_type} {item.id}")
-                        results.append(f"Generated and posted comment and reply successfully for {content_type} {item.id}")
+                        logging.info(f"Comment chain added successfully for {content_type} {item.id}")
+                        results.append(f"Generated and posted comment chain successfully for {content_type} {item.id}")
                     except SQLAlchemyError as db_error:
                         db.session.rollback()
-                        logging.error(f"Database error when adding comment and reply: {str(db_error)}")
-                        results.append(f"Failed to add comment and reply to database for {content_type} {item.id}: {str(db_error)}")
+                        logging.error(f"Database error when adding comment chain: {str(db_error)}")
+                        results.append(f"Failed to add comment chain to database for {content_type} {item.id}: {str(db_error)}")
                 except Exception as e:
-                    logging.error(f"Error generating comment or reply: {str(e)}")
-                    results.append(f"Failed to generate comment or reply for {content_type} {item.id}: {str(e)}")
+                    logging.error(f"Error generating comment chain: {str(e)}")
+                    results.append(f"Failed to generate comment chain for {content_type} {item.id}: {str(e)}")
         
         return results
 
@@ -3744,7 +3776,12 @@ def get_seeder_info(user_id):
 @app.route('/idea_factory/', methods=['GET', 'POST'])
 def idea_factory():
     communities = Community.query.options(joinedload(Community.subreddits)).all()
-    seeders = OfficialSeeder.query.order_by(OfficialSeeder.full_name).all()  # Sort seeders alphabetically by full name
+    # Fetch seeders with their vault counts, ordered by the count
+    seeders_with_counts = db.session.query(
+        OfficialSeeder,
+        func.count(Vault.id).label('vault_count')
+    ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
+
     if request.method == 'POST':
         clear_image_directory()
         selected_community_id = request.form.get('community_id')
@@ -3782,9 +3819,9 @@ def idea_factory():
         if text_results:
             flash(f"Scraped and processed {len(text_results)} text posts")
 
-        return render_template('idea_factory.html', results=text_results, communities=communities, session=session, seeders=seeders)
+        return render_template('idea_factory.html', results=text_results, communities=communities, session=session, seeders_with_counts=seeders_with_counts)
 
-    return render_template('idea_factory.html', communities=communities, session=session, seeders=seeders)
+    return render_template('idea_factory.html', communities=communities, session=session, seeders_with_counts=seeders_with_counts)
 
 
 def modify_text_with_openai(text, professional_context):
@@ -3965,19 +4002,38 @@ def vault_post():
 
 from sqlalchemy.orm import joinedload
 
+from itertools import groupby
+from datetime import datetime
+from collections import OrderedDict
+
 @app.route('/vault_interface')
 def vault_interface():
     community_id = request.args.get('community_id')
+    
+    query = Vault.query.options(
+        joinedload(Vault.official_seeder),
+        joinedload(Vault.comments).joinedload(Comment.official_seeder)
+    )
+    
     if community_id:
-        vaults = Vault.query.options(
-            joinedload(Vault.official_seeder),
-            joinedload(Vault.comments).joinedload(Comment.user)
-        ).filter_by(community_id=community_id).order_by(Vault.is_posted, Vault.created_at.desc()).all()
-    else:
-        vaults = Vault.query.options(
-            joinedload(Vault.official_seeder),
-            joinedload(Vault.comments).joinedload(Comment.user)
-        ).order_by(Vault.is_posted, Vault.created_at.desc()).all()
+        query = query.filter_by(community_id=community_id)
+    
+    vaults = query.order_by(Vault.scheduled_at.asc(), Vault.created_at.desc()).all()
+    
+    # Group scheduled vaults by date
+    scheduled_vaults = sorted(
+        [v for v in vaults if v.scheduled_at],
+        key=lambda x: x.scheduled_at.date()
+    )
+    grouped_vaults = {
+        date: list(items) for date, items in groupby(scheduled_vaults, key=lambda x: x.scheduled_at.date())
+    }
+    
+    # Sort the grouped_vaults dictionary by date in descending order
+    sorted_grouped_vaults = OrderedDict(sorted(grouped_vaults.items(), key=lambda x: x[0], reverse=True))
+    
+    # Unscheduled vaults
+    unscheduled_vaults = [v for v in vaults if not v.scheduled_at]
     
     communities = db.session.query(
         Community.id,
@@ -3985,7 +4041,10 @@ def vault_interface():
         db.session.query(func.count(Vault.id)).filter(Vault.community_id == Community.id).label('vault_count')
     ).group_by(Community.id).all()
     
-    return render_template('vault_interface.html', vaults=vaults, communities=communities)
+    return render_template('vault_interface.html', 
+                           grouped_vaults=sorted_grouped_vaults, 
+                           unscheduled_vaults=unscheduled_vaults, 
+                           communities=communities)
 
 
 @app.route('/delete_vault/<int:vault_id>', methods=['POST'])
@@ -4265,6 +4324,30 @@ def view_seeder_vaults(seeder_id):
 def community_edit():
     # You can pass any other data your template might need here
     return render_template('community_edit.html')
+
+
+@app.route('/schedule_vault/<int:vault_id>', methods=['POST'])
+def schedule_vault(vault_id):
+    vault = Vault.query.get(vault_id)
+    try:
+        scheduled_time = datetime.strptime(request.json['scheduled_at'], '%a, %d %b %Y %H:%M:%S GMT')
+        scheduled_time = pytz.utc.localize(scheduled_time)
+        vault.scheduled_at = scheduled_time
+        db.session.commit()
+        return jsonify(success=True)
+    except Exception as e:
+        return jsonify(success=False, error=str(e))
+
+
+@app.route('/cancel_schedule/<int:vault_id>', methods=['POST'])
+def cancel_schedule(vault_id):
+    vault = Vault.query.get(vault_id)
+    try:
+        vault.scheduled_at = None
+        db.session.commit()
+        return jsonify(success=True)
+    except Exception as e:
+        return jsonify(success=False, error=str(e))
 
 
 if __name__ == '__main__':

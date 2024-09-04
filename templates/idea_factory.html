@@ -102,13 +102,13 @@
                         </select>
                     </div>
                     <div class="mb-3">
-    <label for="seeder_id" class="form-label">Select Official Seeder:</label>
-    <select class="form-select" name="seeder_id" id="seeder_id">
-        {% for seeder in seeders %}
-        <option value="{{ seeder.id }}">{{ seeder.full_name }}</option>
-        {% endfor %}
-    </select>
-</div>
+                        <label for="seeder_id" class="form-label">Select Official Seeder:</label>
+                        <select class="form-select" name="seeder_id" id="seeder_id">
+                            {% for seeder, vault_count in seeders_with_counts %}
+                            <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias}}) ({{ vault_count }} vaults)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
                     <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
                     <button type="button" class="btn btn-secondary" onclick="toggleNewSeederForm({{ loop.index }})">Create New Seeder</button>
