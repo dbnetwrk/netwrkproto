@@ -18,6 +18,28 @@
             <label for="alias" class="form-label">Alias</label>
             <input type="text" class="form-control" id="alias" name="alias" value="{{ seeder.alias }}">
         </div>
+        <div class="mb-3">
+            <label for="state" class="form-label">State</label>
+            <select class="form-select" id="state" name="state">
+                <option value="">Select a state</option>
+                {% for state in State %}
+                <option value="{{ state.name }}" {% if seeder.state == state %}selected{% endif %}>{{ state.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="industry" class="form-label">Industry</label>
+            <select class="form-select" id="industry" name="industry">
+                <option value="">Select an industry</option>
+                {% for industry in Industry %}
+                <option value="{{ industry.name }}" {% if seeder.industry == industry %}selected{% endif %}>{{ industry.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="types_lowercase" name="types_lowercase" {% if seeder.types_lowercase %}checked{% endif %}>
+            <label class="form-check-label" for="types_lowercase">Types in lowercase</label>
+        </div>
         <button type="submit" class="btn btn-primary">Update Seeder</button>
     </form>
 </div>

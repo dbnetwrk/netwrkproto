@@ -24,7 +24,7 @@
         </div>
         {% endfor %}
     </div>
-    
+
     <!-- Display Scheduled Vault posts -->
     <h2>Scheduled Vaults</h2>
     <div id="scheduledVaults" class="accordion">
@@ -52,6 +52,21 @@
     
 </div>
 <script>
+
+
+
+function toggleComments(vaultId) {
+    var commentSection = document.getElementById('commentsSection' + vaultId);
+    var toggleIcon = document.getElementById('toggleIcon' + vaultId);
+    
+    if (commentSection.style.display === 'none') {
+        commentSection.style.display = 'block';
+        toggleIcon.textContent = '▲';
+    } else {
+        commentSection.style.display = 'none';
+        toggleIcon.textContent = '▼';
+    }
+}
 
     document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.scheduled-time').forEach(function(el) {

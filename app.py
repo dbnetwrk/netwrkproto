@@ -29,6 +29,68 @@ import praw
 load_dotenv()
 
 
+from enum import Enum
+
+class State(Enum):
+    AL = "Alabama"
+    AK = "Alaska"
+    AZ = "Arizona"
+    AR = "Arkansas"
+    CA = "California"
+    CO = "Colorado"
+    CT = "Connecticut"
+    DE = "Delaware"
+    FL = "Florida"
+    GA = "Georgia"
+    HI = "Hawaii"
+    ID = "Idaho"
+    IL = "Illinois"
+    IN = "Indiana"
+    IA = "Iowa"
+    KS = "Kansas"
+    KY = "Kentucky"
+    LA = "Louisiana"
+    ME = "Maine"
+    MD = "Maryland"
+    MA = "Massachusetts"
+    MI = "Michigan"
+    MN = "Minnesota"
+    MS = "Mississippi"
+    MO = "Missouri"
+    MT = "Montana"
+    NE = "Nebraska"
+    NV = "Nevada"
+    NH = "New Hampshire"
+    NJ = "New Jersey"
+    NM = "New Mexico"
+    NY = "New York"
+    NC = "North Carolina"
+    ND = "North Dakota"
+    OH = "Ohio"
+    OK = "Oklahoma"
+    OR = "Oregon"
+    PA = "Pennsylvania"
+    RI = "Rhode Island"
+    SC = "South Carolina"
+    SD = "South Dakota"
+    TN = "Tennessee"
+    TX = "Texas"
+    UT = "Utah"
+    VT = "Vermont"
+    VA = "Virginia"
+    WA = "Washington"
+    WV = "West Virginia"
+    WI = "Wisconsin"
+    WY = "Wyoming"
+
+
+class Industry(Enum):
+    FINANCE = "Finance"
+    CONSULTING = "Consulting"
+    MARKETING = "Marketing"
+    MEDICAL = "Medical"
+    TECH = "Tech"
+
 
 UPLOAD_FOLDER = 'C:\\flasker\\static\\uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -129,14 +191,14 @@ class User(db.Model):
     burner_username = db.Column(db.String(50), nullable=True)
     communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
     interests = db.relationship('Interest', secondary=user_interest_association, backref=db.backref('users', lazy='dynamic'))
-    industry_id = db.Column(db.Integer, db.ForeignKey('industry.id'), nullable=True)
-    industry = db.relationship('Industry', backref=db.backref('users', lazy=True))
-    about_me = db.Column(db.Text, nullable=True)  # Add this line for the "About Me" section
-    karma = db.Column(db.Integer, default = 0)
+    industry = db.Column(db.Enum(Industry), nullable=True)  # Changed this line
+    about_me = db.Column(db.Text, nullable=True)
+    karma = db.Column(db.Integer, default=0)
     background_color = db.Column(db.String(7))
     profile_color = db.Column(db.String(7), nullable=True)
     header_pic_url = db.Column(db.String(255), nullable=True)
     seeder = db.Column(db.Boolean, default=False, nullable=False)
+
 
     # Add a method to determine the display name
     def display_name(self, is_anonymous):
@@ -248,16 +310,7 @@ class Interest(db.Model):
 
 
 
-class Industry(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    industry_category_id = db.Column(db.Integer, db.ForeignKey('industry_category.id'), nullable=False)  # Reference to IndustryCategory model
 
-
-class IndustryCategory(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    industries = db.relationship('Industry', backref='industry_category', lazy=True)
 
 class InterestCategory(db.Model):
     __tablename__ = 'interest_category'
@@ -397,12 +450,16 @@ class PreInvite(db.Model):
 
 
 
+
+
 class OfficialSeeder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(150), nullable=False)
     profile_picture = db.Column(db.String(255))  # Assuming URL or path
     alias = db.Column(db.String(150))
     types_lowercase = db.Column(db.Boolean, default=False)
+    state = db.Column(db.Enum(State), nullable=True)
+    industry = db.Column(db.Enum(Industry), nullable=True)
     facts = db.relationship('Fact', backref='official_seeder', lazy=True)
 
 class Fact(db.Model):
@@ -3819,9 +3876,9 @@ def idea_factory():
         if text_results:
             flash(f"Scraped and processed {len(text_results)} text posts")
 
-        return render_template('idea_factory.html', results=text_results, communities=communities, session=session, seeders_with_counts=seeders_with_counts)
+        return render_template('idea_factory.html', results=text_results, communities=communities, session=session, seeders_with_counts=seeders_with_counts, State=State, Industry=Industry)
 
-    return render_template('idea_factory.html', communities=communities, session=session, seeders_with_counts=seeders_with_counts)
+    return render_template('idea_factory.html', communities=communities, session=session, seeders_with_counts=seeders_with_counts, State=State, Industry=Industry)
 
 
 def modify_text_with_openai(text, professional_context):
@@ -4020,6 +4077,10 @@ def vault_interface():
     
     vaults = query.order_by(Vault.scheduled_at.asc(), Vault.created_at.desc()).all()
     
+    # Fetch all communities
+    communities = Community.query.all()
+    community_dict = {c.id: c.name for c in communities}
+    
     # Group scheduled vaults by date
     scheduled_vaults = sorted(
         [v for v in vaults if v.scheduled_at],
@@ -4035,16 +4096,11 @@ def vault_interface():
     # Unscheduled vaults
     unscheduled_vaults = [v for v in vaults if not v.scheduled_at]
     
-    communities = db.session.query(
-        Community.id,
-        Community.name,
-        db.session.query(func.count(Vault.id)).filter(Vault.community_id == Community.id).label('vault_count')
-    ).group_by(Community.id).all()
-    
     return render_template('vault_interface.html', 
                            grouped_vaults=sorted_grouped_vaults, 
                            unscheduled_vaults=unscheduled_vaults, 
-                           communities=communities)
+                           communities=communities,
+                           community_dict=community_dict)
 
 
 @app.route('/delete_vault/<int:vault_id>', methods=['POST'])
@@ -4077,9 +4133,10 @@ def mark_vault_as_posted(vault_id):
 
 @app.context_processor
 def inject_vault_count():
-    # Filter to count only vaults where `is_posted` is False
-    total_vaults = Vault.query.filter_by(is_posted=False).count()
+    # Filter to count only vaults where `scheduled_at` is None
+    total_vaults = Vault.query.filter(Vault.scheduled_at == None).count()
     return dict(total_vaults=total_vaults)
+
 
 
 @app.route('/edit-vault/<int:vault_id>', methods=['GET'])
@@ -4214,6 +4271,8 @@ def add_official_seeder():
         file = request.files['profile_picture']
         alias = request.form.get('alias')
         types_lowercase = 'types_lowercase' in request.form
+        state = request.form.get('state')
+        industry = request.form.get('industry')
         
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
@@ -4231,7 +4290,9 @@ def add_official_seeder():
             full_name=full_name, 
             profile_picture=profile_picture_url, 
             alias=alias,
-            types_lowercase=types_lowercase
+            types_lowercase=types_lowercase,
+            state=State[state] if state else None,
+            industry=Industry[industry] if industry else None
         )
         db.session.add(seeder)
         db.session.commit()
@@ -4241,8 +4302,7 @@ def add_official_seeder():
         OfficialSeeder,
         func.count(Vault.id).label('vault_count')
     ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
-
-    return render_template('official_seeder.html', seeders=seeders_with_vault_count)
+    return render_template('official_seeder.html', seeders=seeders_with_vault_count, State=State, Industry=Industry)
 
 
 @app.route('/edit_official_seeder/<int:seeder_id>', methods=['GET', 'POST'])
@@ -4251,6 +4311,9 @@ def edit_official_seeder(seeder_id):
     if request.method == 'POST':
         seeder.full_name = request.form['full_name']
         seeder.alias = request.form.get('alias')
+        seeder.types_lowercase = 'types_lowercase' in request.form
+        seeder.state = State[request.form.get('state')] if request.form.get('state') else None
+        seeder.industry = Industry[request.form.get('industry')] if request.form.get('industry') else None
         
         file = request.files.get('profile_picture')
         if file and allowed_file(file.filename):
@@ -4266,7 +4329,7 @@ def edit_official_seeder(seeder_id):
         flash('Seeder updated successfully', 'success')
         return redirect(url_for('add_official_seeder'))
     
-    return render_template('edit_official_seeder.html', seeder=seeder)
+    return render_template('edit_official_seeder.html', seeder=seeder, State=State, Industry=Industry)
 
 @app.route('/delete_official_seeder/<int:seeder_id>', methods=['POST'])
 def delete_official_seeder(seeder_id):

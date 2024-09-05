@@ -113,28 +113,42 @@
                     <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
                     <button type="button" class="btn btn-secondary" onclick="toggleNewSeederForm({{ loop.index }})">Create New Seeder</button>
                     <!-- New Seeder Form (initially hidden) -->
-                    <div id="newSeederForm{{ loop.index }}" style="display: none;">
-                        <h6>Create New Seeder</h6>
-                        <div class="mb-3">
-                            <label for="new_seeder_name{{ loop.index }}" class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="new_seeder_name{{ loop.index }}" name="new_seeder_name">
-                        </div>
-                        <div class="mb-3">
-                            <label for="new_seeder_alias{{ loop.index }}" class="form-label">Alias</label>
-                            <input type="text" class="form-control" id="new_seeder_alias{{ loop.index }}" name="new_seeder_alias">
-                        </div>
-                        <div class="mb-3">
-                            <label for="new_seeder_profile_picture{{ loop.index }}" class="form-label">Profile Picture</label>
-                            <input type="file" class="form-control" id="new_seeder_profile_picture{{ loop.index }}" name="new_seeder_profile_picture">
-                        </div>
-                        <div class="mb-3">
-                            <label for="new_seeder_facts{{ loop.index }}" class="form-label">Facts (one per line)</label>
-                            <textarea class="form-control" id="new_seeder_facts{{ loop.index }}" name="new_seeder_facts" rows="3"></textarea>
-                        </div>
-
-                        <div class="mb-3 form-check">
-    <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase{{ loop.index }}" name="new_seeder_types_lowercase">
-    <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
+<div id="newSeederForm{{ loop.index }}" style="display: none;">
+    <h6>Create New Seeder</h6>
+    <div class="mb-3">
+        <label for="new_seeder_name{{ loop.index }}" class="form-label">Full Name</label>
+        <input type="text" class="form-control" id="new_seeder_name{{ loop.index }}" name="new_seeder_name">
+    </div>
+    <div class="mb-3">
+        <label for="new_seeder_alias{{ loop.index }}" class="form-label">Alias</label>
+        <input type="text" class="form-control" id="new_seeder_alias{{ loop.index }}" name="new_seeder_alias">
+    </div>
+    <div class="mb-3">
+        <label for="new_seeder_profile_picture{{ loop.index }}" class="form-label">Profile Picture</label>
+        <input type="file" class="form-control" id="new_seeder_profile_picture{{ loop.index }}" name="new_seeder_profile_picture">
+    </div>
+    <div class="mb-3">
+        <label for="new_seeder_state{{ loop.index }}" class="form-label">State</label>
+        <select class="form-select" id="new_seeder_state{{ loop.index }}" name="new_seeder_state">
+            <option value="">Select a state</option>
+            {% for state in State %}
+            <option value="{{ state.name }}">{{ state.value }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="new_seeder_industry{{ loop.index }}" class="form-label">Industry</label>
+        <select class="form-select" id="new_seeder_industry{{ loop.index }}" name="new_seeder_industry">
+            <option value="">Select an industry</option>
+            {% for industry in Industry %}
+            <option value="{{ industry.name }}">{{ industry.value }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase{{ loop.index }}" name="new_seeder_types_lowercase">
+        <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
+    </div>
 </div>
                     </div>
                     <button type="submit" class="btn btn-secondary">Submit</button>

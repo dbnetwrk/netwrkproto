@@ -1,5 +1,4 @@
 {% extends "admin_panel_base.html" %}
-
 {% block content %}
 <div class="container mt-4">
     <h2>Add Official Seeder Entry</h2>
@@ -16,13 +15,30 @@
             <label for="alias" class="form-label">Alias</label>
             <input type="text" class="form-control" id="alias" name="alias">
         </div>
+        <div class="mb-3">
+            <label for="state" class="form-label">State</label>
+            <select class="form-select" id="state" name="state">
+                <option value="">Select a state</option>
+                {% for state in State %}
+                <option value="{{ state.name }}">{{ state.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="industry" class="form-label">Industry</label>
+            <select class="form-select" id="industry" name="industry">
+                <option value="">Select an industry</option>
+                {% for industry in Industry %}
+                <option value="{{ industry.name }}">{{ industry.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="mb-3 form-check">
             <input type="checkbox" class="form-check-input" id="types_lowercase" name="types_lowercase">
             <label class="form-check-label" for="types_lowercase">Types in lowercase</label>
         </div>
         <button type="submit" class="btn btn-primary">Add Entry</button>
     </form>
-
     <h2>Official Seeder List</h2>
     <table class="table">
     <thead>
@@ -30,6 +46,8 @@
             <th>Alias</th>
             <th>Full Name</th>
             <th>Profile Picture</th>
+            <th>State</th>
+            <th>Industry</th>
             <th>Types Lowercase</th>
             <th>Number of Vaults</th>
             <th>Actions</th>
@@ -41,6 +59,8 @@
             <td>{{ seeder.alias or 'N/A' }}</td>
             <td>{{ seeder.full_name }}</td>
             <td><img src="{{ seeder.profile_picture }}" alt="Profile Picture" style="width: 50px; height: 50px;"></td>
+            <td>{{ seeder.state.value if seeder.state else 'N/A' }}</td>
+            <td>{{ seeder.industry.value if seeder.industry else 'N/A' }}</td>
             <td>
                 <span class="badge {% if seeder.types_lowercase %}bg-success{% else %}bg-danger{% endif %}">
                     {% if seeder.types_lowercase %}Yes{% else %}No{% endif %}
@@ -48,28 +68,31 @@
             </td>
             <td>{{ vault_count }}</td>
             <td>
-                <a href="{{ url_for('view_seeder_vaults', seeder_id=seeder.id) }}" class="btn btn-info">View Vaults</a>
-                <button type="button" class="btn btn-primary" onclick="editSeeder({{ seeder.id }})">Edit</button>
-                <button type="button" class="btn btn-danger" onclick="deleteSeeder({{ seeder.id }})">Delete</button>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('view_seeder_vaults', seeder_id=seeder.id) }}" class="btn btn-sm btn-info">View</a>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="editSeeder({{ seeder.id }})">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteSeeder({{ seeder.id }})">Delete</button>
+                </div>
             </td>
         </tr>
         {% endfor %}
     </tbody>
     </table>
 </div>
-
 <style>
     .badge {
-        font-size: 1em;
-        padding: 0.5em;
+        font-size: 0.8em;
+        padding: 0.4em;
+    }
+    .btn-group .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
     }
 </style>
-
 <script>
 function editSeeder(seederId) {
     window.location.href = `/edit_official_seeder/${seederId}`;
 }
-
 function deleteSeeder(seederId) {
     if (confirm('Are you sure you want to delete this seeder?')) {
         fetch(`/delete_official_seeder/${seederId}`, {
@@ -91,6 +114,5 @@ function deleteSeeder(seederId) {
 }
 </script>
 {% endblock %}
-
 
 
