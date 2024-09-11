@@ -1,0 +1,52 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h1>Eventbrite Scraper</h1>
+    <div class="input-group mb-3">
+        <select id="organizerSelect" class="form-control">
+            {% for organizer in organizers %}
+            <option value="{{ organizer.id }}">{{ organizer.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="input-group-append">
+            <button class="btn btn-outline-secondary" type="button" onclick="scrapeEvents()">Scrape Events</button>
+        </div>
+    </div>
+    <div id="results"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+function scrapeEvents() {
+    const organizerId = document.getElementById('organizerSelect').value;
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = 'Scraping...';
+    axios.post('/scrape', { organizer_id: organizerId })
+        .then(function (response) {
+            if (response.data && response.data.length > 0) {
+                let html = '<h2>Scraped Events:</h2>';
+                response.data.forEach(event => {
+                    html += `
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">${event.name}</h5>
+                                <p class="card-text">Location: ${event.location}</p>
+                                <p class="card-text">Start: ${event.start_time ? new Date(event.start_time).toLocaleString() : 'Not specified'}</p>
+                                <p class="card-text">End: ${event.end_time ? new Date(event.end_time).toLocaleString() : 'Not specified'}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                resultsDiv.innerHTML = html;
+            } else {
+                resultsDiv.innerHTML = 'No events found or empty response received.';
+            }
+        })
+        .catch(function (error) {
+            resultsDiv.innerHTML = 'Error: ' + error.message;
+        });
+}
+</script>
+</script>
+{% endblock %}
+

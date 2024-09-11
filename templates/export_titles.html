@@ -1,0 +1,8 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Export Venue Titles</h2>
+    <p>Click the button below to download a text file containing all venue titles.</p>
+    <a href="{{ url_for('export_venue_titles') }}" class="btn btn-primary">Download Venue Titles</a>
+</div>
+{% endblock %}

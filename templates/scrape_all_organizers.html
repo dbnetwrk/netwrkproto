@@ -1,0 +1,36 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+    <div class="container">
+        <h1>Scrape All Organizers</h1>
+        <button id="scrapeButton">Start Scraping</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('scrapeButton').addEventListener('click', function() {
+            this.disabled = true;
+            this.textContent = 'Scraping...';
+            document.getElementById('result').textContent = 'Scraping in progress...';
+
+            fetch('/scrape_all')
+                .then(response => response.json())
+                .then(data => {
+                    let resultText = 'Scraping completed:\n\n';
+                    data.results.forEach(result => {
+                        resultText += result + '\n';
+                    });
+                    document.getElementById('result').textContent = resultText;
+                })
+                .catch(error => {
+                    document.getElementById('result').textContent = 'An error occurred: ' + error;
+                })
+                .finally(() => {
+                    this.disabled = false;
+                    this.textContent = 'Start Scraping';
+                });
+        });
+    </script>
+</body>
+</html>
+
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container">
+    <h1>Events in Miami</h1>
+    {% if events %}
+        <div class="row">
+            {% for event in events %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    {% if event.logo and event.logo.url %}
+                        <img src="{{ event.logo.url }}" class="card-img-top" alt="{{ event.name.text }}">
+                    {% else %}
+                        <div class="card-img-top bg-light text-center p-3">No Image</div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ event.name.text }}</h5>
+                        <p class="card-text">{{ event.description.text|default('No description')|truncate(100) }}</p>
+                        <a href="{{ event.url }}" class="btn btn-primary">View Event</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No events found.</p>
+    {% endif %}
+</div>
+{% endblock %}

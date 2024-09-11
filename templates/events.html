@@ -1,0 +1,25 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container">
+    <h1>Events</h1>
+    <a href="{{ url_for('events') }}" class="btn btn-primary" role="button">Reload Events</a>
+    <form method="POST">
+        <button type="submit" class="btn btn-success">Load Events from JSON</button>
+    </form>
+
+    <form action="{{ url_for('scrape_all') }}" method="post">
+    <button type="submit">Scrape All Organizers</button>
+</form>
+    <hr>
+    <ul class="list-group">
+        {% for event in events %}
+        <li class="list-group-item">
+            <strong>{{ event.name }}</strong> at {{ event.venue_name }}<br>
+            Location: {{ event.location }}<br>
+            Start Time: {{ event.start_time.strftime('%Y-%m-%d %H:%M') }}<br>
+            End Time: {{ event.end_time.strftime('%Y-%m-%d %H:%M') }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Run Scraper</h2>
+    <form id="scraperForm" action="{{ url_for('run_scraper') }}" method="POST" class="mb-4">
+        <div class="form-group">
+            <label for="category">Select Category:</label>
+            <select name="category" id="category" class="form-control">
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>
+                        {{ category }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" name="run_scraper" class="btn btn-primary mt-2">Run Scraper</button>
+    </form>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} mt-3" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <h3 class="mt-5">{{ selected_category }} Scraper Results</h3>
+    <div id="resultsTable">
+        <table class="table mt-3">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th>Text</th>
+                    <th>Scrape Date</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in results %}
+                <tr>
+                    <td>{{ result.url }}</td>
+                    <td>{{ result.text[:100] }}{% if result.text|length > 100 %}...{% endif %}</td>
+                    <td>{{ result.scrape_date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>{{ result.category.value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.getElementById('category').addEventListener('change', function() {
+    var category = this.value;
+    fetch(`{{ url_for('run_scraper') }}?category=${category}`)
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            document.getElementById('resultsTable').innerHTML = doc.getElementById('resultsTable').innerHTML;
+            document.querySelector('h3').textContent = `${category} Scraper Results`;
+        });
+});
+</script>
+{% endblock %}

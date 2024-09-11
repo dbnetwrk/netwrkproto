@@ -1,0 +1,39 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<h2>Add New Writing Style</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label for="author" class="form-label">Author:</label>
+        <input type="text" class="form-control" id="author" name="author" required>
+    </div>
+    <div class="mb-3">
+        <label for="content" class="form-label">Content:</label>
+        <textarea class="form-control" id="content" name="content" required rows="3"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Writing Style</button>
+</form>
+<hr>
+<h3>Existing Writing Styles</h3>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Author</th>
+            <th>Content</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for style in styles %}
+        <tr>
+            <td>{{ style.author }}</td>
+            <td>{{ style.content }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('delete_writing_style', id=style.id) }}">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

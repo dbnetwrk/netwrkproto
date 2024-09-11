@@ -1,0 +1,60 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h1>Instagram Scraper</h1>
+    <div class="mb-3">
+        <label for="organizerSelect" class="form-label">Select Event Organizer</label>
+        <select id="organizerSelect" class="form-select">
+            {% for organizer in organizers %}
+                {% if organizer.instagram_username %}
+                    <option value="{{ organizer.id }}">{{ organizer.name }} (@{{ organizer.instagram_username }})</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+    </div>
+    <button id="scrapeButton" class="btn btn-primary mb-3" onclick="scrapeInstagram()">Scrape Instagram</button>
+    <div id="results" class="mt-3"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+function scrapeInstagram() {
+    const button = document.getElementById('scrapeButton');
+    const resultsDiv = document.getElementById('results');
+    const organizerId = document.getElementById('organizerSelect').value;
+    
+    button.disabled = true;
+    button.textContent = 'Scraping...';
+    resultsDiv.innerHTML = '<p>Scraping in progress... This may take a moment.</p>';
+
+    axios.post('/run-instagram-scraper', { organizer_id: organizerId })
+        .then(function (response) {
+            button.disabled = false;
+            button.textContent = 'Scrape Instagram';
+            
+            let html = `<h2>Scraped Posts:</h2>
+                        <p>Full dataset: <a href="${response.data.dataset_url}" target="_blank">${response.data.dataset_url}</a></p>`;
+            
+            response.data.results.forEach(post => {
+                html += `
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">${post.caption || 'No caption'}</h5>
+                            <p class="card-text">Likes: ${post.likesCount}, Comments: ${post.commentsCount}</p>
+                            <p class="card-text">Posted on: ${new Date(post.timestamp).toLocaleString()}</p>
+                            ${post.displayUrl ? `<img src="${post.displayUrl}" alt="Post image" class="img-fluid">` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        })
+        .catch(function (error) {
+            button.disabled = false;
+            button.textContent = 'Scrape Instagram';
+            resultsDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
+        });
+}
+</script>
+{% endblock %}

@@ -25,6 +25,25 @@ import pytz
 import uuid
 import requests
 import praw
+from flask import Flask, request, jsonify, render_template
+import scrapy
+from scrapy.crawler import CrawlerProcess
+from scrapy.utils.project import get_project_settings
+import json
+from scrapy import signals
+from scrapy.signalmanager import dispatcher
+import crochet
+from apify_client import ApifyClient
+
+import os
+
+from langchain.indexes import VectorstoreIndexCreator
+from langchain_community.utilities import ApifyWrapper
+from langchain_core.document_loaders.base import Document
+from langchain_openai import OpenAI
+from langchain_openai.embeddings import OpenAIEmbeddings
+import enum
+
 
 load_dotenv()
 
@@ -99,6 +118,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app = Flask(__name__)
 socketio = SocketIO(app)
+crochet.setup()
 
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -111,6 +131,21 @@ api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=api_key)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['DEBUG'] = True
+
+apify_api_token = os.getenv('APIFY_API_TOKEN')
+apify_client = ApifyClient(apify_api_token)
+
+# Initialize ApifyWrapper with the client
+apify = ApifyWrapper(apify_client=apify_client)
+
+index = None
+
+
+EVENTBRITE_API_URL = "https://www.eventbriteapi.com/v3"
+EVENTBRITE_TOKEN = os.getenv("EVENTBRITE_PRIVATE_TOKEN")
+
+
+YELP_TOKEN = os.getenv("YELP_PRIVATE_TOKEN")
 
 
 jobstores = {
@@ -467,6 +502,214 @@ class Fact(db.Model):
     fact_text = db.Column(db.Text, nullable=False)
     seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))
 
+
+class WritingStyle(db.Model):
+    __tablename__ = 'writing_styles'  # Explicitly specify the table name here
+
+    id = db.Column(db.Integer, primary_key=True)
+    author = db.Column(db.String(100))
+    content = db.Column(db.Text)
+
+
+
+class EventbriteSpider(scrapy.Spider):
+    name = 'eventbrite'
+    allowed_domains = ['www.eventbrite.com']
+    custom_settings = {
+        'FEEDS': {
+            'output.json': {
+                'format': 'json',
+                'overwrite': True,
+            },
+        },
+    }
+
+    def __init__(self, url=None, *args, **kwargs):
+        super(EventbriteSpider, self).__init__(*args, **kwargs)
+        self.start_urls = [url if url else 'https://www.eventbrite.com']
+
+    def parse(self, response):
+        script = response.xpath('//script[contains(text(), "window.__SERVER_DATA__")]/text()').get()
+        if script:
+            json_str = script.split('window.__SERVER_DATA__ = ', 1)[-1].rsplit(';', 1)[0]
+            try:
+                json_data = json.loads(json_str)
+                events = self.extract_events(json_data)
+                for event in events:
+                    if self.is_miami_event(event):
+                        yield {
+                            'name': event['name']['text'],
+                            'venue_name': self.extract_venue_name(event.get('venue')),
+                            'location': self.extract_location(event.get('venue')),
+                            'start_time': self.extract_time(event.get('start')),
+                            'end_time': self.extract_time(event.get('end'))
+                        }
+            except json.JSONDecodeError as e:
+                self.logger.error(f"JSON decode error: {e}")
+        else:
+            self.logger.error("Could not find the script containing event data")
+
+    def extract_events(self, json_data):
+        events = []
+        if 'view_data' in json_data and 'events' in json_data['view_data']:
+            events_data = json_data['view_data']['events']
+            if isinstance(events_data, dict):
+                for event_list in events_data.values():
+                    if isinstance(event_list, list):
+                        events.extend(event_list)
+            elif isinstance(events_data, list):
+                events = events_data
+        return events
+
+    def extract_venue_name(self, venue):
+        if venue:
+            return venue.get('name', 'Venue name not specified')
+        return 'Online Event'
+
+    def extract_location(self, venue):
+        if venue:
+            address = venue.get('address', {})
+            city = address.get('city', '')
+            region = address.get('region', '')
+            return f"{city}, {region}".strip(', ')
+        return 'Online Event'
+
+    def extract_time(self, time_data):
+        if time_data:
+            return time_data.get('local', '')
+        return 'Time not specified'
+
+    def is_miami_event(self, event):
+        event_name = event['name']['text'].lower()
+        location = self.extract_location(event.get('venue')).lower()
+        return 'miami' in event_name or 'miami' in location
+
+
+
+class MiamiArticle(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    heading = db.Column(db.String(500), nullable=False)
+    date = db.Column(db.DateTime, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text)
+    author = db.Column(db.String(200))
+    tags = db.Column(db.String(500))  # Store as comma-separated values
+    url = db.Column(db.String(1000))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'heading': self.heading,
+            'date': self.date.isoformat(),
+            'description': self.description,
+            'content': self.content,
+            'author': self.author,
+            'tags': self.tags.split(',') if self.tags else [],
+            'url': self.url,
+            'created_at': self.created_at.isoformat()
+        }
+
+
+
+
+
+class EventOrganizer(db.Model):
+    __tablename__ = 'eventorganizers'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    url = db.Column(db.String(255), nullable=True)
+    instagram_username = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f'<EventOrganizer {self.name}>'
+
+
+class Event(db.Model):
+    __tablename__ = 'events'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    venue_name = db.Column(db.String(255))
+    location = db.Column(db.String(255))
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime)
+    organizer_id = db.Column(db.Integer, db.ForeignKey('eventorganizers.id'))
+    organizer = db.relationship('EventOrganizer', backref=db.backref('events', lazy=True))
+
+    def __repr__(self):
+        return f'<Event {self.name}>'
+
+
+class Venue(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.Text)
+    price = db.Column(db.String(20))
+    category_name = db.Column(db.String(200))
+    neighborhood = db.Column(db.String(200))
+    street = db.Column(db.String(500))
+    city = db.Column(db.String(200))
+    postal_code = db.Column(db.String(50))
+    website = db.Column(db.String(1000))
+    menu = db.Column(db.String(1000))
+    permanently_closed = db.Column(db.Boolean)
+    total_score = db.Column(db.Float)
+    temporarily_closed = db.Column(db.Boolean)
+    reviews_count = db.Column(db.Integer)
+    google_search_url = db.Column(db.String(1000))
+    reviews = db.relationship('Review', backref='venue', lazy=True)
+
+
+
+class Review(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    venue_id = db.Column(db.Integer, db.ForeignKey('venue.id'), nullable=False)
+    text = db.Column(db.Text)
+    published_at_date = db.Column(db.DateTime)
+    # Add other fields as needed
+
+    def __init__(self, text, published_at_date, **kwargs):
+        super(Review, self).__init__(**kwargs)
+        self.text = text
+        self.published_at_date = published_at_date
+
+
+
+
+
+from enum import Enum
+
+class CategoryEnum(enum.Enum):
+    FOOD = 'FOOD'
+    SCENES = 'SCENES'
+    CAREER = 'CAREER'
+
+class ScraperResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(1000))
+    title = db.Column(db.String(500))
+    text = db.Column(db.Text)
+    scrape_date = db.Column(db.DateTime, default=datetime.utcnow)
+    category = db.Column(db.Enum(CategoryEnum), nullable=False)
+
+    def __init__(self, url, title, text, category):
+        self.url = url
+        self.title = title
+        self.text = text
+        self.category = category
+
+class SelectedURLs(db.Model):
+
+    
+    __tablename__ = 'selected_urls'
+
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(1000), unique=True, nullable=False)
+    category = db.Column(db.Enum(CategoryEnum), nullable=False)
+
+    def __init__(self, url, category):
+        self.url = url
+        self.category = category
 
 
 industry_images = {
@@ -4402,15 +4645,439 @@ def schedule_vault(vault_id):
         return jsonify(success=False, error=str(e))
 
 
-@app.route('/cancel_schedule/<int:vault_id>', methods=['POST'])
-def cancel_schedule(vault_id):
-    vault = Vault.query.get(vault_id)
-    try:
-        vault.scheduled_at = None
+@app.route('/add_writing_style', methods=['GET', 'POST'])
+def add_writing_style():
+    if request.method == 'POST':
+        author = request.form['author']
+        content = request.form['content']
+        new_style = WritingStyle(author=author, content=content)
+        db.session.add(new_style)
         db.session.commit()
-        return jsonify(success=True)
+        flash('Writing Style Added Successfully!')
+        return redirect(url_for('add_writing_style'))
+
+    styles = WritingStyle.query.all()
+    return render_template('add_writing_style.html', styles=styles)
+
+@app.route('/delete_writing_style/<int:id>', methods=['POST'])
+def delete_writing_style(id):
+    style_to_delete = WritingStyle.query.get_or_404(id)
+    db.session.delete(style_to_delete)
+    db.session.commit()
+    flash('Writing Style Deleted Successfully!')
+    return redirect(url_for('add_writing_style'))
+
+
+
+
+#miami scraper retry
+
+from flask_cors import CORS
+
+CORS(app)
+
+from scrapy.crawler import CrawlerRunner
+from twisted.internet import reactor
+
+
+
+
+
+output_data = []
+
+
+
+def scrape_with_crawler(url):
+    global output_data
+    output_data = []
+    
+    process = CrawlerProcess(get_project_settings())
+    process.crawl(EventbriteSpider, url=url)
+    process.start()
+
+@app.route('/scraper')
+def scraper_page():
+    organizers = EventOrganizer.query.all()
+    return render_template('scraper.html', organizers=organizers)
+
+@app.route('/scrape', methods=['POST'])
+def scrape():
+    organizer_id = request.json['organizer_id']
+    organizer = EventOrganizer.query.get(organizer_id)
+    if not organizer:
+        return jsonify({'error': 'Organizer not found'}), 404
+    
+    url = organizer.url
+    app.logger.info(f"Starting scrape for URL: {url}")
+    scrape_with_crochet(url)
+    time.sleep(2)  # Allow some time for the scraping to complete
+    return jsonify(output_data)
+
+
+@app.route('/scrape-all-organizers-page')
+def scraper_page_organizers():
+    return render_template('scrape_all_organizers.html', organizers=organizers)
+
+
+import time
+from scrapy.crawler import CrawlerRunner
+from scrapy.utils.project import get_project_settings
+from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks, returnValue
+
+@app.route('/scrape_all', methods=['POST'])
+def scrape_all():
+    runner = CrawlerRunner(get_project_settings())
+    
+    @inlineCallbacks
+    def crawl_sequentially():
+        app.logger.info("Starting bulk scrape")
+        organizers = EventOrganizer.query.all()
+        total = len(organizers)
+        results = []
+
+        for index, organizer in enumerate(organizers, 1):
+            if not organizer.url:
+                app.logger.info(f"Skipping organizer: {organizer.name} (No URL provided)")
+                results.append({"organizer": organizer.name, "status": "skipped", "message": "No URL provided"})
+                continue
+
+            app.logger.info(f"Processing organizer: {organizer.name} ({index}/{total})")
+            try:
+                app.logger.info(f"Starting scrape for {organizer.name}")
+                yield runner.crawl(EventbriteSpider, url=organizer.url)
+                app.logger.info(f"Scrape completed for {organizer.name}")
+                app.logger.info(f"Processing and saving events for {organizer.name}")
+                process_and_save_events()
+                app.logger.info(f"Events processed and saved for {organizer.name}")
+                results.append({"organizer": organizer.name, "status": "success"})
+            except Exception as e:
+                app.logger.error(f"Error processing {organizer.name}: {str(e)}", exc_info=True)
+                results.append({"organizer": organizer.name, "status": "error", "message": str(e)})
+
+        app.logger.info("Bulk scrape completed")
+        returnValue(results)
+
+    def scrape_complete(results):
+        app.logger.info("All scraping completed")
+        reactor.stop()
+        return jsonify({"message": "Bulk scraping completed", "results": results})
+
+    crawl_sequentially().addCallback(scrape_complete)
+    reactor.run(installSignalHandlers=False)
+    
+    return "Scraping in progress. Check logs for details."
+
+
+def process_and_save_events():
+    try:
+        with open('output.json', 'r') as file:
+            events_data = json.load(file)
+        
+        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        for event in events_data:
+            event_start_time = datetime.fromisoformat(event['start_time'])
+            if event_start_time >= one_week_ago:
+                exists = Event.query.filter_by(
+                    name=event['name'],
+                    start_time=event_start_time,
+                    location=event['location']
+                ).first() is not None
+                if not exists:
+                    new_event = Event(
+                        name=event['name'],
+                        venue_name=event['venue_name'],
+                        location=event['location'],
+                        start_time=event_start_time,
+                        end_time=datetime.fromisoformat(event['end_time'])
+                    )
+                    db.session.add(new_event)
+        db.session.commit()
+        os.remove('output.json')
     except Exception as e:
-        return jsonify(success=False, error=str(e))
+        db.session.rollback()
+        raise e
+
+
+
+@app.route('/events', methods=['GET', 'POST'])
+def events():
+    if request.method == 'POST':
+        # Attempt to load JSON data from 'output.json'
+        try:
+            with open('output.json', 'r') as file:
+                events_data = json.load(file)
+            # Calculate the cutoff date which is one week ago
+            one_week_ago = datetime.utcnow() - timedelta(days=7)
+            for event in events_data:
+                event_start_time = datetime.fromisoformat(event['start_time'])
+                # Check if the event is newer than one week ago
+                if event_start_time >= one_week_ago:
+                    # Check if event already exists based on name, start_time, and location
+                    exists = Event.query.filter_by(
+                        name=event['name'],
+                        start_time=event_start_time,
+                        location=event['location']
+                    ).first() is not None
+                    if not exists:
+                        new_event = Event(
+                            name=event['name'],
+                            venue_name=event['venue_name'],
+                            location=event['location'],
+                            start_time=event_start_time,
+                            end_time=datetime.fromisoformat(event['end_time'])
+                        )
+                        db.session.add(new_event)
+            db.session.commit()
+            os.remove('output.json')
+            flash('Events loaded and file cleaned up successfully!', 'success')
+        except Exception as e:
+            flash(str(e), 'danger')
+        return redirect(url_for('events'))
+    
+    events = Event.query.all()
+    return render_template('events.html', events=events)
+
+
+
+
+
+@app.route('/organizers', methods=['GET', 'POST'])
+def organizers():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        url = request.form.get('url')
+        instagram_username = request.form.get('instagram_username')
+        if name:
+            organizer = EventOrganizer(name=name, url=url, instagram_username=instagram_username)
+            db.session.add(organizer)
+            db.session.commit()
+            flash('Organizer added successfully!', 'success')
+        return redirect(url_for('organizers'))
+    organizers = EventOrganizer.query.all()
+    return render_template('organizers.html', organizers=organizers)
+
+@app.route('/organizers/delete/<int:id>')
+def delete_organizer(id):
+    organizer = EventOrganizer.query.get_or_404(id)
+    db.session.delete(organizer)
+    db.session.commit()
+    flash('Organizer deleted successfully!', 'success')
+    return redirect(url_for('organizers'))
+
+
+from scrapy.crawler import CrawlerRunner
+from twisted.internet import reactor
+from scrapy.utils.log import configure_logging
+
+
+
+from flask import render_template, jsonify, request, flash, redirect, url_for
+from sqlalchemy.exc import IntegrityError
+
+@app.route('/run-scraper', methods=['GET', 'POST'])
+def run_scraper():
+    categories = [category.value for category in CategoryEnum]
+    selected_category = request.form.get('category') or request.args.get('category') or categories[0]
+
+    if request.method == 'POST' and 'run_scraper' in request.form:
+        client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
+        
+        # Get URLs for the selected category from SelectedURLs
+        urls = SelectedURLs.query.filter_by(category=selected_category).all()
+        
+        start_urls = [{"url": url.url} for url in urls]
+        
+        run_input = {
+            "startUrls": start_urls,
+            "maxCrawlDepth": 0
+        }
+        run = client.actor("apify/website-content-crawler").call(run_input=run_input)
+        
+        new_results = 0
+        skipped_results = 0
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+            
+            if not existing_result:
+                scraper_result = ScraperResult(
+                    url=item.get('url', ''),
+                    title=item.get('title', ''),
+                    text=item.get('text', ''),
+                    category=selected_category
+                )
+                db.session.add(scraper_result)
+                try:
+                    db.session.commit()
+                    new_results += 1
+                except IntegrityError:
+                    db.session.rollback()
+                    skipped_results += 1
+            else:
+                skipped_results += 1
+        
+        flash(f"Scraper completed for {selected_category}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")
+    
+    results = ScraperResult.query.filter_by(category=selected_category).order_by(ScraperResult.scrape_date.desc()).all()
+    return render_template('run_scraper.html', categories=categories, selected_category=selected_category, results=results)
+
+
+
+#instagram scraper
+@app.route('/instagram-scraper')
+def instagram_scraper_page():
+    organizers = EventOrganizer.query.filter(EventOrganizer.instagram_username.isnot(None)).all()
+    return render_template('instagram_scraper.html', organizers=organizers)
+
+@app.route('/run-instagram-scraper', methods=['POST'])
+def run_instagram_scraper():
+    organizer_id = request.json.get('organizer_id')
+    organizer = EventOrganizer.query.get_or_404(organizer_id)
+
+    if not organizer.instagram_username:
+        return jsonify({"error": "Selected organizer does not have an Instagram username"}), 400
+
+    client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
+    run_input = {
+        "username": [organizer.instagram_username],
+        "resultsLimit": 30,
+    }
+    run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
+    
+    results = []
+    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+        results.append(item)
+
+    return jsonify({
+        "dataset_url": f"https://console.apify.com/storage/datasets/{run['defaultDatasetId']}",
+        "results": results
+    })
+
+
+#Json cleaner
+
+
+@app.route('/upload-venues', methods=['GET', 'POST'])
+def upload_venues():
+    if request.method == 'POST':
+        if 'jsonFile' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        
+        file = request.files['jsonFile']
+        source = request.form.get('source')  # Get the selected source from the dropdown
+        
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        
+        if file and file.filename.endswith('.json'):
+            try:
+                venues_data = json.load(file)
+                for index, venue_data in enumerate(venues_data):
+                    print(f"Processing venue {index + 1}:")
+                    print(json.dumps(venue_data, indent=2))
+                    try:
+                        if source == 'google_maps':
+                            venue = process_google_maps_venue(venue_data)
+                        elif source == 'tripadvisor':
+                            venue = process_tripadvisor_venue(venue_data)
+                        else:
+                            raise ValueError("Invalid source selected")
+                        
+                        db.session.add(venue)
+                        print(f"Successfully processed venue {index + 1}")
+                    except Exception as e:
+                        print(f"Error processing venue {index + 1}: {str(e)}")
+                        # Optionally, you can choose to continue with the next venue
+                        # instead of stopping the entire process
+                        continue
+                
+                db.session.commit()
+                message = f"Successfully uploaded {len(venues_data)} venues from {source}."
+            except Exception as e:
+                db.session.rollback()
+                message = f"An error occurred: {str(e)}"
+                print(f"Error details: {str(e)}")
+            
+            return render_template('upload_venues.html', message=message)
+    
+    return render_template('upload_venues.html')
+
+def process_google_maps_venue(venue_data):
+    return Venue(
+        title=venue_data['title'][:500],
+        description=venue_data['description'],
+        price=venue_data['price'][:20] if venue_data['price'] else None,
+        category_name=venue_data['categoryName'][:200] if venue_data['categoryName'] else None,
+        neighborhood=venue_data['neighborhood'][:200] if venue_data['neighborhood'] else None,
+        street=venue_data['street'][:500] if venue_data['street'] else None,
+        city=venue_data['city'][:200] if venue_data['city'] else None,
+        postal_code=venue_data['postalCode'][:50] if venue_data['postalCode'] else None,
+        website=venue_data['website'][:1000] if venue_data['website'] else None,
+        menu=venue_data['menu'][:1000] if venue_data['menu'] else None,
+        permanently_closed=venue_data['permanentlyClosed'],
+        total_score=venue_data['totalScore'],
+        temporarily_closed=venue_data['temporarilyClosed'],
+        reviews_count=venue_data['reviewsCount']
+    )
+
+def process_tripadvisor_venue(venue_data):
+    subcategories = venue_data.get('subcategories', [])
+    category_name = subcategories[0] if subcategories else "attraction"
+    
+    address_obj = venue_data.get('addressObj', {})
+    
+    return Venue(
+        title=venue_data.get('localName', '')[:500],
+        description=venue_data.get('description', ''),
+        price=None,
+        category_name=category_name[:200] if category_name else None,
+        neighborhood=None,
+        street=address_obj.get('street1', '')[:500],
+        city=address_obj.get('city', '')[:200],
+        postal_code=address_obj.get('postalcode', '')[:50],
+        website=venue_data.get('website', '')[:1000],
+        menu=None,
+        permanently_closed=venue_data.get('isLongClosed', False),
+        total_score=venue_data.get('rating'),
+        temporarily_closed=venue_data.get('isClosed', False),
+        reviews_count=venue_data.get('numberOfReviews')
+    )
+
+
+@app.route('/random-venue', methods=['GET', 'POST'])
+def random_venue():
+    venue = None
+    if request.method == 'POST':
+        # Select a random venue and eagerly load its reviews
+        venue = Venue.query.options(joinedload(Venue.reviews)).order_by(func.random()).first()
+    
+    return render_template('random_venue.html', venue=venue)
+
+
+
+@app.route('/manage-urls', methods=['GET', 'POST'])
+def manage_urls():
+    if request.method == 'POST':
+        url = request.form.get('url')
+        category = request.form.get('category')
+        if url and category:
+            new_url = SelectedURLs(url=url, category=CategoryEnum[category])
+            db.session.add(new_url)
+            try:
+                db.session.commit()
+                flash("URL added successfully!", "success")
+            except IntegrityError:
+                db.session.rollback()
+                flash("This URL already exists.", "error")
+        else:
+            flash("Please provide both URL and category.", "error")
+    
+    urls = SelectedURLs.query.all()
+    return render_template('manage_urls.html', urls=urls, categories=CategoryEnum)
+
+
 
 
 if __name__ == '__main__':
