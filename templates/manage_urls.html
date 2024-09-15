@@ -15,15 +15,19 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="is_eventbrite" name="is_eventbrite">
+            <label class="form-check-label" for="is_eventbrite">Is Eventbrite URL?</label>
+        </div>
         <button type="submit" class="btn btn-primary">Add URL</button>
     </form>
-
     <h3 class="mt-5">Existing URLs</h3>
     <table class="table">
         <thead>
             <tr>
                 <th>URL</th>
                 <th>Category</th>
+                <th>Eventbrite?</th>
             </tr>
         </thead>
         <tbody>
@@ -31,6 +35,7 @@
             <tr>
                 <td>{{ url.url }}</td>
                 <td>{{ url.category.name }}</td>
+                <td>{{ "Yes" if url.is_eventbrite else "No" }}</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -1,36 +1,57 @@
-from playwright.sync_api import sync_playwright
-import time
-import re
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-def run(playwright):
-    browser = playwright.chromium.launch(headless=False)
-    page = browser.new_page()
-    page.goto("https://www.eventbrite.com/b/fl--miami/nightlife/?category=this-weekend")
+def scrape_menu():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # Set headless=True for production
+        page = browser.new_page()
 
-    # Wait for the main content to load
-    page.wait_for_selector(".eds-structure__main")
+        # Navigate to the search results page
+        page.goto("https://www.google.com/search?q=Moxies+Miami")
 
-    # Scroll to bottom of page multiple times to trigger lazy loading
-    for _ in range(5):
-        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        time.sleep(2)
+        # Try to close the pop-up if it appears
+        try:
+            not_now_button = page.locator("text='Not now'").first
+            not_now_button.click(timeout=5000)  # Wait up to 5 seconds for the button to be clickable
+        except PlaywrightTimeoutError:
+            print("Pop-up not found or couldn't be closed. Proceeding anyway.")
 
-    # Extract all links that match the pattern we're looking for
-    links = page.evaluate("""
-        () => {
-            const links = [];
-            document.querySelectorAll('a[href*="/e/"][class*="event-card-link"]').forEach(link => {
-                links.push(link.href);
-            });
-            return links;
-        }
-    """)
+        # Find and click the menu button using jsname and text content
+        try:
+            menu_button = (page.locator("[data-id='menu-viewer-entrypoint'] span:has-text('Menu')").first)
+            #menu_button = (page.locator("[jsname='UXbvIb'] span:has-text('Menu')").first)
+            menu_button.click(timeout=5000)
+        except PlaywrightTimeoutError:
+            print("Couldn't find or click the Menu button. The page might have changed.")
+            browser.close()
+            return
 
-    # Print all unique links
-    for link in set(links):
-        print(link)
+        # Wait for menu items to load
+        try:
+            page.wait_for_selector("[data-menu-item-id]", timeout=10000)  # Wait up to 10 seconds
+        except PlaywrightTimeoutError:
+            print("Menu items didn't load in time. The page structure might have changed.")
+            browser.close()
+            return
 
-    browser.close()
+        # Extract menu items
+        menu_items = page.query_selector_all("[data-menu-item-id]")
 
-with sync_playwright() as playwright:
-    run(playwright)
+        # Parse each menu item
+        for item in menu_items:
+            # Use text content of the entire item, then split it to get name and price
+            full_text = item.inner_text()
+            # Assuming the price is always at the end, separated by a space
+            parts = full_text.rsplit(' ', 1)
+            
+            if len(parts) == 2:
+                name, price = parts
+            else:
+                name = full_text
+                price = "N/A"
+            
+            print(f"{name.strip()} {price.strip()}")
+
+        browser.close()
+
+if __name__ == "__main__":
+    scrape_menu()

@@ -13,33 +13,58 @@
     </div>
 
 
-    <!-- Display Unscheduled Vault posts -->
+     <!-- Display Unscheduled Vault posts -->
     <h2 class="mt-4">Unscheduled Vaults</h2>
     <div id="unscheduledVaults" class="row">
         {% for vault in unscheduled_vaults %}
         <div class="col-12 mb-4">
             <div class="card" data-vault-id="{{ vault.id }}">
                 {% include 'vault_card.html' %}
+                
             </div>
         </div>
         {% endfor %}
     </div>
 
+
     <!-- Display Scheduled Vault posts -->
     <h2>Scheduled Vaults</h2>
     <div id="scheduledVaults" class="accordion">
-        {% for date, vaults in grouped_vaults.items() %}
+        {% for date, vaults in grouped_scheduled_vaults.items() %}
         <div class="accordion-item">
-            <h2 class="accordion-header" id="heading{{ date.strftime('%Y%m%d') }}">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ date.strftime('%Y%m%d') }}" aria-expanded="false" aria-controls="collapse{{ date.strftime('%Y%m%d') }}">
+            <h2 class="accordion-header" id="headingScheduled{{ date.strftime('%Y%m%d') }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseScheduled{{ date.strftime('%Y%m%d') }}" aria-expanded="false" aria-controls="collapseScheduled{{ date.strftime('%Y%m%d') }}">
                     {{ date.strftime('%Y-%m-%d') }} ({{ vaults|length }} vaults)
                 </button>
             </h2>
-            <div id="collapse{{ date.strftime('%Y%m%d') }}" class="accordion-collapse collapse" aria-labelledby="heading{{ date.strftime('%Y%m%d') }}">
+            <div id="collapseScheduled{{ date.strftime('%Y%m%d') }}" class="accordion-collapse collapse" aria-labelledby="headingScheduled{{ date.strftime('%Y%m%d') }}">
                 <div class="accordion-body">
                     {% for vault in vaults %}
                     <div class="card mb-3" data-vault-id="{{ vault.id }}">
-                        <!-- Vault content (same as before) -->
+                        {% include 'vault_card.html' %}
+                        <button class="btn btn-success" onclick="markAsPosted({{ vault.id }})">Mark as Posted</button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+   <!-- Display Posted Vault posts -->
+    <h2 class="mt-4">Posted Vaults</h2>
+    <div id="postedVaults" class="accordion">
+        {% for date, vaults in grouped_posted_vaults.items() %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingPosted{{ date.strftime('%Y%m%d') }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePosted{{ date.strftime('%Y%m%d') }}" aria-expanded="false" aria-controls="collapsePosted{{ date.strftime('%Y%m%d') }}">
+                    {{ date.strftime('%Y-%m-%d') }} ({{ vaults|length }} vaults)
+                </button>
+            </h2>
+            <div id="collapsePosted{{ date.strftime('%Y%m%d') }}" class="accordion-collapse collapse" aria-labelledby="headingPosted{{ date.strftime('%Y%m%d') }}">
+                <div class="accordion-body">
+                    {% for vault in vaults %}
+                    <div class="card mb-3" data-vault-id="{{ vault.id }}">
                         {% include 'vault_card.html' %}
                     </div>
                     {% endfor %}
@@ -48,6 +73,7 @@
         </div>
         {% endfor %}
     </div>
+</div>
     
     
 </div>
@@ -168,25 +194,25 @@ function editVault(vaultId) {
     var url = `/edit-vault/${vaultId}`;
     window.location.href = url;
 }
-function markAsPosted(vaultId) {
-    fetch('/mark_vault_as_posted/' + vaultId, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-    }).then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert('Failed to mark as posted: ' + data.error);
-        }
-    }).catch(error => {
-        console.error('Error marking vault as posted:', error);
-        alert('Error marking vault as posted. See console for details.');
-    });
-}
+    function markAsPosted(vaultId) {
+        fetch('/mark_vault_as_posted/' + vaultId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Failed to mark as posted: ' + data.error);
+            }
+        }).catch(error => {
+            console.error('Error marking vault as posted:', error);
+            alert('Error marking vault as posted. See console for details.');
+        });
+    }
 </script>
 {% endblock %}
 

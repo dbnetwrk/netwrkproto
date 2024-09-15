@@ -1,15 +1,36 @@
 {% extends "admin_panel_base.html" %}
-
 {% block content %}
 <div class="container">
-    <h2>Edit Prompt</h2>
-    <form method="POST" action="{{ url_for('update_ai_comment_prompt', id=prompt.id) }}" class="mb-3">
-        <div class="input-group">
-            <input type="text" name="prompt_text" class="form-control" value="{{ prompt.prompt }}" required>
-            <div class="input-group-append">
-                <button class="btn btn-outline-primary" type="submit">Update Prompt</button>
-            </div>
+    <h2>Edit AI Comment Prompt</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="prompt">Prompt:</label>
+            <textarea name="prompt" id="prompt" class="form-control" required>{{ prompt.prompt }}</textarea>
         </div>
+        <div class="form-group">
+            <label for="prompt_type">Prompt Type:</label>
+            <select name="prompt_type" id="prompt_type" class="form-control" required>
+                <option value="top_level" {% if prompt.prompt_type == 'top_level' %}selected{% endif %}>Top Level Comment</option>
+                <option value="reply" {% if prompt.prompt_type == 'reply' %}selected{% endif %}>Reply</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="data_type">Data Type:</label>
+            <select name="data_type" id="data_type" class="form-control" required>
+                <option value="none" {% if prompt.data_type == 'none' %}selected{% endif %}>No External Data</option>
+                <option value="venue" {% if prompt.data_type == 'venue' %}selected{% endif %}>Venue</option>
+                <option value="scraper_result" {% if prompt.data_type == 'scraper_result' %}selected{% endif %}>Scraper Result</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+    <label for="is_active">Status:</label>
+    <select name="is_active" id="is_active" class="form-control" required>
+        <option value="1" {% if prompt.is_active %}selected{% endif %}>Active</option>
+        <option value="0" {% if not prompt.is_active %}selected{% endif %}>Inactive</option>
+    </select>
+</div>
+        <button type="submit" class="btn btn-primary">Update Prompt</button>
     </form>
 </div>
 {% endblock %}

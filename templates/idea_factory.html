@@ -42,6 +42,14 @@
     <input type="text" class="form-control" id="community_context" name="community_context" value="{{ session.get('community_context') }}" placeholder="Enter context">
 </div>
 
+    <div class="mb-3">
+    <label for="article_category" class="form-label">Select Article Category:</label>
+    <select class="form-select" id="article_category" name="article_category">
+        <option value="FOOD">Food</option>
+        <option value="SCENES">Scenes</option>
+        <option value="CAREER">Career</option>
+    </select>
+</div>
 
         <button type="submit" class="btn btn-primary">Scrape</button>
     </form>
@@ -85,6 +93,22 @@
                     <div class="mb-3">
                         <p>{{ result.ai_content }}</p>
                     </div>
+                    <button type="button" class="btn btn-warning" onclick="generateSentence({{ loop.index }}, 'controversial')">
+    Controversial
+</button>
+<button type="button" class="btn btn-danger" onclick="generateSentence({{ loop.index }}, 'anxiety')">
+    Anxiety
+</button>
+<button type="button" class="btn btn-success" onclick="generateVenue({{ loop.index }})">
+    Venue
+</button>
+{% if result.article_url %}
+    <a href="{{ result.article_url }}" target="_blank" class="btn btn-primary">Source</a>
+{% else %}
+    <button type="button" class="btn btn-secondary disabled">No related article available</button>
+{% endif %}
+
+<div id="generatedSentence{{ loop.index }}"></div>
                     <div class="mb-3">
                         <label for="title" class="form-label">Title</label>
                         <input type="text" class="form-control" name="title">
@@ -105,13 +129,15 @@
                         <label for="seeder_id" class="form-label">Select Official Seeder:</label>
                         <select class="form-select" name="seeder_id" id="seeder_id">
                             {% for seeder, vault_count in seeders_with_counts %}
-                            <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias}}) ({{ vault_count }} vaults)</option>
+                            <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias}}) ({{ vault_count }} vaults) ({{ seeder.state.value}}) ({{ seeder.industry.value}}) </option>
                             {% endfor %}
                         </select>
                     </div>
 
                     <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
                     <button type="button" class="btn btn-secondary" onclick="toggleNewSeederForm({{ loop.index }})">Create New Seeder</button>
+
+                    
                     <!-- New Seeder Form (initially hidden) -->
 <div id="newSeederForm{{ loop.index }}" style="display: none;">
     <h6>Create New Seeder</h6>
@@ -150,7 +176,16 @@
         <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
     </div>
 </div>
+
+
                     </div>
+
+
+                    <div class="mb-3">
+        <label for="scheduled_at" class="form-label">Schedule Post (optional)</label>
+        <input type="datetime-local" class="form-control" id="scheduled_at" name="scheduled_at">
+    </div>
+                    
                     <button type="submit" class="btn btn-secondary">Submit</button>
                 </form>
             </div>
@@ -244,6 +279,25 @@
 <script>
 
 
+function generateSentence(index, type) {
+    const content = document.querySelector(`#vaultModal${index} .mb-3 p`).innerText;
+    fetch('/generate_sentence', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: content, type: type }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById(`generatedSentence${index}`).innerText = data.sentence;
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}
+
+
 function toggleNewSeederForm(index) {
     var form = document.getElementById('newSeederForm' + index);
     if (form.style.display === 'none') {
@@ -272,28 +326,55 @@ $(document).ready(function() {
     });
 
     $('.vault-form').on('submit', function(e) {
-        e.preventDefault();
-        var form = $(this);
-        var postIndex = form.data('index');
-        var modalId = '#vaultModal' + postIndex;
+    e.preventDefault();
+    var form = $(this);
+    var postIndex = form.data('index');
+    var modalId = '#vaultModal' + postIndex;
 
-        $.ajax({
-            type: "POST",
-            url: form.attr('action'),
-            data: form.serialize(),
-            success: function(data) {
-                $(modalId).modal('hide');
-                alert('Post Vaulted Successfully');
-                $('#postCard' + postIndex).fadeOut(); // Or update the UI in another way
-            },
-            error: function(xhr, status, error) {
-                alert('Error vaulting post: ' + error);
-            }
-        });
+    // Create a FormData object to handle file uploads if needed
+    var formData = new FormData(this);
+
+    $.ajax({
+        type: "POST",
+        url: form.attr('action'),
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(data) {
+            $(modalId).modal('hide');
+            alert('Post Vaulted Successfully');
+            $('#postCard' + postIndex).fadeOut();
+        },
+        error: function(xhr, status, error) {
+            alert('Error vaulting post: ' + error);
+        }
     });
+});
 });
 
 
+function generateVenue(index) {
+    fetch('/random_venue2')
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error:', data.error);
+            document.getElementById(`generatedSentence${index}`).innerText = 'Failed to fetch venue';
+        } else {
+            const venueInfo = `
+                <strong>${data.title}</strong><br>
+                Review count: ${data.reviews_count}<br>
+                Neighborhood: ${data.neighborhood}<br>
+                <a href="${data.google_search_url}" target="_blank">Google Search</a>
+            `;
+            document.getElementById(`generatedSentence${index}`).innerHTML = venueInfo;
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        document.getElementById(`generatedSentence${index}`).innerText = 'Error fetching venue';
+    });
+}
 
 
 

@@ -1,0 +1,8 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<h1>Menu Scraper</h1>
+<form method="POST" action="{{ url_for('start_scrape') }}">
+    <button type="submit" class="btn btn-primary">Start Scrape</button>
+</form>
+<div id="scrape-status"></div>
+{% endblock %}

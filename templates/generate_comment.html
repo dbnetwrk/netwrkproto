@@ -1,0 +1,36 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Generate Comment</h2>
+    <div class="form-group">
+        <label for="postInput">Paste your post here:</label>
+        <textarea class="form-control" id="postInput" rows="5"></textarea>
+    </div>
+    <button class="btn btn-primary mr-2" onclick="generateComment('venue')">Recommend Venue</button>
+    <button class="btn btn-secondary" onclick="generateComment('event')">Recommend Event/News</button>
+    <div class="mt-3">
+        <h3>Generated Comment:</h3>
+        <p id="generatedComment"></p>
+    </div>
+</div>
+
+<script>
+function generateComment(type) {
+    const postText = document.getElementById('postInput').value;
+    fetch('/generate_comment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({post_text: postText, type: type}),
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('generatedComment').innerText = data.comment;
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}
+</script>
+{% endblock %}

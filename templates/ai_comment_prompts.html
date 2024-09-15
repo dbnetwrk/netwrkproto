@@ -23,6 +23,11 @@
                 <option value="top_level">Top Level Comment</option>
                 <option value="reply">Reply</option>
             </select>
+            <select name="data_type" class="form-control" required>
+                <option value="none">No External Data</option>
+                <option value="venue">Venue</option>
+                <option value="scraper_result">Scraper Result</option>
+            </select>
             <div class="input-group-append">
                 <button class="btn btn-outline-primary" type="submit">Add Prompt</button>
             </div>
@@ -30,39 +35,58 @@
     </form>
     
     <!-- List Existing Prompts -->
-    <h3>Top Level Comment Prompts</h3>
     {% for prompt in prompts if prompt.prompt_type == 'top_level' %}
-    <div class="card mb-2">
-        <div class="card-body">
-            {{ prompt.prompt }}
-            <span class="badge bg-primary">Top Level</span>
-            <!-- Actions -->
-            <a href="{{ url_for('edit_ai_comment_prompt', id=prompt.id) }}" class="btn btn-secondary btn-sm">Edit</a>
-            <form method="POST" action="{{ url_for('delete_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
-                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');">Delete</button>
-            </form>
-        </div>
+<div class="card mb-2">
+    <div class="card-body">
+        {{ prompt.prompt }}
+        <span class="badge bg-primary">Top Level</span>
+        <span class="badge bg-info">{{ prompt.data_type.capitalize() }}</span>
+        <span class="badge {% if prompt.is_active %}bg-success{% else %}bg-danger{% endif %}">
+            {% if prompt.is_active %}Active{% else %}Inactive{% endif %}
+        </span>
+        <!-- Actions -->
+        <a href="{{ url_for('edit_ai_comment_prompt', id=prompt.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+        <form method="POST" action="{{ url_for('toggle_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
+            <button type="submit" class="btn {% if prompt.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm">
+                {% if prompt.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('delete_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
+            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');">Delete</button>
+        </form>
     </div>
-    {% else %}
-    <p>No top level prompts found.</p>
-    {% endfor %}
+</div>
+{% else %}
+<p>No top level prompts found.</p>
+{% endfor %}
 
-    <h3>Reply Prompts</h3>
-    {% for prompt in prompts if prompt.prompt_type == 'reply' %}
-    <div class="card mb-2">
-        <div class="card-body">
-            {{ prompt.prompt }}
-            <span class="badge bg-secondary">Reply</span>
-            <!-- Actions -->
-            <a href="{{ url_for('edit_ai_comment_prompt', id=prompt.id) }}" class="btn btn-secondary btn-sm">Edit</a>
-            <form method="POST" action="{{ url_for('delete_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
-                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');">Delete</button>
-            </form>
-        </div>
+
+
+<h3>Reply Prompts</h3>
+{% for prompt in prompts if prompt.prompt_type == 'reply' %}
+<div class="card mb-2">
+    <div class="card-body">
+        {{ prompt.prompt }}
+        <span class="badge bg-primary">Reply</span>
+        <span class="badge bg-info">{{ prompt.data_type.capitalize() }}</span>
+        <span class="badge {% if prompt.is_active %}bg-success{% else %}bg-danger{% endif %}">
+            {% if prompt.is_active %}Active{% else %}Inactive{% endif %}
+        </span>
+        <!-- Actions -->
+        <a href="{{ url_for('edit_ai_comment_prompt', id=prompt.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+        <form method="POST" action="{{ url_for('toggle_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
+            <button type="submit" class="btn {% if prompt.is_active %}btn-warning{% else %}btn-success{% endif %} btn-sm">
+                {% if prompt.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('delete_ai_comment_prompt', id=prompt.id) }}" style="display:inline-block;">
+            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');">Delete</button>
+        </form>
     </div>
-    {% else %}
-    <p>No reply prompts found.</p>
-    {% endfor %}
+</div>
+{% else %}
+<p>No reply prompts found.</p>
+{% endfor %}
+
 </div>
 {% endblock %}
-

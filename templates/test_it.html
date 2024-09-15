@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miami Venue Recommender</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h1>Miami Venue Recommender</h1>
+    <textarea id="postInput" rows="4" cols="50" placeholder="Enter your post about a restaurant or attraction you enjoyed..."></textarea>
+    <button onclick="generateComment()">Get Recommendation</button>
+    <div id="recommendation"></div>
+    <div id="sources"></div>
+
+    <script>
+        function generateComment() {
+            const post = document.getElementById('postInput').value;
+            axios.post('/generate_comment', {
+                post: post
+            })
+            .then(function (response) {
+                document.getElementById('recommendation').innerHTML = `<h3>Recommendation:</h3><p>${response.data.comment}</p>`;
+                let sourcesHtml = '<h3>Based on:</h3><ul>';
+                response.data.sources.forEach(source => {
+                    sourcesHtml += `<li>${source}</li>`;
+                });
+                sourcesHtml += '</ul>';
+                document.getElementById('sources').innerHTML = sourcesHtml;
+            })
+            .catch(function (error) {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

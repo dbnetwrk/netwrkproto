@@ -1,0 +1,54 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Admin Chat Interface</h2>
+    <div id="chat-box" class="border p-3 mb-3" style="height: 400px; overflow-y: scroll;">
+        <!-- Chat messages will appear here -->
+    </div>
+    <form id="chat-form">
+        <div class="input-group mb-3">
+            <input type="text" id="user-input" class="form-control" placeholder="Type your message...">
+            <div class="input-group-append">
+                <button class="btn btn-primary" type="submit">Send</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('chat-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var userInput = document.getElementById('user-input').value;
+    sendMessage(userInput);
+});
+
+function sendMessage(message) {
+    var chatBox = document.getElementById('chat-box');
+    chatBox.innerHTML += '<p><strong>You:</strong> ' + message + '</p>';
+    
+    fetch('/admin/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({message: message}),
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        chatBox.innerHTML += '<p><strong>AI:</strong> ' + data.response + '</p>';
+        chatBox.scrollTop = chatBox.scrollHeight;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        chatBox.innerHTML += '<p><strong>Error:</strong> Failed to get response. Please try again.</p>';
+    });
+    
+    document.getElementById('user-input').value = '';
+}
+</script>
+{% endblock %}
