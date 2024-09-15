@@ -3859,6 +3859,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 
 #prompt functionality for pulling venues and such
+import json
+
 def resolve_prompt_template(prompt, post_content):
     if prompt.data_type == 'none':
         return prompt.prompt
@@ -3868,33 +3870,53 @@ def resolve_prompt_template(prompt, post_content):
         current_app.logger.debug(f"Found venue: {item.title if item else 'None'}")
     elif prompt.data_type == 'scraper_result':
         item = find_diverse_recommendation(post_content, 'event')
+        current_app.logger.debug(f"Found event: {item.title if hasattr(item, 'title') else 'None'}")
     else:
         return prompt.prompt  # Fallback to original prompt if data_type is not recognized
 
     if not item:
         return prompt.prompt  # Fallback to original prompt if no recommendation found
 
-    # Replace placeholders in the prompt
-    resolved_prompt = prompt.prompt
-    placeholders = re.findall(r'\{(\w+\.?\w*)\}', prompt.prompt)
-    for placeholder in placeholders:
-        if '.' in placeholder:
-            attr, subattr = placeholder.split('.')
-            if hasattr(item, subattr):
-                value = getattr(item, subattr)
-            else:
-                value = f"[{placeholder} not found]"
-        else:
-            if hasattr(item, placeholder):
-                value = getattr(item, placeholder)
-            else:
-                value = f"[{placeholder} not found]"
-        
-        resolved_prompt = resolved_prompt.replace(f'{{{placeholder}}}', str(value))
+    # Create a formatted string representation of the entire object
+    item_info = format_item_info(item)
+
+    # Replace the placeholder in the prompt with the formatted item info
+    resolved_prompt = prompt.prompt.replace('{item}', item_info)
 
     current_app.logger.debug(f"Here is the resolved prompt: {resolved_prompt}")
 
     return resolved_prompt
+
+def format_item_info(item):
+    if isinstance(item, Venue):
+        info = f"""
+Venue Information:
+- Title: {item.title}
+- Description: {item.description}
+- Price: {item.price}
+- Category: {item.category_name}
+- Neighborhood: {item.neighborhood}
+- Address: {item.street}, {item.city}, {item.postal_code}
+- Website: {item.website}
+- Menu: {json.dumps(item.menu) if item.menu else 'Not available'}
+- Permanently Closed: {'Yes' if item.permanently_closed else 'No'}
+- Temporarily Closed: {'Yes' if item.temporarily_closed else 'No'}
+- Total Score: {item.total_score}
+- Number of Reviews: {item.reviews_count}
+- Google Search URL: {item.google_search_url}
+"""
+    elif isinstance(item, ScraperResult):
+        info = f"""
+Event Information:
+- Title: {item.title if hasattr(item, 'title') else 'Not available'}
+- Content: {item.text}
+- Date: {item.date if hasattr(item, 'date') else 'Not available'}
+- URL: {item.url if hasattr(item, 'url') else 'Not available'}
+"""
+    else:
+        info = str(item)
+
+    return info.strip()
 
 
 @app.route('/toggle_ai_comment_prompt/<int:id>', methods=['POST'])
@@ -5585,20 +5607,15 @@ venue_index = None
 event_index = None
 venue_ids = None
 event_ids = None
+embeddings_initialized = False
 
 
+@app.before_request
 def ensure_embeddings_initialized():
-    global venue_index, venue_ids, event_index, event_ids
-    
-    if venue_index is None or event_index is None:
-        with app.app_context():
-            venue_index, venue_ids = load_embeddings('venue_index.faiss', 'venue_ids.pkl')
-            if venue_index is None:
-                venue_index, venue_ids = generate_and_save_venue_embeddings()
-
-            event_index, event_ids = load_embeddings('event_index.faiss', 'event_ids.pkl')
-            if event_index is None:
-                event_index, event_ids = generate_and_save_event_embeddings()
+    global embeddings_initialized
+    if not embeddings_initialized:
+        initialize_embeddings()
+        embeddings_initialized = True
 
 
 def generate_and_save_venue_embeddings(index_file='venue_index.faiss', id_file='venue_ids.pkl'):
@@ -5729,6 +5746,8 @@ def select_diverse_item(items, post_text, similarity_threshold=0.7):
 
 
 def find_diverse_recommendation(post_text, item_type='venue', k=10, similarity_threshold=0.7):
+
+    global venue_index, venue_ids, event_index, event_ids
     if item_type == 'venue':
         top_items = find_top_k_similar_venues(post_text, k)
     else:
@@ -5804,7 +5823,16 @@ def admin_generate_comment():
 
 
 
+def initialize_embeddings():
+    with app.app_context():
+        global venue_index, venue_ids, event_index, event_ids
+        venue_index, venue_ids = load_embeddings('venue_index.faiss', 'venue_ids.pkl')
+        if venue_index is None:
+            venue_index, venue_ids = generate_and_save_venue_embeddings()
 
+        event_index, event_ids = load_embeddings('event_index.faiss', 'event_ids.pkl')
+        if event_index is None:
+            event_index, event_ids = generate_and_save_event_embeddings()
 
 
 
