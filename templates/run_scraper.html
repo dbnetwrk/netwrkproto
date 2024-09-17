@@ -13,7 +13,10 @@
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" name="run_scraper" class="btn btn-primary mt-2">Run Scraper</button>
+        <div class="d-flex">
+            <button type="submit" name="run_scraper" class="btn btn-primary mt-2 mr-2">Run Scraper</button>
+            <a href="{{ url_for('manage_urls') }}" class="btn btn-secondary mt-2">Manage URLs</a>
+        </div>
     </form>
     
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,7 +29,7 @@
         {% endif %}
     {% endwith %}
     
-    <h3 class="mt-5">{{ selected_category }} Scraper Results</h3>
+    <h3 class="mt-5">{% if selected_category == 'ALL' %}All{% else %}{{ selected_category }}{% endif %} Scraper Results</h3>
     <div id="resultsTable">
         <table class="table mt-3">
             <thead>
@@ -50,7 +53,6 @@
         </table>
     </div>
 </div>
-
 <script>
 document.getElementById('category').addEventListener('change', function() {
     var category = this.value;
@@ -60,7 +62,7 @@ document.getElementById('category').addEventListener('change', function() {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             document.getElementById('resultsTable').innerHTML = doc.getElementById('resultsTable').innerHTML;
-            document.querySelector('h3').textContent = `${category} Scraper Results`;
+            document.querySelector('h3').textContent = category === 'ALL' ? 'All Scraper Results' : `${category} Scraper Results`;
         });
 });
 </script>

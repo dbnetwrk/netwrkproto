@@ -710,12 +710,14 @@ class SelectedURLs(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(1000), unique=True, nullable=False)
     category = db.Column(db.Enum(CategoryEnum), nullable=False)
-    is_eventbrite = db.Column(db.Boolean, default=False)  # New field
+    is_eventbrite = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)  # New field
 
-    def __init__(self, url, category, is_eventbrite=False):
+    def __init__(self, url, category, is_eventbrite=False, is_active=True):
         self.url = url
         self.category = category
         self.is_eventbrite = is_eventbrite
+        self.is_active = is_active
 
 
 industry_images = {
@@ -4220,53 +4222,111 @@ def idea_factory():
     return render_template('idea_factory.html', communities=communities, session=session, seeders_with_counts=seeders_with_counts, State=State, Industry=Industry)
 
 
+from datetime import date
+
 def modify_text_with_openai(text, professional_context, article_category):
-    random_article = ScraperResult.query.filter_by(category=CategoryEnum[article_category]).order_by(func.random()).first()
     professional_context = "make it in the context of a 22-26 year old person that just moved to miami"
-    random_article = ScraperResult.query.order_by(func.random()).first()
+    current_app.logger.info(f"Starting idea_factory for category: {article_category}")
     
+    # Initialize context variables
+    context = ""
+    context_type = ""
+    url = None
+
+    if article_category == "VENUE":
+        # Fetch a random venue
+        random_venue = Venue.query.filter(Venue.permanently_closed == False, Venue.temporarily_closed == False).order_by(func.random()).first()
+
+        
+        if random_venue:
+            # Format the total score correctly
+            total_score_str = f"{random_venue.total_score:.1f}" if random_venue.total_score is not None else "N/A"
+            
+            context = (
+                f"Local Venue Spotlight: '{random_venue.title or 'Unnamed Venue'}' "
+                f"in {random_venue.neighborhood or 'an unknown neighborhood'}. "
+                f"Category: {random_venue.category_name or 'Uncategorized'}. "
+                f"Description: {(random_venue.description or 'No description available.')[:100]}... "
+                f"Address: {random_venue.street or 'Unknown street'}, "
+                f"{random_venue.city or 'Unknown city'}, {random_venue.postal_code or 'No postal code'}. "
+                f"Price Range: {random_venue.price or 'Unknown'}. "
+                f"Overall Score: {total_score_str}/5 "
+                f"based on {random_venue.reviews_count or 0} reviews. "
+                f"Status: {'Open' if not random_venue.permanently_closed and not random_venue.temporarily_closed else 'Temporarily Closed' if random_venue.temporarily_closed else 'Permanently Closed'}. "
+            )
+            
+            # Fetch a recent review for the venue
+            recent_review = Review.query.filter_by(venue_id=random_venue.id).order_by(Review.published_at_date.desc()).first()
+            if recent_review:
+                context += (
+                    f"Recent Review: '{(recent_review.text or 'No review text')[:100]}...' "
+                    f"- Posted on {recent_review.published_at_date.strftime('%B %d, %Y') if recent_review.published_at_date else 'Unknown date'}"
+                )
+            
+            context_type = "Local Venue"
+            url = random_venue.google_search_url
+        else:
+            context = "No local venue information available."
+            context_type = "Local Venue"
+    else:
+        # Fetch a random article for other categories
+        random_article = ScraperResult.query.filter_by(category=CategoryEnum[article_category]).order_by(func.random()).first()
+        
+        if random_article:
+            context = (
+                f"Recent news/event from Miami: '{random_article.title}'. "
+                f"Summary: {random_article.text}..."
+            )
+            context_type = "Local Event/News"
+            url = random_article.url
+        else:
+            context = "No recent news available."
+            context_type = "Local Event/News"
+
     context_suffix = f"{professional_context}" if professional_context else "make it different from the original post by changing all details"
     
-    news_context = (
-        f"Recent news/event from Miami: '{random_article.title}'. "
-        f"Summary: {random_article.text}..."
-    ) if random_article else "No recent news available."
     print(context_suffix)
     
     # Randomly select the number of paragraphs (1, 2, or 3)
     max_paragraphs = random.choice([1, 2, 3])
     
-    prompt = (
-    f"Take this Reddit post and extract the universal theme from it: \n\n"
-    f"{text}\n\n"
-    f"and then below that, generate a new post that follows the theme, but uses this local event in Miami as the backdrop {news_context} and is written by someone in their early 20s who is not from Miami. "
-    #f"Subtly incorporate or allude to this recent local news/event without making it the main focus: {news_context}\n"
-    "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
-    f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
-    "It doesn't feel scripted or generic.\n"
-    f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
-    "about the person's situation or viewpoint.\n"
-    f"Emotional Engagement: The post connects on an emotional level, whether it's sharing joy, struggles, doubts, "
-    "or achievements. This helps create a bond with readers. \n"
-    f"Storytelling: Personal posts often incorporate elements of storytelling, which is also a key aspect of virality. "
-    "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable. \n"
-    f"Relevance: These posts are relevant to the interests and needs of the community. In a professional or young "
-    "adult setting, topics might include career challenges, educational experiences, personal development, or "
-    "balancing life and work.\n"
-    f"Interactive: Personal posts invite interaction by asking questions or seeking advice, thereby fostering a "
-    "community dialogue. \n"
-    f"Reflective: They often reflect on personal experiences or lessons learned, which can provide valuable insights "
-    "to others in similar situations. \n\n"
-    f"Virality Principles:\n"
-    f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image. \n"
-    f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers. \n"
-    f"3. Emotion: Aim to elicit strong emotions like awe, excitement, amusement, anger, or anxiety which are linked to higher sharing rates.\n"
-    f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
-    f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others.\n"
-    f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
-    f"Format your response clearly with the new post, which should be at most {max_paragraphs} paragraph{'s' if max_paragraphs > 1 else ''}, and use 8th grade verbiage."
-    )
+    today = date.today()
+    week_from_today = today + timedelta(days=7)
+    random_date = today + timedelta(days=random.randint(0, 7))
 
+
+    prompt = (
+        f"Take this Reddit post and extract the universal theme from it: \n\n"
+        f"{text}\n\n"
+        f"and then below that, generate a new post that follows the theme, but change specific details and incorporate the following local context as the backdrop:\n\n"
+        f"{context_type}: {context}\n\n"
+        f"The post should be written by someone in their early 20s who is a recent Miami transplant. Always include specific dates in your response, keeping in mind that the post should be framed as though it was written on {random_date.strftime('%B %d, %Y')}. "
+        "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
+        f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
+        "It doesn't feel scripted or generic.\n"
+        f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
+        "about the person's situation or viewpoint. Use the provided local information to add authenticity.\n"
+        f"Emotional Engagement: The post connects on an emotional level, whether it's sharing joy, struggles, doubts, "
+        "or achievements. This helps create a bond with readers. \n"
+        f"Storytelling: Personal posts often incorporate elements of storytelling, which is also a key aspect of virality. "
+        "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable. "
+        f"Weave in the {context_type.lower()} as a setting or backdrop for part of the story.\n"
+        f"Relevance: These posts are relevant to the interests and needs of the community. In a professional or young "
+        "adult setting, topics might include career challenges, educational experiences, personal development, or "
+        "balancing life and work. Relate these to the Miami context.\n"
+        f"Interactive: Personal posts invite interaction by asking questions or seeking advice, thereby fostering a "
+        "community dialogue. Ask for recommendations or experiences related to the {context_type.lower()}.\n"
+        f"Reflective: They often reflect on personal experiences or lessons learned, which can provide valuable insights "
+        "to others in similar situations. \n\n"
+        f"Virality Principles:\n"
+        f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image. Use the {context_type.lower()} information to this effect.\n"
+        f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers. Mention the {context_type.lower()} by name if applicable.\n"
+        f"3. Emotion: Aim to elicit strong emotions like awe, excitement, amusement, anger, or anxiety which are linked to higher sharing rates.\n"
+        f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
+        f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others. This could relate to the {context_type.lower()}.\n"
+        f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
+        f"Format your response clearly with the new post, which should be at most {max_paragraphs} paragraph{'s' if max_paragraphs > 1 else ''}, and use 8th grade verbiage."
+    )
 
     try:
         response = client.chat.completions.create(
@@ -4275,8 +4335,8 @@ def modify_text_with_openai(text, professional_context, article_category):
                 {"role": "system", "content": prompt}
             ]
         )
-        text = response.choices[0].message.content.strip()
-        return text, random_article.url if random_article else None
+        text = response.choices[0].message.content.strip() + " (Should be posted on: " + random_date.strftime("%B %d, %Y") + ")"
+        return text, url
     except Exception as e:
         print(f"Failed to modify text: {str(e)}")
         return text  # Return the original text if modification fails
@@ -4460,9 +4520,9 @@ answer the above question with Y or N at each output.
 
     try:
         if sentence_type == 'controversial':
-            user_prompt = f"Based on the following content, come up with one controversial sentence that could be added to it: \n\n{content}<think>"
+            user_prompt = f"Based on the following content, come up with one controversial sentence that could be added to the content: \n\n{content}<think>"
         elif sentence_type == 'anxiety':
-            user_prompt = f"Based on the following content, come up with one sentence that could be added to it that would invoke anxiety in the reader:\n\n{content}<think>"
+            user_prompt = f"Based on the following content, come up with one sentence that could be added to the content that would invoke anxiety in the reader:\n\n{content}<think>"
         else:
             return jsonify({'error': 'Invalid sentence type'}), 400
 
@@ -4487,7 +4547,7 @@ answer the above question with Y or N at each output.
             return jsonify({'sentence': match[0]})
         else:
             # Handle cases where no text is found within quotes
-            return jsonify({'sentence': 'No text found within quotes'})
+            return jsonify({'sentence': generated_sentence})
 
     except Exception as e:
         print(f"Error generating sentence: {str(e)}")
@@ -5236,6 +5296,7 @@ from flask import current_app
 @app.route('/run-scraper', methods=['GET', 'POST'])
 def run_scraper():
     categories = [category.value for category in CategoryEnum]
+    categories.insert(0, 'ALL')
     selected_category = request.form.get('category') or request.args.get('category') or categories[0]
     
     current_app.logger.info(f"Starting scraper for category: {selected_category}")
@@ -5243,8 +5304,13 @@ def run_scraper():
     if request.method == 'POST' and 'run_scraper' in request.form:
         client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
         
-        # Get URLs for the selected category from SelectedURLs
-        urls = SelectedURLs.query.filter_by(category=selected_category).all()
+        # Get URLs for the selected category (or all categories) from SelectedURLs
+        if selected_category == 'ALL':
+            urls = SelectedURLs.query.filter_by(is_active=True).all()
+        else:
+            urls = SelectedURLs.query.filter_by(category=selected_category, is_active=True).all()
+
+
         current_app.logger.info(f"Found {len(urls)} URLs for category {selected_category}")
         
         max_depth = 0
@@ -5252,7 +5318,6 @@ def run_scraper():
         for url in urls:
             if url.is_eventbrite:
                 current_app.logger.info(f"Processing Eventbrite URL: {url.url}")
-                # If it's an Eventbrite URL, scrape it first
                 eventbrite_links = scrape_eventbrite(url.url)
                 current_app.logger.info(f"Found {len(eventbrite_links)} links from Eventbrite URL")
                 start_urls.extend([{"url": link} for link in eventbrite_links])
@@ -5280,11 +5345,15 @@ def run_scraper():
             existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
             
             if not existing_result:
+                # Determine the category for the current URL
+                url_obj = SelectedURLs.query.filter_by(url=item.get('url', '')).first()
+                category = url_obj.category if url_obj else selected_category
+                
                 scraper_result = ScraperResult(
                     url=item.get('url', ''),
                     title=item.get('title', ''),
                     text=item.get('text', ''),
-                    category=selected_category
+                    category=category
                 )
                 db.session.add(scraper_result)
                 try:
@@ -5302,7 +5371,11 @@ def run_scraper():
         current_app.logger.info(f"Scraper completed. New results: {new_results}, Skipped: {skipped_results}")
         flash(f"Scraper completed for {selected_category}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")
     
-    results = ScraperResult.query.filter_by(category=selected_category).order_by(ScraperResult.scrape_date.desc()).all()
+    # Fetch results based on selected category
+    if selected_category == 'ALL':
+        results = ScraperResult.query.order_by(ScraperResult.scrape_date.desc()).all()
+    else:
+        results = ScraperResult.query.filter_by(category=selected_category).order_by(ScraperResult.scrape_date.desc()).all()
     current_app.logger.info(f"Fetched {len(results)} results for display")
     return render_template('run_scraper.html', categories=categories, selected_category=selected_category, results=results)
 
@@ -5464,23 +5537,34 @@ def random_venue2():
 @app.route('/manage-urls', methods=['GET', 'POST'])
 def manage_urls():
     if request.method == 'POST':
-        url = request.form.get('url')
-        category = request.form.get('category')
-        is_eventbrite = request.form.get('is_eventbrite') == 'on'  # Checkbox returns 'on' if checked
-        if url and category:
-            new_url = SelectedURLs(url=url, category=CategoryEnum[category], is_eventbrite=is_eventbrite)
-            db.session.add(new_url)
-            try:
+        if 'add_url' in request.form:
+            url = request.form.get('url')
+            category = request.form.get('category')
+            is_eventbrite = request.form.get('is_eventbrite') == 'on'
+            if url and category:
+                try:
+                    new_url = SelectedURLs(url=url, category=CategoryEnum[category], is_eventbrite=is_eventbrite)
+                    db.session.add(new_url)
+                    db.session.commit()
+                    flash("URL added successfully!", "success")
+                except IntegrityError:
+                    db.session.rollback()
+                    flash("This URL already exists.", "error")
+            else:
+                flash("Please provide both URL and category.", "error")
+        elif 'toggle_active' in request.form:
+            url_id = request.form.get('url_id')
+            url_obj = SelectedURLs.query.get(url_id)
+            if url_obj:
+                url_obj.is_active = not url_obj.is_active
                 db.session.commit()
-                flash("URL added successfully!", "success")
-            except IntegrityError:
-                db.session.rollback()
-                flash("This URL already exists.", "error")
-        else:
-            flash("Please provide both URL and category.", "error")
-    
-    urls = SelectedURLs.query.all()
+                flash(f"URL {'activated' if url_obj.is_active else 'deactivated'} successfully!", "success")
+            else:
+                flash("URL not found.", "error")
+
+    urls = SelectedURLs.query.order_by(SelectedURLs.category).all()
     return render_template('manage_urls.html', urls=urls, categories=CategoryEnum)
+
 
 
 

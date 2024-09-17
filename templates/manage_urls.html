@@ -19,7 +19,7 @@
             <input type="checkbox" class="form-check-input" id="is_eventbrite" name="is_eventbrite">
             <label class="form-check-label" for="is_eventbrite">Is Eventbrite URL?</label>
         </div>
-        <button type="submit" class="btn btn-primary">Add URL</button>
+        <button type="submit" name="add_url" class="btn btn-primary">Add URL</button>
     </form>
     <h3 class="mt-5">Existing URLs</h3>
     <table class="table">
@@ -28,6 +28,8 @@
                 <th>URL</th>
                 <th>Category</th>
                 <th>Eventbrite?</th>
+                <th>Status</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -36,6 +38,15 @@
                 <td>{{ url.url }}</td>
                 <td>{{ url.category.name }}</td>
                 <td>{{ "Yes" if url.is_eventbrite else "No" }}</td>
+                <td>{{ "Active" if url.is_active else "Inactive" }}</td>
+                <td>
+                    <form action="{{ url_for('manage_urls') }}" method="POST">
+                        <input type="hidden" name="url_id" value="{{ url.id }}">
+                        <button type="submit" name="toggle_active" class="btn btn-sm {% if url.is_active %}btn-danger{% else %}btn-success{% endif %}">
+                            {% if url.is_active %}Deactivate{% else %}Activate{% endif %}
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
