@@ -100,9 +100,11 @@ class State(Enum):
     VT = "Vermont"
     VA = "Virginia"
     WA = "Washington"
+    DC = "Washington DC"
     WV = "West Virginia"
     WI = "Wisconsin"
     WY = "Wyoming"
+
 
 
 class Industry(Enum):
@@ -111,6 +113,18 @@ class Industry(Enum):
     MARKETING = "Marketing"
     MEDICAL = "Medical"
     TECH = "Tech"
+    ENTERTAINMENT = "Entertainment"
+    LAW = "Law"
+    HOSPITALITY = "Hospitality"
+    RETAIL = "Retail"
+
+class Neighborhood(Enum):
+    BRICKELL = "Brickell"
+    EDGEWATER = "Edgewater"
+    DOWNTOWN = "Downtown"
+    MIDTOWN = "Midtown"
+    WYNWOOD = "Wynwood"
+    MIAMIBEACH = "Miami Beach"
 
 
 UPLOAD_FOLDER = 'C:\\flasker\\static\\uploads'
@@ -502,6 +516,7 @@ class OfficialSeeder(db.Model):
     types_lowercase = db.Column(db.Boolean, default=False)
     state = db.Column(db.Enum(State), nullable=True)
     industry = db.Column(db.Enum(Industry), nullable=True)
+    neighborhood = db.Column(db.Enum(Neighborhood), nullable=True) 
     facts = db.relationship('Fact', backref='official_seeder', lazy=True)
 
 class Fact(db.Model):
@@ -4169,9 +4184,13 @@ def get_seeder_info(user_id):
 ## IDEA FACTORY ##
 
 
+from collections import defaultdict
+
 @app.route('/idea_factory/', methods=['GET', 'POST'])
 def idea_factory():
     communities = Community.query.options(joinedload(Community.subreddits)).all()
+    community_dict = {c.id: c.name for c in communities}  # Create community_dict
+
     # Fetch seeders with their vault counts, ordered by the count
     seeders_with_counts = db.session.query(
         OfficialSeeder,
@@ -4217,9 +4236,28 @@ def idea_factory():
         if text_results:
             flash(f"Scraped and processed {len(text_results)} text posts")
 
-        return render_template('idea_factory.html', results=text_results, communities=communities, session=session, seeders_with_counts=seeders_with_counts, State=State, Industry=Industry)
+        return render_template(
+            'idea_factory.html',
+            results=text_results,
+            communities=communities,
+            session=session,
+            seeders_with_counts=seeders_with_counts,
+            State=State,
+            Industry=Industry,
+            Neighborhood=Neighborhood,
+            community_dict=community_dict  # Pass community_dict to template
+        )
 
-    return render_template('idea_factory.html', communities=communities, session=session, seeders_with_counts=seeders_with_counts, State=State, Industry=Industry)
+    return render_template(
+        'idea_factory.html',
+        communities=communities,
+        session=session,
+        seeders_with_counts=seeders_with_counts,
+        State=State,
+        Industry=Industry,
+        Neighborhood=Neighborhood,
+        community_dict=community_dict  # Pass community_dict to template
+    )
 
 
 from datetime import date
@@ -4274,14 +4312,14 @@ def modify_text_with_openai(text, professional_context, article_category):
         
         if random_article:
             context = (
-                f"Recent news/event from Miami: '{random_article.title}'. "
+                f"Recent news/event/jobpost from Miami: '{random_article.title}'. "
                 f"Summary: {random_article.text}..."
             )
-            context_type = "Local Event/News"
+            context_type = "Local Event/News/Job Post"
             url = random_article.url
         else:
             context = "No recent news available."
-            context_type = "Local Event/News"
+            context_type = "Local Event/News/Job Post"
 
     context_suffix = f"{professional_context}" if professional_context else "make it different from the original post by changing all details"
     
@@ -4298,7 +4336,7 @@ def modify_text_with_openai(text, professional_context, article_category):
     prompt = (
         f"Take this Reddit post and extract the universal theme from it: \n\n"
         f"{text}\n\n"
-        f"and then below that, generate a new post that follows the theme, but change specific details and incorporate the following local context as the backdrop:\n\n"
+        f"and then below that, generate a new post that follows the theme, but change the details and incorporate the following local context as the backdrop:\n\n"
         f"{context_type}: {context}\n\n"
         f"The post should be written by someone in their early 20s who is a recent Miami transplant. Always include specific dates in your response, keeping in mind that the post should be framed as though it was written on {random_date.strftime('%B %d, %Y')}. "
         "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
@@ -4624,6 +4662,143 @@ def delete_comment(comment_id):
 #Da Vault
 
 
+#vault post utility functions
+
+
+from datetime import datetime, timedelta
+import calendar
+
+def get_week_ranges(reference_date=None):
+    if reference_date is None:
+        reference_date = datetime.utcnow()
+    start_of_week = reference_date - timedelta(days=reference_date.weekday())  # Monday
+    end_of_week = start_of_week + timedelta(days=6)  # Sunday
+    next_start_of_week = end_of_week + timedelta(days=1)
+    next_end_of_week = next_start_of_week + timedelta(days=6)
+    return {
+        'current_week': (start_of_week.date(), end_of_week.date()),
+        'next_week': (next_start_of_week.date(), next_end_of_week.date())
+    }
+
+def get_vault_counts_by_week_and_community():
+    week_ranges = get_week_ranges()
+    current_week_start, current_week_end = week_ranges['current_week']
+    next_week_start, next_week_end = week_ranges['next_week']
+    
+    # Current Week Scheduled
+    current_week_scheduled = db.session.query(
+        Vault.community_id,
+        func.count(Vault.id)
+    ).filter(
+        Vault.scheduled_at >= current_week_start,
+        Vault.scheduled_at <= current_week_end,
+        Vault.is_posted == False
+    ).group_by(Vault.community_id).all()
+    
+    # Next Week Scheduled
+    next_week_scheduled = db.session.query(
+        Vault.community_id,
+        func.count(Vault.id)
+    ).filter(
+        Vault.scheduled_at >= next_week_start,
+        Vault.scheduled_at <= next_week_end,
+        Vault.is_posted == False
+    ).group_by(Vault.community_id).all()
+    
+    # Day-by-Day Breakdown for Current Week
+    current_week_daily = db.session.query(
+        func.date(Vault.scheduled_at).label('scheduled_date'),
+        Vault.community_id,
+        func.count(Vault.id)
+    ).filter(
+        Vault.scheduled_at >= current_week_start,
+        Vault.scheduled_at <= current_week_end,
+        Vault.is_posted == False
+    ).group_by(
+        func.date(Vault.scheduled_at),
+        Vault.community_id
+    ).all()
+    
+    # Posted Vaults This Week
+    posted_this_week = db.session.query(
+        func.count(Vault.id)
+    ).filter(
+        Vault.created_at >= current_week_start,
+        Vault.created_at <= current_week_end,
+        Vault.is_posted == True
+    ).scalar()
+    
+    return {
+        'current_week_scheduled': current_week_scheduled,
+        'next_week_scheduled': next_week_scheduled,
+        'current_week_daily': current_week_daily,
+        'posted_this_week': posted_this_week
+    }
+
+def get_daily_community_breakdown():
+    week_ranges = get_week_ranges()
+    current_week_start, current_week_end = week_ranges['current_week']
+    
+    daily_breakdown = db.session.query(
+        func.date(Vault.scheduled_at).label('scheduled_date'),
+        Vault.community_id,
+        func.count(Vault.id)
+    ).filter(
+        Vault.scheduled_at >= current_week_start,
+        Vault.scheduled_at <= current_week_end,
+        Vault.is_posted == False
+    ).group_by(
+        func.date(Vault.scheduled_at),
+        Vault.community_id
+    ).all()
+    
+    return daily_breakdown
+
+
+
+from flask import jsonify
+
+@app.route('/api/vault_scheduling_stats')
+def vault_scheduling_stats():
+    stats = get_vault_counts_by_week_and_community()
+    
+    # Process current_week_scheduled
+    current_week = {item.community_id: item.count for item in stats['current_week_scheduled']}
+    
+    # Process next_week_scheduled
+    next_week = {item.community_id: item.count for item in stats['next_week_scheduled']}
+    
+    # Process current_week_daily
+    daily = {}
+    for item in stats['current_week_daily']:
+        date_str = item.scheduled_date.strftime('%Y-%m-%d')
+        if date_str not in daily:
+            daily[date_str] = {}
+        daily[date_str][item.community_id] = item.count
+    
+    return jsonify({
+        'current_week_scheduled': current_week,
+        'next_week_scheduled': next_week,
+        'current_week_daily': daily,
+        'posted_this_week': stats['posted_this_week']
+    })
+
+
+
+@app.route('/api/vault_daily_community_breakdown')
+def vault_daily_community_breakdown():
+    breakdown = get_daily_community_breakdown()
+    processed = {}
+    for item in breakdown:
+        date_str = item.scheduled_date.strftime('%Y-%m-%d')
+        if date_str not in processed:
+            processed[date_str] = {}
+        processed[date_str][item.community_id] = item.count
+    return jsonify(processed)
+
+
+
+
 @app.route('/vault_post', methods=['POST'])
 def vault_post():
     try:
@@ -4644,8 +4819,12 @@ def vault_post():
             new_seeder = OfficialSeeder(
                 full_name=request.form['new_seeder_name'],
                 alias=request.form.get('new_seeder_alias'),
-                 types_lowercase=request.form.get('new_seeder_types_lowercase') == 'on'
+                types_lowercase=request.form.get('new_seeder_types_lowercase') == 'on',
+                neighborhood=Neighborhood[request.form.get('new_seeder_neighborhood')] if request.form.get('new_seeder_neighborhood') else None,
+                state=State[request.form.get('new_seeder_state')] if request.form.get('new_seeder_state') else None,
+                industry=Industry[request.form.get('new_seeder_industry')] if request.form.get('new_seeder_industry') else None
             )
+
             
             # Handle profile picture upload
             if 'new_seeder_profile_picture' in request.files:
@@ -4729,13 +4908,42 @@ def vault_interface():
     }
     sorted_grouped_posted_vaults = OrderedDict(sorted(grouped_posted_vaults.items(), key=lambda x: x[0], reverse=True))
 
+
+    # Fetch scheduling statistics
+    stats = get_vault_counts_by_week_and_community()
+    
+    # Process for template
+    current_week_scheduled = {c.id: 0 for c in communities}
+    for community_id, count in stats['current_week_scheduled']:
+        current_week_scheduled[community_id] = count
+    
+    next_week_scheduled = {c.id: 0 for c in communities}
+    for community_id, count in stats['next_week_scheduled']:
+        next_week_scheduled[community_id] = count
+    
+    # Process daily breakdown
+    daily_breakdown = {}
+    for date, community_id, count in stats['current_week_daily']:
+        date_str = date.strftime('%Y-%m-%d')
+        if date_str not in daily_breakdown:
+            daily_breakdown[date_str] = {}
+        daily_breakdown[date_str][community_id] = count
+    
+    posted_this_week = stats['posted_this_week']
+    
+
+
+
     return render_template('vault_interface.html', 
                            grouped_scheduled_vaults=sorted_grouped_scheduled_vaults,
                            grouped_posted_vaults=sorted_grouped_posted_vaults,
                            unscheduled_vaults=unscheduled_vaults, 
                            communities=communities,
-                           community_dict=community_dict)
-
+                           community_dict=community_dict,
+                           current_week_scheduled=current_week_scheduled,
+                           next_week_scheduled=next_week_scheduled,
+                           daily_breakdown=daily_breakdown,
+                           posted_this_week=posted_this_week)
 
 @app.route('/delete_vault/<int:vault_id>', methods=['POST'])
 def delete_vault(vault_id):
@@ -4768,7 +4976,7 @@ def mark_vault_as_posted(vault_id):
 @app.context_processor
 def inject_vault_count():
     # Filter to count only vaults where `scheduled_at` is None
-    total_vaults = Vault.query.filter(Vault.scheduled_at == None).count()
+    total_vaults = Vault.query.filter(Vault.is_posted == False).count()
     return dict(total_vaults=total_vaults)
 
 
@@ -4907,6 +5115,7 @@ def add_official_seeder():
         types_lowercase = 'types_lowercase' in request.form
         state = request.form.get('state')
         industry = request.form.get('industry')
+        neighborhood = request.form.get('neighborhood')
         
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
@@ -4926,7 +5135,8 @@ def add_official_seeder():
             alias=alias,
             types_lowercase=types_lowercase,
             state=State[state] if state else None,
-            industry=Industry[industry] if industry else None
+            industry=Industry[industry] if industry else None,
+            neighborhood=Neighborhood[neighborhood] if neighborhood else None
         )
         db.session.add(seeder)
         db.session.commit()
@@ -4936,7 +5146,7 @@ def add_official_seeder():
         OfficialSeeder,
         func.count(Vault.id).label('vault_count')
     ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
-    return render_template('official_seeder.html', seeders=seeders_with_vault_count, State=State, Industry=Industry)
+    return render_template('official_seeder.html', seeders=seeders_with_vault_count, State=State, Industry=Industry, Neighborhood=Neighborhood)
 
 
 @app.route('/edit_official_seeder/<int:seeder_id>', methods=['GET', 'POST'])
@@ -4948,6 +5158,7 @@ def edit_official_seeder(seeder_id):
         seeder.types_lowercase = 'types_lowercase' in request.form
         seeder.state = State[request.form.get('state')] if request.form.get('state') else None
         seeder.industry = Industry[request.form.get('industry')] if request.form.get('industry') else None
+        seeder.neighborhood = Neighborhood[request.form.get('neighborhood')] if request.form.get('neighborhood') else None
         
         file = request.files.get('profile_picture')
         if file and allowed_file(file.filename):
@@ -4963,7 +5174,7 @@ def edit_official_seeder(seeder_id):
         flash('Seeder updated successfully', 'success')
         return redirect(url_for('add_official_seeder'))
     
-    return render_template('edit_official_seeder.html', seeder=seeder, State=State, Industry=Industry)
+    return render_template('edit_official_seeder.html', seeder=seeder, State=State, Industry=Industry, Neighborhood=Neighborhood)
 
 @app.route('/delete_official_seeder/<int:seeder_id>', methods=['POST'])
 def delete_official_seeder(seeder_id):
@@ -5310,63 +5521,95 @@ def run_scraper():
         else:
             urls = SelectedURLs.query.filter_by(category=selected_category, is_active=True).all()
 
-
         current_app.logger.info(f"Found {len(urls)} URLs for category {selected_category}")
-        
-        max_depth = 0
-        start_urls = []
-        for url in urls:
-            if url.is_eventbrite:
-                current_app.logger.info(f"Processing Eventbrite URL: {url.url}")
-                eventbrite_links = scrape_eventbrite(url.url)
-                current_app.logger.info(f"Found {len(eventbrite_links)} links from Eventbrite URL")
-                start_urls.extend([{"url": link} for link in eventbrite_links])
-                max_depth = 0
-            else:
-                current_app.logger.info(f"Adding non-Eventbrite URL: {url.url}")
-                start_urls.append({"url": url.url})
-                max_depth = 1
-        
-        current_app.logger.info(f"Total URLs to scrape: {len(start_urls)}")
-        
-        run_input = {
-            "startUrls": start_urls,
-            "maxCrawlDepth": max_depth
-        }
-        current_app.logger.info("Starting Apify actor")
-        run = client.actor("apify/website-content-crawler").call(run_input=run_input)
-        current_app.logger.info(f"Apify actor run ID: {run['id']}")
         
         new_results = 0
         skipped_results = 0
-        current_app.logger.info("Processing Apify results")
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            current_app.logger.debug(f"Processing item: {item.get('url', '')}")
-            existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
-            
-            if not existing_result:
-                # Determine the category for the current URL
-                url_obj = SelectedURLs.query.filter_by(url=item.get('url', '')).first()
-                category = url_obj.category if url_obj else selected_category
+        
+        for url in urls:
+            if url.url == "https://www.JobTrigger.com" and url.category == CategoryEnum.CAREER:
+                # Use LinkedIn jobs scraper
+                run_input = {
+                    "contractType": "F",
+                    "experienceLevel": "3",
+                    "location": "Miami",
+                    "proxy": {
+                        "useApifyProxy": True,
+                        "apifyProxyGroups": ["RESIDENTIAL"]
+                    },
+                    "rows": 50
+                }
+                current_app.logger.info("Starting LinkedIn jobs scraper")
+                run = client.actor("bebity/linkedin-jobs-scraper").call(run_input=run_input)
+                current_app.logger.info(f"LinkedIn jobs scraper run ID: {run['id']}")
                 
-                scraper_result = ScraperResult(
-                    url=item.get('url', ''),
-                    title=item.get('title', ''),
-                    text=item.get('text', ''),
-                    category=category
-                )
-                db.session.add(scraper_result)
-                try:
-                    db.session.commit()
-                    new_results += 1
-                    current_app.logger.debug(f"Added new result: {item.get('url', '')}")
-                except IntegrityError:
-                    db.session.rollback()
-                    skipped_results += 1
-                    current_app.logger.warning(f"IntegrityError for URL: {item.get('url', '')}")
+                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    existing_result = ScraperResult.query.filter_by(url=item.get('jobUrl', '')).first()
+                    
+                    if not existing_result:
+                        scraper_result = ScraperResult(
+                            url=item.get('jobUrl', ''),
+                            title=item.get('title', ''),
+                            text=f"Company: {item.get('companyName', '')}\n"
+                                 f"Location: {item.get('location', '')}\n"
+                                 f"Posted: {item.get('postedTime', '')}\n"
+                                 f"Contract Type: {item.get('contractType', '')}\n"
+                                 f"Experience Level: {item.get('experienceLevel', '')}\n"
+                                 f"Description: {item.get('description', '')}",
+                            category=CategoryEnum.CAREER
+                        )
+                        db.session.add(scraper_result)
+                        try:
+                            db.session.commit()
+                            new_results += 1
+                            current_app.logger.debug(f"Added new LinkedIn job result: {item.get('jobUrl', '')}")
+                        except IntegrityError:
+                            db.session.rollback()
+                            skipped_results += 1
+                            current_app.logger.warning(f"IntegrityError for LinkedIn job URL: {item.get('jobUrl', '')}")
+                    else:
+                        skipped_results += 1
+                        current_app.logger.debug(f"Skipped existing LinkedIn job result: {item.get('jobUrl', '')}")
             else:
-                skipped_results += 1
-                current_app.logger.debug(f"Skipped existing result: {item.get('url', '')}")
+                # Use website content crawler for other URLs
+                run_input = {
+                    "startUrls": [{"url": url.url}],
+                    "maxCrawlDepth": 1 if not url.is_eventbrite else 0
+                }
+                
+                if url.is_eventbrite:
+                    current_app.logger.info(f"Processing Eventbrite URL: {url.url}")
+                    eventbrite_links = scrape_eventbrite(url.url)
+                    current_app.logger.info(f"Found {len(eventbrite_links)} links from Eventbrite URL")
+                    run_input["startUrls"] = [{"url": link} for link in eventbrite_links]
+                
+                current_app.logger.info("Starting Apify website content crawler")
+                run = client.actor("apify/website-content-crawler").call(run_input=run_input)
+                current_app.logger.info(f"Apify actor run ID: {run['id']}")
+                
+                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    current_app.logger.debug(f"Processing item: {item.get('url', '')}")
+                    existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                    
+                    if not existing_result:
+                        scraper_result = ScraperResult(
+                            url=item.get('url', ''),
+                            title=item.get('title', ''),
+                            text=item.get('text', ''),
+                            category=url.category
+                        )
+                        db.session.add(scraper_result)
+                        try:
+                            db.session.commit()
+                            new_results += 1
+                            current_app.logger.debug(f"Added new result: {item.get('url', '')}")
+                        except IntegrityError:
+                            db.session.rollback()
+                            skipped_results += 1
+                            current_app.logger.warning(f"IntegrityError for URL: {item.get('url', '')}")
+                    else:
+                        skipped_results += 1
+                        current_app.logger.debug(f"Skipped existing result: {item.get('url', '')}")
         
         current_app.logger.info(f"Scraper completed. New results: {new_results}, Skipped: {skipped_results}")
         flash(f"Scraper completed for {selected_category}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")

@@ -109,6 +109,13 @@
     <button type="button" class="btn btn-secondary disabled">No related article available</button>
 {% endif %}
 
+<a href="{{ url_for('vault_interface') }}" class="btn btn-info" target="_blank">View Scheduling Stats</a>
+
+
+
+
+
+
 <div id="generatedSentence{{ loop.index }}"></div>
                     <div class="mb-3">
                         <label for="title" class="form-label">Title</label>
@@ -130,13 +137,34 @@
                         <label for="seeder_id" class="form-label">Select Official Seeder:</label>
                         <select class="form-select" name="seeder_id" id="seeder_id">
                             {% for seeder, vault_count in seeders_with_counts %}
-                            <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias}}) ({{ vault_count }} vaults) ({{ seeder.state.value}}) ({{ seeder.industry.value}}) </option>
+                            <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias}}) ({{ vault_count }} vaults) ({{ seeder.state.value}})  ({{ seeder.industry.value}}) ({{ seeder.neighborhood.value}})</option>
                             {% endfor %}
                         </select>
                     </div>
 
                     <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
                     <button type="button" class="btn btn-secondary" onclick="toggleNewSeederForm({{ loop.index }})">Create New Seeder</button>
+
+
+<!-- Scheduling Stats Modal -->
+<div class="modal fade" id="schedulingStatsModal{{ loop.index }}" tabindex="-1" aria-labelledby="schedulingStatsModalLabel{{ loop.index }}" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scheduling Statistics</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Content will be loaded via JavaScript -->
+                <div id="schedulingStatsContent{{ loop.index }}">
+                    <p>Loading statistics...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 
                     
                     <!-- New Seeder Form (initially hidden) -->
@@ -172,6 +200,16 @@
             {% endfor %}
         </select>
     </div>
+    <div class="mb-3">
+    <label for="new_seeder_neighborhood{{ loop.index }}" class="form-label">Neighborhood</label>
+    <select class="form-select" id="new_seeder_neighborhood{{ loop.index }}" name="new_seeder_neighborhood">
+        <option value="">Select a neighborhood</option>
+        {% for neighborhood in Neighborhood %}
+        <option value="{{ neighborhood.name }}">{{ neighborhood.value }}</option>
+        {% endfor %}
+    </select>
+</div>
+
     <div class="mb-3 form-check">
         <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase{{ loop.index }}" name="new_seeder_types_lowercase">
         <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
@@ -442,7 +480,42 @@ function fetchSeederInfo(userId, index) {
 }
 
 
+document.addEventListener('DOMContentLoaded', function() {
+    {% for vault in unscheduled_vaults %}
+    var schedulingModal = document.getElementById('schedulingStatsModal{{ loop.index }}');
+    schedulingModal.addEventListener('show.bs.modal', function () {
+        fetch('/api/vault_daily_community_breakdown')
+            .then(response => response.json())
+            .then(data => {
+                var contentDiv = document.getElementById('schedulingStatsContent{{ loop.index }}');
+                var htmlContent = '<h5>Day-by-Day Breakdown (Current Week)</h5>';
+                htmlContent += '<table class="table table-bordered"><thead><tr><th>Date</th><th>Community</th><th>Number of Vaults</th></tr></thead><tbody>';
+                for (var date in data) {
+                    for (var community_id in data[date]) {
+                        var community_name = getCommunityName(community_id); // Implement this function
+                        htmlContent += `<tr>
+                            <td>${date}</td>
+                            <td>${community_name}</td>
+                            <td>${data[date][community_id]}</td>
+                        </tr>`;
+                    }
+                }
+                htmlContent += '</tbody></table>';
+                contentDiv.innerHTML = htmlContent;
+            })
+            .catch(error => {
+                console.error('Error fetching scheduling stats:', error);
+                document.getElementById('schedulingStatsContent{{ loop.index }}').innerHTML = '<p>Error loading statistics.</p>';
+            });
+    });
+    {% endfor %}
+});
 
+// Helper function to map community IDs to names
+function getCommunityName(community_id) {
+    var communityDict = {{ community_dict | tojson }};
+    return communityDict[community_id] || 'Unknown';
+}
 
 
 </script>

@@ -33,6 +33,17 @@
                 {% endfor %}
             </select>
         </div>
+
+        <div class="mb-3">
+    <label for="neighborhood" class="form-label">Neighborhood</label>
+    <select class="form-select" id="neighborhood" name="neighborhood">
+        <option value="">Select a neighborhood</option>
+        {% for neighborhood in Neighborhood %}
+        <option value="{{ neighborhood.name }}">{{ neighborhood.value }}</option>
+        {% endfor %}
+    </select>
+</div>
+
         <div class="mb-3 form-check">
             <input type="checkbox" class="form-check-input" id="types_lowercase" name="types_lowercase">
             <label class="form-check-label" for="types_lowercase">Types in lowercase</label>
@@ -48,6 +59,7 @@
             <th>Profile Picture</th>
             <th>State</th>
             <th>Industry</th>
+            <th>Neighborhood</th>
             <th>Types Lowercase</th>
             <th>Number of Vaults</th>
             <th>Actions</th>
@@ -61,6 +73,7 @@
             <td><img src="{{ seeder.profile_picture }}" alt="Profile Picture" style="width: 50px; height: 50px;"></td>
             <td>{{ seeder.state.value if seeder.state else 'N/A' }}</td>
             <td>{{ seeder.industry.value if seeder.industry else 'N/A' }}</td>
+            <td>{{ seeder.neighborhood.value if seeder.neighborhood else 'N/A' }}</td>
             <td>
                 <span class="badge {% if seeder.types_lowercase %}bg-success{% else %}bg-danger{% endif %}">
                     {% if seeder.types_lowercase %}Yes{% else %}No{% endif %}
