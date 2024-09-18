@@ -668,6 +668,7 @@ class Venue(db.Model):
     description = db.Column(db.Text)
     price = db.Column(db.String(20))
     category_name = db.Column(db.String(200))
+    main_category = db.Column(db.String(255))
     neighborhood = db.Column(db.String(200))
     street = db.Column(db.String(500))
     city = db.Column(db.String(200))
@@ -4271,11 +4272,17 @@ def modify_text_with_openai(text, professional_context, article_category):
     context_type = ""
     url = None
 
-    if article_category == "VENUE":
-        # Fetch a random venue
-        random_venue = Venue.query.filter(Venue.permanently_closed == False, Venue.temporarily_closed == False).order_by(func.random()).first()
+    if article_category in ["VENUE", "RESTAURANTS"]:
 
+        # Fetch a random venue
+        venue_query = Venue.query.filter(Venue.permanently_closed == False, Venue.temporarily_closed == False)
         
+        # Add filter for restaurants if the category is RESTAURANT
+        if article_category == "RESTAURANTS":
+            venue_query = venue_query.filter(Venue.main_category == "Restaurant")
+        
+        # Fetch a random venue
+        random_venue = venue_query.order_by(func.random()).first()
         if random_venue:
             # Format the total score correctly
             total_score_str = f"{random_venue.total_score:.1f}" if random_venue.total_score is not None else "N/A"
@@ -4292,6 +4299,12 @@ def modify_text_with_openai(text, professional_context, article_category):
                 f"based on {random_venue.reviews_count or 0} reviews. "
                 f"Status: {'Open' if not random_venue.permanently_closed and not random_venue.temporarily_closed else 'Temporarily Closed' if random_venue.temporarily_closed else 'Permanently Closed'}. "
             )
+
+
+            if random_venue.menu:
+                context += f"\nHere is the menu: {random_venue.menu}\n"
+            else:
+                context += "Menu information is not available for this venue.\n"
             
             # Fetch a recent review for the venue
             recent_review = Review.query.filter_by(venue_id=random_venue.id).order_by(Review.published_at_date.desc()).first()
@@ -4336,7 +4349,7 @@ def modify_text_with_openai(text, professional_context, article_category):
     prompt = (
         f"Take this Reddit post and extract the universal theme from it: \n\n"
         f"{text}\n\n"
-        f"and then below that, generate a new post that follows the theme, but change the details and incorporate the following local context as the backdrop:\n\n"
+        f"and then below that, generate a new post that follows the theme, but dramatically alter the specific details of the post while maintaining the core theme. Incorporate the following local context as the backdrop:\n\n"
         f"{context_type}: {context}\n\n"
         f"The post should be written by someone in their early 20s who is a recent Miami transplant. Always include specific dates in your response, keeping in mind that the post should be framed as though it was written on {random_date.strftime('%B %d, %Y')}. "
         "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
@@ -4558,9 +4571,9 @@ answer the above question with Y or N at each output.
 
     try:
         if sentence_type == 'controversial':
-            user_prompt = f"Based on the following content, come up with one controversial sentence that could be added to the content: \n\n{content}<think>"
+            user_prompt = f"Based on the following reddit post, come up with one controversial sentence that could be added to the post before posting it: \n\n{content}<think>"
         elif sentence_type == 'anxiety':
-            user_prompt = f"Based on the following content, come up with one sentence that could be added to the content that would invoke anxiety in the reader:\n\n{content}<think>"
+            user_prompt = f"Based on the following reddit post, come up with one sentence that could be added to the post before posting it that would invoke anxiety in the reader:\n\n{content}<think>"
         else:
             return jsonify({'error': 'Invalid sentence type'}), 400
 
@@ -4676,7 +4689,7 @@ def get_week_ranges(reference_date=None):
     next_start_of_week = end_of_week + timedelta(days=1)
     next_end_of_week = next_start_of_week + timedelta(days=6)
     return {
-        'current_week': (start_of_week.date(), end_of_week.date()),
+        'current_week': (start_of_week.date(), next_start_of_week.date()),  # Adjusted
         'next_week': (next_start_of_week.date(), next_end_of_week.date())
     }
 
@@ -4685,13 +4698,13 @@ def get_vault_counts_by_week_and_community():
     current_week_start, current_week_end = week_ranges['current_week']
     next_week_start, next_week_end = week_ranges['next_week']
     
-    # Current Week Scheduled
+    # Current Week Scheduled (Using < next_week_start)
     current_week_scheduled = db.session.query(
         Vault.community_id,
         func.count(Vault.id)
     ).filter(
         Vault.scheduled_at >= current_week_start,
-        Vault.scheduled_at <= current_week_end,
+        Vault.scheduled_at < current_week_end,  # Changed from <= to <
         Vault.is_posted == False
     ).group_by(Vault.community_id).all()
     
@@ -4701,7 +4714,7 @@ def get_vault_counts_by_week_and_community():
         func.count(Vault.id)
     ).filter(
         Vault.scheduled_at >= next_week_start,
-        Vault.scheduled_at <= next_week_end,
+        Vault.scheduled_at < next_week_end,  # Ensure similar logic
         Vault.is_posted == False
     ).group_by(Vault.community_id).all()
     
@@ -4712,7 +4725,7 @@ def get_vault_counts_by_week_and_community():
         func.count(Vault.id)
     ).filter(
         Vault.scheduled_at >= current_week_start,
-        Vault.scheduled_at <= current_week_end,
+        Vault.scheduled_at < current_week_end,  # Changed from <= to <
         Vault.is_posted == False
     ).group_by(
         func.date(Vault.scheduled_at),
@@ -4724,7 +4737,7 @@ def get_vault_counts_by_week_and_community():
         func.count(Vault.id)
     ).filter(
         Vault.created_at >= current_week_start,
-        Vault.created_at <= current_week_end,
+        Vault.created_at < current_week_end,  # Changed from <= to <
         Vault.is_posted == True
     ).scalar()
     
@@ -4745,7 +4758,7 @@ def get_daily_community_breakdown():
         func.count(Vault.id)
     ).filter(
         Vault.scheduled_at >= current_week_start,
-        Vault.scheduled_at <= current_week_end,
+        Vault.scheduled_at < current_week_end,  # Changed from <= to <
         Vault.is_posted == False
     ).group_by(
         func.date(Vault.scheduled_at),
@@ -4753,7 +4766,6 @@ def get_daily_community_breakdown():
     ).all()
     
     return daily_breakdown
-
 
 
 from flask import jsonify
@@ -5535,22 +5547,35 @@ def run_scraper():
                     "location": "Miami",
                     "proxy": {
                         "useApifyProxy": True,
-                        "apifyProxyGroups": ["RESIDENTIAL"]
+                        "apifyProxyGroups": [
+                            "RESIDENTIAL"
+                        ]
                     },
-                    "rows": 50
+                    "publishedAt": "r604800",
+                    "rows": 200,
+                    "workType": "1",
+                    "title": ""
                 }
                 current_app.logger.info("Starting LinkedIn jobs scraper")
                 run = client.actor("bebity/linkedin-jobs-scraper").call(run_input=run_input)
                 current_app.logger.info(f"LinkedIn jobs scraper run ID: {run['id']}")
                 
+                unique_companies = {}
+                
                 for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    company_name = item.get('companyName', '')
+                    
+                    if company_name not in unique_companies:
+                        unique_companies[company_name] = item
+                
+                for company_name, item in unique_companies.items():
                     existing_result = ScraperResult.query.filter_by(url=item.get('jobUrl', '')).first()
                     
                     if not existing_result:
                         scraper_result = ScraperResult(
                             url=item.get('jobUrl', ''),
                             title=item.get('title', ''),
-                            text=f"Company: {item.get('companyName', '')}\n"
+                            text=f"Company: {company_name}\n"
                                  f"Location: {item.get('location', '')}\n"
                                  f"Posted: {item.get('postedTime', '')}\n"
                                  f"Contract Type: {item.get('contractType', '')}\n"
@@ -5562,14 +5587,15 @@ def run_scraper():
                         try:
                             db.session.commit()
                             new_results += 1
-                            current_app.logger.debug(f"Added new LinkedIn job result: {item.get('jobUrl', '')}")
+                            current_app.logger.debug(f"Added new LinkedIn job result for company: {company_name}")
                         except IntegrityError:
                             db.session.rollback()
                             skipped_results += 1
                             current_app.logger.warning(f"IntegrityError for LinkedIn job URL: {item.get('jobUrl', '')}")
                     else:
                         skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing LinkedIn job result: {item.get('jobUrl', '')}")
+                        current_app.logger.debug(f"Skipped existing LinkedIn job result for company: {company_name}")
+
             else:
                 # Use website content crawler for other URLs
                 run_input = {
@@ -6161,6 +6187,48 @@ def initialize_embeddings():
         if event_index is None:
             event_index, event_ids = generate_and_save_event_embeddings()
 
+
+
+
+def load_json_data(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return json.load(file)
+    except UnicodeDecodeError:
+        # If UTF-8 fails, try with 'iso-8859-1' encoding
+        with open(file_path, 'r', encoding='iso-8859-1') as file:
+            return json.load(file)
+
+def categorize_venues(category):
+    json_file_path = "restaurants.json"  # File in root directory
+    try:
+        json_data = load_json_data(json_file_path)
+    except Exception as e:
+        return f"Error loading JSON file: {str(e)}"
+
+    for item in json_data:
+        # Try to find an existing venue
+        venue = Venue.query.filter_by(
+            title=item['title'],
+            street=item['street'],
+            city=item['city']
+        ).first()
+
+
+        if venue:
+            # Update existing venue's main_category
+            venue.main_category = category
+
+    db.session.commit()
+    return f"Categorization complete. Category: {category}"
+
+@app.route('/categorize/<category>')
+def categorize_route(category):
+    try:
+        result = categorize_venues(category)
+        return jsonify({"message": result}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
