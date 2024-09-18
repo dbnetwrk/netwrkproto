@@ -4536,7 +4536,7 @@ def get_five_second_moment(text):
     prompt = (
         "All great stories, regardless of length or depth or tone, tell the story of a five-second moment in a person's life.\n\n"
         "Every great story ever told is essentially about a five-second moment in the life of a human being, and the purpose of the story is to bring that moment to the greatest clarity possible.\n\n"
-        "I'm going to give you a post/story, and I need you to give me the five-second moment in one concise sentence, as though it is a universal theme\n\n"
+        "I'm going to give you a post/story, and I need you to give me the core feeling or realization in the five-second moment in one concise sentence.\n\n"
         f"{text}"
     )
 
@@ -4574,41 +4574,26 @@ def generate_story():
 
 def parse_seeder_info(seeder_info):
 
-    current_app.logger.debug(f"HERE IS WHERE WE ARE PARSING SEEDER INFO: {seeder_info}")
+    current_app.logger.debug(f"HERE IS SEEDER Info we are parsing: {seeder_info}")
+
+    # Use regular expressions to extract the information
+    pattern = r'\(([^)]+)\)'  # Matches anything inside parentheses
+    matches = re.findall(pattern, seeder_info)
     
-    if seeder_info.get('is_new'):
-        current_app.logger.debug(f"WE HAVE IDENTIFIED THAT SEEDER_INFO.GET IS NEW YES")
-        # New Seeder
-        return {
-            'name': seeder_info.get('name'),
-            'alias': seeder_info.get('alias'),
-            'state': seeder_info.get('state'),
-            'industry': seeder_info.get('industry'),
-            'neighborhood': seeder_info.get('neighborhood')
-        }
-    else:
-        # Existing Seeder
-        info_str = seeder_info.get('info', '')
-        try:
-            parts = info_str.split(')')
-            return {
-                'name': parts[0].split('(')[0].strip(),
-                'alias': parts[0].split('(')[1].strip(),
-                'vaults': parts[1].strip()[1:],  # Assuming parts[1] is "(5 vaults"
-                'state': parts[2].strip()[1:],   # Adjusted index
-                'industry': parts[3].strip()[1:],
-                'neighborhood': parts[4].strip()[1:]
-            }
-        except Exception as e:
-            current_app.logger.error(f"Error parsing existing seeder info: {e}")
-            return {
-                'name': None,
-                'alias': None,
-                'vaults': None,
-                'state': None,
-                'industry': None,
-                'neighborhood': None
-            }
+    # Initialize variables with default values
+    state = industry = neighborhood = "Unknown"
+    
+    # Extract information if available
+    if len(matches) >= 4:
+        state = matches[-3]
+        industry = matches[-2]
+        neighborhood = matches[-1]
+    
+    return {
+        "state": state,
+        "industry": industry,
+        "neighborhood": neighborhood
+    }
 
 
 def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info, scheduled_date):
@@ -4698,19 +4683,29 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
         formatted_date = "an unspecified date"
 
     user_prompt = (
-        f"I need you to write a story, in a paragraph, where the following happens:\n\n"
-        f"1. The beginning starts with the opposite of the five-second moment: \"{five_sec_moment}\".\n"
-        f"2. The five-second moment is realized towards the end.\n"
-        f"3. Use this local context in Miami as the backdrop for the story: {context}\n"
-        f"4. The story is scheduled to be posted on {formatted_date}.\n\n"
-        f"Write the story in the first person, in the style of a reddit post where you ask a question to spark engagement at the end. "
-        f"Write it as though it is coming from a transplant to Miami with the following characteristics:\n"
-        f"- From: {seeder_details['state']}\n"
-        f"- Industry: {seeder_details['industry']}\n"
-        f"- Living in: {seeder_details['neighborhood']} neighborhood\n"
-        f"Use a casual tone with 8th grade verbiage, and incorporate the seeder's background subtly into the story."
+        f"All great stories, regardless of length or depth or tone, tell the story of a five-second moment in a person's life. And the purpose of that story is to bring that moment to the greatest clarity possible. Everything included in the story should only serve to bring that five-second moment to the greatest possible clarity.\n\n"
+        f"I need you to write a story where the following happens:\n\n"
+        f"1. The five-second moment is this: {five_sec_moment}\n"
+        f"2. The five-second moment is realized towards the end of the story.\n"
+        f"3. The beginning starts with the opposite of the five-second moment.\n"
+        f"4. Use this local event/job posting/news article/restaurant/place as the backdrop for the story: {context}\n"
+        f"5. The story is written on {formatted_date}.\n"
+        f"6. Write the story in the first person, in the style of a reddit post, where you ask a question to spark engagement at the end.\n"
+        f"7. Write it as though it is coming from a recent transplant to Miami with the following characteristics:\n"
+        f"   - From: {seeder_details['state']}\n"
+        f"   - Works in: {seeder_details['industry']}\n"
+        f"   - Living in: {seeder_details['neighborhood']} neighborhood\n"
+        f"   - Age: 22-26\n"
+        f"8. Write in 8th grade verbiage, and incorporate the seeder's background subtly into the story.\n"
+        f"9. Write in a tone similar to this piece of text: \"Like it's like I've been seeing more and more of older people basically telling women to just have kids. Saying stuff like 'your career won't matter but kids do' brother maybe i like my career maybe I have hopes and dreams. Why would I give that up for a kid?\n"
+        f"Not to mention what if I end up unhappy In my marriage now you got people in my ear telling me to stay for the kids and if I do leave I'm expected to want majority custody or else I'm a terrible mother.\n"
+        f"Also your body is almost always cooked!\n"
+        f"It seems so exhausting being a mother with practically no reward and I feel like the older peeps will hear these issues and just tell you to have kids like why do they do that?\"\n"
+        f"10. The story should be two paragraphs.\n"
+        f"11. Wrap the story in <story> brackets.\n"
+        f"12. Start the story as close to the end as possible.\n"
+        f"13. If the reference data for the backdrop contains specific dates, include them in the story\n"
     )
-
     current_app.logger.info(f"HERE IS THE USER PROMPT WOOO: {user_prompt}")
 
 
@@ -4728,7 +4723,16 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
                 }
             ]
         )
-        generated_story = response.content[0].text.strip()
+        full_response = response.content[0].text.strip()
+        
+        # Extract text between <story> tags
+        story_pattern = r'<story>(.*?)</story>'
+        match = re.search(story_pattern, full_response, re.DOTALL)
+        
+        if match:
+            generated_story = match.group(1).strip()
+        else:
+            generated_story = "No story found in the generated content."
         
         return generated_story
     except Exception as e:
@@ -4745,18 +4749,23 @@ from collections import defaultdict
 
 @app.route('/generate_story_2', methods=['POST'])
 def generate_story_2():
-    data = request.json
-    five_sec_moment = data.get('five_sec_moment')
-    
-    
-    generated_story = generate_story_with_anthropic(
-        five_sec_moment, 
-        article_category, 
-        seeder_info, 
-        scheduled_date  # Pass the scheduled date
-    )
-    
-    return jsonify({'story': generated_story})
+    five_sec_moment = request.form.get('five_sec_moment')
+    article_category = request.form.get('article_category')
+    is_new_seeder = request.form.get('is_new_seeder') == 'true'
+    scheduled_date = request.form.get('scheduled_at')
+
+    if is_new_seeder:
+        seeder_info = json.loads(request.form.get('seeder_info'))
+        # Format seeder_info as needed for generate_story_with_anthropic
+        formatted_seeder_info = f"{seeder_info['full_name']} ({seeder_info['alias']}) (0 vaults) ({seeder_info['state']}) ({seeder_info['industry']}) ({seeder_info['neighborhood']})"
+    else:
+        formatted_seeder_info = request.form.get('seeder_info')
+
+    try:
+        story = generate_story_with_anthropic(five_sec_moment, article_category, formatted_seeder_info, scheduled_date)
+        return jsonify({'story': story})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/idea_factory_2/', methods=['GET', 'POST'])
@@ -5353,9 +5362,9 @@ answer the above question with Y or N at each output.
 
     try:
         if sentence_type == 'controversial':
-            user_prompt = f"Based on the following reddit post, come up with one controversial sentence that could be added to the post before posting it: \n\n{content}<think>"
+            user_prompt = f"Based on the following reddit post, come up with one controversial sentence that could be added to the post before posting it: \n\n{content} Wrap the sentence in <sentence> brackets <think>"
         elif sentence_type == 'anxiety':
-            user_prompt = f"Based on the following reddit post, come up with one sentence that could be added to the post before posting it that would invoke anxiety in the reader:\n\n{content}<think>"
+            user_prompt = f"Based on the following reddit post, come up with one sentence that could be added to the post before posting it that would invoke anxiety in the reader:\n\n{content} Wrap the sentence in <sentence> brackets <think>"
         else:
             return jsonify({'error': 'Invalid sentence type'}), 400
 
@@ -5371,16 +5380,16 @@ answer the above question with Y or N at each output.
                 }
             ]
         )
-    
-        generated_sentence = response.content[0].text.strip()    
-        match = re.findall(r'"([^"]*)"', generated_sentence)  # This will find all text within quotation marks
+
+        generated_sentence = response.content[0].text.strip()
+        match = re.search(r'<sentence>(.*?)</sentence>', generated_sentence, re.DOTALL)
 
         if match:
-            # Return the first match (assuming you're interested in the first quoted text)
-            return jsonify({'sentence': match[0]})
+            # Return the content within the <sentence> tags
+            return jsonify({'sentence': match.group(1).strip()})
         else:
-            # Handle cases where no text is found within quotes
-            return jsonify({'sentence': generated_sentence})
+            # Handle cases where no text is found within <sentence> tags
+            return jsonify({'error': 'No sentence found within tags'}), 400
 
     except Exception as e:
         print(f"Error generating sentence: {str(e)}")

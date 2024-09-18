@@ -2,8 +2,8 @@
 
 {% block content %}
 <div class="container">
-    <h2>Netwrk Idea Factory</h2>
-    <p>Welcome to the Netwrk Idea Factory. This is where ideas are born.</p>
+    <h2>Netwrk Story Factory</h2>
+    <p>Welcome to the Netwrk Idea Factory. This is where stories are born.</p>
     <form method="POST" action="{{ url_for('idea_factory_2') }}">
         <div class="mb-3">
             <label for="community" class="form-label">Select a Community:</label>
@@ -38,16 +38,7 @@
         </div>
 
 
-        <div class="mb-3">
-            <label for="article_category" class="form-label">Select Article Category:</label>
-            <select class="form-select" id="article_category" name="article_category">
-                <option value="FOOD">Food</option>
-                <option value="SCENES">Scenes</option>
-                <option value="CAREER">Career</option>
-                <option value="VENUE">Venue</option>
-                <option value="RESTAURANTS">Restaurants</option>
-            </select>
-        </div>
+        
 
         <button type="submit" class="btn btn-primary">Scrape</button>
     </form>
@@ -66,14 +57,38 @@
                     {% endif %}
                     {% if result.content %}
                     <p class="card-text">{{ result.content | truncate_lines | safe }}</p>
-                    <p class="card-text">{{ result.ai_content | truncate_lines | safe }}</p>
+                    <p class="card-text ai-content">{{ result.ai_content | truncate_lines | safe }}</p>
                     {% endif %}
+
+
+                    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#collapseForm{{ loop.index }}" aria-expanded="false" aria-controls="collapseForm{{ loop.index }}">
+                    <i class="fas fa-chevron-down"></i> Toggle Form
+                </button>
+
+                 <div class="collapse" id="collapseForm{{ loop.index }}">
 
                     <!-- Vault Form Embedded Directly into the Card -->
                     <form method="POST" action="{{ url_for('vault_post') }}" class="vault-form" data-index="{{ loop.index }}">
+                    
+
                         <div class="mb-3">
-                            <p>{{ result.ai_content }}</p>
+                            <label for="scheduled_at{{ loop.index }}" class="form-label">Schedule Post (optional)</label>
+                            <input type="datetime-local" class="form-control" id="scheduled_at{{ loop.index }}" name="scheduled_at">
                         </div>
+
+                        
+
+                        <div class="mb-3">
+            <label for="article_category" class="form-label">Select Article Category:</label>
+            <select class="form-select" id="article_category" name="article_category">
+                <option value="FOOD">Food</option>
+                <option value="SCENES">Scenes</option>
+                <option value="CAREER">Career</option>
+                <option value="VENUE">Venue</option>
+                <option value="RESTAURANTS">Restaurants</option>
+            </select>
+        </div>
+
                         <div class="mb-3">
                             <label for="seeder_id{{ loop.index }}" class="form-label">Select Official Seeder:</label>
                             <select class="form-select" name="seeder_id" id="seeder_id{{ loop.index }}">
@@ -135,6 +150,9 @@
                                 <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
                             </div>
                         </div>
+                        <button type="button" class="btn btn-primary" onclick="generateStory({{ loop.index }})">
+    Generate Story
+</button>
                         <button type="button" class="btn btn-warning" onclick="generateSentence({{ loop.index }}, 'controversial')">
                             Controversial
                         </button>
@@ -149,6 +167,8 @@
                         {% else %}
                             <button type="button" class="btn btn-secondary disabled">No related article available</button>
                         {% endif %}
+
+                        <div id="generatedStory{{ loop.index }}" class="generated-story mb-3"></div>
 
                         <div id="generatedSentence{{ loop.index }}"></div>
 
@@ -170,13 +190,11 @@
                         </div>
                         
 
-                        <div class="mb-3">
-                            <label for="scheduled_at{{ loop.index }}" class="form-label">Schedule Post (optional)</label>
-                            <input type="datetime-local" class="form-control" id="scheduled_at{{ loop.index }}" name="scheduled_at">
-                        </div>
+                        
 
                         <button type="submit" class="btn btn-secondary">Vault Post</button>
                     </form>
+                </div>
                 </div>
             </div>
         </div>
@@ -189,22 +207,107 @@
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.0/js/bootstrap.min.js"></script>
 
 <script>
-function generateSentence(index, type) {
-    const content = document.querySelector(`#postCard${index} .vault-form .mb-3 p`).innerText;
-    fetch('/generate_sentence', {
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click event listeners to all collapse toggle buttons
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const icon = this.querySelector('i');
+            if (icon.classList.contains('fa-chevron-down')) {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        });
+    });
+});
+
+
+
+
+function generateStory(index) {
+    const form = document.querySelector(`#postCard${index} .vault-form`);
+    const formData = new FormData(form);
+    
+    // Check if we're using a new seeder or an existing one
+    const newSeederForm = document.getElementById(`newSeederForm${index}`);
+    let seederInfo;
+
+    if (newSeederForm.style.display !== 'none') {
+        // New seeder form is visible, collect data from it
+        seederInfo = {
+            full_name: document.getElementById(`new_seeder_name${index}`).value,
+            alias: document.getElementById(`new_seeder_alias${index}`).value,
+            state: document.getElementById(`new_seeder_state${index}`).value,
+            industry: document.getElementById(`new_seeder_industry${index}`).value,
+            neighborhood: document.getElementById(`new_seeder_neighborhood${index}`).value
+        };
+        formData.append('seeder_info', JSON.stringify(seederInfo));
+        formData.append('is_new_seeder', 'true');
+    } else {
+        // Using existing seeder
+        const seederSelect = document.getElementById(`seeder_id${index}`);
+        const seederOption = seederSelect.options[seederSelect.selectedIndex];
+        seederInfo = seederOption.text;
+        formData.append('seeder_info', seederInfo);
+        formData.append('is_new_seeder', 'false');
+    }
+
+    // Add other necessary data to formData
+    formData.append('index', index);
+    
+    // Get the content from the textarea
+    const content = document.querySelector(`#postCard${index} .ai-content`).textContent;
+    formData.append('five_sec_moment', content);
+
+    fetch('/generate_story_2', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content: content, type: type }),
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
-        document.getElementById(`generatedSentence${index}`).innerText = data.sentence;
+        if (data.error) {
+            console.error('Error:', data.error);
+            document.getElementById(`generatedStory${index}`).innerText = 'Failed to generate story';
+        } else {
+            document.getElementById(`generatedStory${index}`).innerText = data.story;
+        }
     })
     .catch((error) => {
         console.error('Error:', error);
+        document.getElementById(`generatedStory${index}`).innerText = 'Error generating story';
     });
+}
+
+
+
+function generateSentence(index, type) {
+    const generatedStoryElement = document.getElementById(`generatedStory${index}`);
+    
+    if (generatedStoryElement && generatedStoryElement.innerText.trim() !== '') {
+        const content = generatedStoryElement.innerText;
+        
+        fetch('/generate_sentence', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: content, type: type }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById(`generatedSentence${index}`).innerText = data.sentence;
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            document.getElementById(`generatedSentence${index}`).innerText = 'Error generating sentence';
+        });
+    } else {
+        console.error('No generated story found to create sentence from');
+        document.getElementById(`generatedSentence${index}`).innerText = 'Error: No generated story available';
+    }
 }
 
 function toggleNewSeederForm(index) {

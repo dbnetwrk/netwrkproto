@@ -97,12 +97,12 @@
                                 <label for="new_seeder_profile_picture{{ loop.index }}" class="form-label">Profile Picture</label>
                                 <input type="file" class="form-control" id="new_seeder_profile_picture{{ loop.index }}" name="new_seeder_profile_picture">
                             </div>
-                            <div class="mb-3">
+                                <div class="mb-3">
                                 <label for="new_seeder_state{{ loop.index }}" class="form-label">State</label>
                                 <select class="form-select" id="new_seeder_state{{ loop.index }}" name="new_seeder_state">
                                     <option value="">Select a state</option>
                                     {% for state in State %}
-                                    <option value="{{ state.name }}">{{ state.name }}</option>
+                                    <option value="{{ state.name }}">{{ state.value }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -480,12 +480,15 @@ function generateStory(index) {
     const newSeederForm = document.getElementById(`newSeederForm${index}`);
     
     if (newSeederForm.style.display === 'block') {
+
+        var stateSelect = document.getElementById(`new_seeder_state${index}`);
+        
         // New Seeder
         seederInfo = {
             is_new: true,
             name: document.getElementById(`new_seeder_name${index}`).value,
             alias: document.getElementById(`new_seeder_alias${index}`).value,
-            state: document.getElementById(`new_seeder_state${index}`).value,
+            state: document.getElementById(`new_seeder_state${index}`).options[document.getElementById(`new_seeder_state${index}`).selectedIndex].value,
             industry: document.getElementById(`new_seeder_industry${index}`).value,
             neighborhood: document.getElementById(`new_seeder_neighborhood${index}`).value
         };
