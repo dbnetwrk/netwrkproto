@@ -3969,11 +3969,28 @@ def show_delete_page():
 #ai comment prompt management
 
 
+from sqlalchemy import case
+
 @app.route('/ai_comment_prompts')
 def ai_comment_prompts():
-    prompts = AICommentPrompt.query.all()
+    # Query and sort top-level prompts
+    top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level').order_by(
+        case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
+        AICommentPrompt.id  # Then sort by ID
+    ).all()
+
+    # Query and sort reply prompts
+    reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply').order_by(
+        case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
+        AICommentPrompt.id  # Then sort by ID
+    ).all()
+
     communities = Community.query.all()
-    return render_template('ai_comment_prompts.html', prompts=prompts, communities=communities)
+    
+    return render_template('ai_comment_prompts.html', 
+                           top_level_prompts=top_level_prompts, 
+                           reply_prompts=reply_prompts, 
+                           communities=communities)
 
 @app.route('/add_ai_comment_prompt', methods=['POST'])
 def add_ai_comment_prompt():
@@ -4058,22 +4075,22 @@ def resolve_prompt_template(prompt, post_content):
         return prompt.prompt
 
     if prompt.data_type == 'venue':
-        item = find_diverse_recommendation(post_content, 'venue')
-        current_app.logger.debug(f"Found venue: {item.title if item else 'None'}")
+        items = find_diverse_recommendations(post_content, 'venue', num_recommendations=10)
+        current_app.logger.debug(f"Found venues: {[item.title for item in items if item]}")
     elif prompt.data_type == 'scraper_result':
-        item = find_diverse_recommendation(post_content, 'event')
-        current_app.logger.debug(f"Found event: {item.title if hasattr(item, 'title') else 'None'}")
+        items = find_diverse_recommendations(post_content, 'event', num_recommendations=10)
+        current_app.logger.debug(f"Found events: {[item.title if hasattr(item, 'title') else 'None' for item in items]}")
     else:
         return prompt.prompt  # Fallback to original prompt if data_type is not recognized
 
-    if not item:
-        return prompt.prompt  # Fallback to original prompt if no recommendation found
+    if not items:
+        return prompt.prompt  # Fallback to original prompt if no recommendations found
 
-    # Create a formatted string representation of the entire object
-    item_info = format_item_info(item)
+    # Create a formatted string representation of all items
+    items_info = "\n\n".join([format_item_info(item) for item in items])
 
-    # Replace the placeholder in the prompt with the formatted item info
-    resolved_prompt = prompt.prompt.replace('{item}', item_info)
+    # Replace the placeholder in the prompt with the formatted items info
+    resolved_prompt = prompt.prompt.replace('{item}', items_info)
 
     current_app.logger.debug(f"Here is the resolved prompt: {resolved_prompt}")
 
@@ -6889,29 +6906,20 @@ def select_diverse_item(items, post_text, similarity_threshold=0.7):
     return max(valid_items, key=lambda x: x[1])[0]
 
 
-def find_diverse_recommendation(post_text, item_type='venue', k=10, similarity_threshold=0.7):
-
-    global venue_index, venue_ids, event_index, event_ids
+def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_threshold=0.7, num_recommendations=10):
     if item_type == 'venue':
         top_items = find_top_k_similar_venues(post_text, k)
     else:
         top_items = find_top_k_similar_events(post_text, k)
     
     if not top_items:
-        return None
+        return []
 
     post_embedding = model.encode(post_text)
     item_embeddings = [model.encode(get_item_text(item)) for item in top_items]
     
     # Calculate similarities to the post
     similarities_to_post = [np.dot(post_embedding, item_emb) / (np.linalg.norm(post_embedding) * np.linalg.norm(item_emb)) for item_emb in item_embeddings]
-    
-    # Exclude the most similar item (likely the exact match)
-    if len(top_items) > 1:
-        most_similar_index = similarities_to_post.index(max(similarities_to_post))
-        top_items = top_items[:most_similar_index] + top_items[most_similar_index+1:]
-        item_embeddings = item_embeddings[:most_similar_index] + item_embeddings[most_similar_index+1:]
-        similarities_to_post = similarities_to_post[:most_similar_index] + similarities_to_post[most_similar_index+1:]
     
     # Calculate diversity scores
     diversity_scores = []
@@ -6928,10 +6936,10 @@ def find_diverse_recommendation(post_text, item_type='venue', k=10, similarity_t
     valid_items = [(item, score) for item, sim, score in zip(top_items, similarities_to_post, combined_scores) if sim >= similarity_threshold]
     
     if not valid_items:
-        return top_items[0] if top_items else None  # Return the most similar item if no items meet the threshold
+        return top_items[:num_recommendations]  # Return the most similar items if no items meet the threshold
     
-    # Return the item with the highest combined score
-    return max(valid_items, key=lambda x: x[1])[0]
+    # Sort by combined score and return the top num_recommendations
+    return [item for item, _ in sorted(valid_items, key=lambda x: x[1], reverse=True)[:num_recommendations]]
 
 @app.route('/generate_comment', methods=['POST'])
 def generate_comment():
