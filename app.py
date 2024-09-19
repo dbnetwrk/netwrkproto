@@ -5957,12 +5957,30 @@ def edit_vault(vault_id):
 @app.route('/update-vault/<int:vault_id>', methods=['POST'])
 def update_vault(vault_id):
     vault = Vault.query.get_or_404(vault_id)
-    vault.title = request.form['title']
-    vault.content = request.form['content']
-    vault.community_id = request.form['community']  # Update community_id based on user selection
-    vault.seeder_id = request.form['seeder_id']  # Update seeder_id based on user selection
-
-    db.session.commit()
+    
+    try:
+        vault.title = request.form['title']
+        vault.content = request.form['content']
+        vault.community_id = request.form['community']
+        vault.seeder_id = request.form['seeder_id']
+        
+        # Handle the scheduled date
+        scheduled_at = request.form.get('scheduled_at')
+        if scheduled_at:
+            try:
+                vault.scheduled_at = datetime.strptime(scheduled_at, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                flash('Invalid date format. Please use the date picker.', 'error')
+                return redirect(url_for('edit_vault', vault_id=vault.id))
+        else:
+            vault.scheduled_at = None
+        
+        db.session.commit()
+        flash('Vault updated successfully.', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        flash(f'An error occurred while updating the vault: {str(e)}', 'error')
+    
     return redirect(url_for('vault_interface'))
 
 
