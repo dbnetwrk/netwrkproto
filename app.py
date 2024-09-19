@@ -4051,13 +4051,18 @@ from threading import Thread
 @app.route('/start_seed_job', methods=['POST'])
 def start_seed_job():
     content_type = request.form.get('content_type')
+    comments_per_item = int(request.form.get('comments_per_item', 1))
     
     if content_type not in ['post', 'vault']:
         flash('Invalid content type selected.')
         return redirect(url_for('ai_comment_prompts'))
     
+    if comments_per_item < 1:
+        flash('Number of comments per item must be at least 1.')
+        return redirect(url_for('ai_comment_prompts'))
+    
     # Start the job in a background thread
-    thread = Thread(target=generate_comments_for_all_items, args=(content_type,))
+    thread = Thread(target=generate_comments_for_all_items, args=(content_type, comments_per_item))
     thread.start()
     
     flash('Comment generation started!')
@@ -4138,7 +4143,7 @@ def toggle_ai_comment_prompt(id):
     return redirect(url_for('ai_comment_prompts'))
 
 
-def generate_comments_for_all_items(content_type='post'):
+def generate_comments_for_all_items(content_type='post', comments_per_item=1):
     with app.app_context():
         top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level', is_active=True).all()
         reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply', is_active=True).all()
@@ -4164,8 +4169,10 @@ def generate_comments_for_all_items(content_type='post'):
         
         for item in items:
             item_context = f"You're in a conversation with your friend. Your friend just said this: {item.title}\nContent: {item.content}\n\n"
+
+            selected_prompts = random.sample(top_level_prompts, min(comments_per_item, len(top_level_prompts)))
             
-            for prompt in top_level_prompts:
+            for prompt in selected_prompts:
                 if content_type == 'post':
                     commenter = User.query.filter(User.seeder == True, User.id != item.user_id).order_by(func.random()).first()
                 else:  # vault
@@ -4722,6 +4729,7 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
         f"11. Wrap the story in <story> brackets.\n"
         f"12. Start the story close to the ending\n"
         f"13. If the reference data for the backdrop contains specific dates, include them in the story\n"
+        f"<think>\n"
     )
     current_app.logger.info(f"HERE IS THE USER PROMPT WOOO: {user_prompt}")
 
@@ -4755,6 +4763,142 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
     except Exception as e:
         current_app.logger.error(f"Failed to generate story: {str(e)}")
         return "Failed to generate story."
+
+
+## DISCUSSION FACTORY ##
+
+
+def discussion_question_generator(text):
+    emotions = ["controversial", "anxiety", None]
+    chosen_emotion = random.choice(emotions)
+    
+    emotion_prompt = (
+        f"Emotion you want to invoke in the audience: {chosen_emotion}\n\n"
+        if chosen_emotion
+        else ""
+    )
+    
+    prompt = (
+        f"You are a discussion question generator. Your goal is to generate a discussion question that results in people commenting. Here are the specifications:\n\n"
+        f"Give a concise, one sentence discussion question that is based on this piece of text: \n\n"
+        f"{text}\n\n"
+        f"Use 8th grade verbiage\n\n"
+        f"Wrap your response in <question> brackets\n\n"
+        f"The community does not know about the article you are referencing\n\n"
+        f"The community is recent transplants to Miami that are between 22-26 years old\n\n"
+        f"{emotion_prompt} <think>"
+    )
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20240620",
+            max_tokens=500,
+            temperature=0.8,
+            system=super_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+        full_response = response.content[0].text.strip()
+        
+        current_app.logger.debug(f"Full response: {full_response}")
+        
+        # Extract text between <question> tags
+        match = re.search(r'<question>(.*?)</question>', full_response, re.DOTALL)
+        if match:
+            discussion_question = match.group(1).strip()
+        else:
+            # If no match, return the full response
+            discussion_question = full_response
+        
+        current_app.logger.debug(f"Extracted question: {discussion_question}")
+        return discussion_question
+    except Exception as e:
+        current_app.logger.error(f"Failed to extract discussion question: {str(e)}")
+        return None
+
+
+@app.route('/discussion_factory/', methods=['GET', 'POST'])
+def discussion_factory():
+    communities = Community.query.options(joinedload(Community.subreddits)).all()
+    community_dict = {c.id: c.name for c in communities}
+    seeders_with_counts = db.session.query(
+        OfficialSeeder,
+        func.count(Vault.id).label('vault_count')
+    ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
+    
+    if request.method == 'POST':
+        clear_image_directory()
+        number_of_posts = int(request.form.get('number_of_posts', 100))
+        article_category = request.form.get('article_category')
+        session_data = {
+            'number_of_posts': number_of_posts
+        }
+        session.update(session_data)
+        results = []
+
+        # Fetch ScraperResult objects matching the category
+        scraper_results = ScraperResult.query.filter_by(category=article_category).all()
+
+        if scraper_results:
+            # If there are fewer results than requested, we'll need to repeat some
+            results_needed = max(number_of_posts, len(scraper_results))
+            
+            for i in range(results_needed):
+                # Use modulo to cycle through available results if needed
+                scraper_result = scraper_results[i % len(scraper_results)]
+                
+                article = {
+                    'url': scraper_result.url,
+                    'title': scraper_result.title,
+                    'text': scraper_result.text,
+                    'category': scraper_result.category
+                }
+                results.append(article)
+        
+        # Shuffle the results to mix up any repeated entries
+        random.shuffle(results)
+
+        # Trim results to the requested number if we ended up with more
+        results = results[:number_of_posts]
+
+        # Generate the discussion content
+        for article in results:
+            full_text = f"Title: {article.get('title', '')}\n\n{article['text']}"
+            modified_content = discussion_question_generator(full_text)
+            article['ai_content'] = modified_content
+
+        text_results = [article for article in results]
+
+        if text_results:
+            flash(f"Scraped and processed {len(text_results)} text posts")
+
+        return render_template(
+            'discussion_factory.html',
+            results=text_results,
+            communities=communities,
+            session=session,
+            seeders_with_counts=seeders_with_counts,
+            State=State,
+            Industry=Industry,
+            Neighborhood=Neighborhood,
+            community_dict=community_dict,  # Pass community_dict to template
+        )
+
+    return render_template(
+        'discussion_factory.html',
+        communities=communities,
+        session=session,
+        seeders_with_counts=seeders_with_counts,
+        State=State,
+        Industry=Industry,
+        Neighborhood=Neighborhood,
+        community_dict=community_dict  # Pass community_dict to template
+    )
+
+
 
 
 
@@ -5387,7 +5531,7 @@ answer the above question with Y or N at each output.
 
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20240620",
-            max_tokens=100,
+            max_tokens=500,
             temperature=0.8,
             system=super_prompt,
             messages=[

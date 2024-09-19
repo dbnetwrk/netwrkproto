@@ -1,0 +1,425 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Netwrk Discussion Factory</h2>
+    <p>Welcome to the Netwrk discussion Factory. This is where discussions are born.</p>
+    <form method="POST" action="{{ url_for('discussion_factory') }}">
+        
+
+        
+
+        <div class="mb-3">
+            <label for="number_of_posts" class="form-label">Number of Discussions to Generate</label>
+            <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ session.get('number_of_posts', 100) }}">
+        </div>
+
+
+        <div class="mb-3">
+    <label for="article_category" class="form-label">Select Article Category:</label>
+    <select class="form-select" id="article_category" name="article_category">
+        <option value="FOOD">Food</option>
+        <option value="SCENES">Scenes</option>
+        <option value="CAREER">Career</option>
+        
+    </select>
+</div>
+
+        
+
+        <button type="submit" class="btn btn-primary">Scrape</button>
+    </form>
+
+    <div class="row mt-2">
+        {% for result in results %}
+        <div class="col-12 mb-3" id="postCard{{ loop.index }}">
+            <div class="card">
+                <div class="card-body">
+                    <p class="card-subtitle text-muted">{{ result.url }}</p>
+                    {% if result.title %}
+                    <h4 class="card-title">{{ result.title }}</h4>
+                    {% endif %}
+                    {% if result.text %}
+                    <p class="card-text">{{ result.text[:100] | truncate_lines | safe }}</p>
+                    <p class="card-text ai-content">{{ result.ai_content}}</p>
+                    {% endif %}
+
+
+                    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#collapseForm{{ loop.index }}" aria-expanded="false" aria-controls="collapseForm{{ loop.index }}">
+                    <i class="fas fa-chevron-down"></i> Toggle Form
+                </button>
+
+                 <div class="collapse" id="collapseForm{{ loop.index }}">
+
+                    <!-- Vault Form Embedded Directly into the Card -->
+                    <form method="POST" action="{{ url_for('vault_post') }}" class="vault-form" data-index="{{ loop.index }}">
+                    
+
+                        <div class="mb-3">
+                            <label for="scheduled_at{{ loop.index }}" class="form-label">Schedule Post (optional)</label>
+                            <input type="datetime-local" class="form-control" id="scheduled_at{{ loop.index }}" name="scheduled_at">
+                        </div>
+
+                        
+
+
+                        <div class="mb-3">
+                            <label for="seeder_id{{ loop.index }}" class="form-label">Select Official Seeder:</label>
+                            <select class="form-select" name="seeder_id" id="seeder_id{{ loop.index }}">
+                                {% for seeder, vault_count in seeders_with_counts %}
+                                <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias }}) ({{ vault_count }} vaults) ({{ seeder.state.value }}) ({{ seeder.industry.value }}) ({{ seeder.neighborhood.value }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <input type="hidden" name="reddit_post_id" value="{{ result.reddit_post_id }}">
+
+                        <button type="button" class="btn btn-secondary" onclick="toggleNewSeederForm({{ loop.index }})">Create New Seeder</button>
+
+                        <!-- New Seeder Form (initially hidden) -->
+                        <div id="newSeederForm{{ loop.index }}" style="display: none;">
+                            <h6>Create New Seeder</h6>
+                            <div class="mb-3">
+                                <label for="new_seeder_name{{ loop.index }}" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="new_seeder_name{{ loop.index }}" name="new_seeder_name">
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_seeder_alias{{ loop.index }}" class="form-label">Alias</label>
+                                <input type="text" class="form-control" id="new_seeder_alias{{ loop.index }}" name="new_seeder_alias">
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_seeder_profile_picture{{ loop.index }}" class="form-label">Profile Picture</label>
+                                <input type="file" class="form-control" id="new_seeder_profile_picture{{ loop.index }}" name="new_seeder_profile_picture">
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_seeder_state{{ loop.index }}" class="form-label">State</label>
+                                <select class="form-select" id="new_seeder_state{{ loop.index }}" name="new_seeder_state">
+                                    <option value="">Select a state</option>
+                                    {% for state in State %}
+                                    <option value="{{ state.name }}">{{ state.value }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_seeder_industry{{ loop.index }}" class="form-label">Industry</label>
+                                <select class="form-select" id="new_seeder_industry{{ loop.index }}" name="new_seeder_industry">
+                                    <option value="">Select an industry</option>
+                                    {% for industry in Industry %}
+                                    <option value="{{ industry.name }}">{{ industry.value }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_seeder_neighborhood{{ loop.index }}" class="form-label">Neighborhood</label>
+                                <select class="form-select" id="new_seeder_neighborhood{{ loop.index }}" name="new_seeder_neighborhood">
+                                    <option value="">Select a neighborhood</option>
+                                    {% for neighborhood in Neighborhood %}
+                                    <option value="{{ neighborhood.name }}">{{ neighborhood.value }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase{{ loop.index }}" name="new_seeder_types_lowercase">
+                                <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
+                            </div>
+                        </div>
+                        
+                        
+
+                        <div class="mb-3">
+                            <label for="title{{ loop.index }}" class="form-label">Title</label>
+                            <input type="text" class="form-control" name="title" id="title{{ loop.index }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="content{{ loop.index }}" class="form-label">Content</label>
+                            <textarea class="form-control" name="content" id="content{{ loop.index }}"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="community_id{{ loop.index }}" class="form-label">Select Community</label>
+                            <select class="form-select" name="community_id" id="community_id{{ loop.index }}">
+                                {% for community in communities %}
+                                <option value="{{ community.id }}">{{ community.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+
+                        
+
+                        <button type="submit" class="btn btn-secondary">Vault Post</button>
+                    </form>
+                </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.0/js/bootstrap.min.js"></script>
+
+<script>
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click event listeners to all collapse toggle buttons
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const icon = this.querySelector('i');
+            if (icon.classList.contains('fa-chevron-down')) {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        });
+    });
+});
+
+
+
+
+function generateStory(index) {
+    const form = document.querySelector(`#postCard${index} .vault-form`);
+    const formData = new FormData(form);
+    
+    // Check if we're using a new seeder or an existing one
+    const newSeederForm = document.getElementById(`newSeederForm${index}`);
+    let seederInfo;
+    if (newSeederForm.style.display !== 'none') {
+        // New seeder form is visible, collect data from it
+        seederInfo = {
+            full_name: document.getElementById(`new_seeder_name${index}`).value,
+            alias: document.getElementById(`new_seeder_alias${index}`).value,
+            state: document.getElementById(`new_seeder_state${index}`).value,
+            industry: document.getElementById(`new_seeder_industry${index}`).value,
+            neighborhood: document.getElementById(`new_seeder_neighborhood${index}`).value
+        };
+        formData.append('seeder_info', JSON.stringify(seederInfo));
+        formData.append('is_new_seeder', 'true');
+    } else {
+        // Using existing seeder
+        const seederSelect = document.getElementById(`seeder_id${index}`);
+        const seederOption = seederSelect.options[seederSelect.selectedIndex];
+        seederInfo = seederOption.text;
+        formData.append('seeder_info', seederInfo);
+        formData.append('is_new_seeder', 'false');
+    }
+    // Add other necessary data to formData
+    formData.append('index', index);
+    
+    // Get the content from the textarea
+    const content = document.querySelector(`#postCard${index} .ai-content`).textContent;
+    formData.append('five_sec_moment', content);
+    fetch('/generate_story_2', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error:', data.error);
+            document.getElementById(`generatedStory${index}`).innerText = 'Failed to generate story';
+        } else {
+            document.getElementById(`generatedStory${index}`).innerText = data.story;
+            
+            // Update the source button
+            const sourceButton = document.querySelector(`#postCard${index} .source-button`);
+            if (data.article_url) {
+                sourceButton.href = data.article_url;
+                sourceButton.classList.remove('btn-secondary', 'disabled');
+                sourceButton.classList.add('btn-primary');
+                sourceButton.innerText = 'Source';
+            } else {
+                sourceButton.removeAttribute('href');
+                sourceButton.classList.remove('btn-primary');
+                sourceButton.classList.add('btn-secondary', 'disabled');
+                sourceButton.innerText = 'No related article available';
+            }
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        document.getElementById(`generatedStory${index}`).innerText = 'Error generating story';
+    });
+}
+
+
+
+function generateSentence(index, type) {
+    const generatedStoryElement = document.getElementById(`generatedStory${index}`);
+    
+    if (generatedStoryElement && generatedStoryElement.innerText.trim() !== '') {
+        const content = generatedStoryElement.innerText;
+        
+        fetch('/generate_sentence', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: content, type: type }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById(`generatedSentence${index}`).innerText = data.sentence;
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            document.getElementById(`generatedSentence${index}`).innerText = 'Error generating sentence';
+        });
+    } else {
+        console.error('No generated story found to create sentence from');
+        document.getElementById(`generatedSentence${index}`).innerText = 'Error: No generated story available';
+    }
+}
+
+function toggleNewSeederForm(index) {
+    var form = document.getElementById('newSeederForm' + index);
+    if (form.style.display === 'none') {
+        form.style.display = 'block';
+    } else {
+        form.style.display = 'none';
+    }
+}
+
+$(document).ready(function() {
+    $('.vault-form').on('submit', function(e) {
+        e.preventDefault();
+        var form = $(this);
+        var postIndex = form.data('index');
+        var cardId = '#postCard' + postIndex;
+
+        // Create a FormData object to handle file uploads if needed
+        var formData = new FormData(this);
+
+        $.ajax({
+            type: "POST",
+            url: form.attr('action'),
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                alert('Post Vaulted Successfully');
+                $(cardId).fadeOut();
+            },
+            error: function(xhr, status, error) {
+                alert('Error vaulting post: ' + error);
+            }
+        });
+    });
+});
+
+function generateVenue(index) {
+    fetch('/random_venue2')
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error:', data.error);
+            document.getElementById(`generatedSentence${index}`).innerText = 'Failed to fetch venue';
+        } else {
+            const venueInfo = `
+                <strong>${data.title}</strong><br>
+                Review count: ${data.reviews_count}<br>
+                Neighborhood: ${data.neighborhood}<br>
+                <a href="${data.google_search_url}" target="_blank">Google Search</a>
+            `;
+            document.getElementById(`generatedSentence${index}`).innerHTML = venueInfo;
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        document.getElementById(`generatedSentence${index}`).innerText = 'Error fetching venue';
+    });
+}
+
+function updateSeeders(communityId, index) {
+    fetch(`/get_seeders_community/${communityId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error(data.error);
+                return;
+            }
+            const userDropdownMenu = document.getElementById('userDropdownMenu' + index);
+            userDropdownMenu.innerHTML = '';
+            data.forEach(seeder => {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `
+                    <a class="dropdown-item d-flex align-items-center" href="#" onclick="selectSeeder(${seeder.id}, '${seeder.name}', ${index})">
+                        <img src="${seeder.profile_picture}" alt="${seeder.name}" class="seeder-img">
+                        <span>${seeder.name}</span>
+                    </a>`;
+                userDropdownMenu.appendChild(listItem);
+            });
+        })
+        .catch(error => console.error('Error fetching seeders:', error));
+}
+
+function selectSeeder(userId, userName, index) {
+    document.getElementById('seeder_id' + index).value = userId;
+    document.getElementById('userDropdown' + index).textContent = userName;
+    fetchSeederInfo(userId, index);
+}
+
+function fetchSeederInfo(userId, index) {
+    if (!userId) return;
+    var aboutDiv = document.getElementById('aboutSeeder' + index);
+    var profilePic = document.getElementById('profilePicture' + index);
+    if (!aboutDiv) return;
+
+    fetch(`/get_seeder_info/${userId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to fetch');
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                console.error(data.error);
+                aboutDiv.innerText = 'No information available';
+                profilePic.style.display = 'none';
+                return;
+            }
+            aboutDiv.innerText = data.about_me || 'No information provided';
+            if (data.profile_picture) {
+                profilePic.src = data.profile_picture;
+                profilePic.style.display = 'block';
+            } else {
+                profilePic.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching seeder info:', error);
+            aboutDiv.innerText = 'Error loading information';
+            profilePic.style.display = 'none';
+        });
+}
+</script>
+
+<style>
+.card-subtitle {
+    font-size: 0.8rem;
+    color: gray;
+}
+
+.dropdown-item.d-flex {
+    display: flex;
+    align-items: center;
+}
+
+.seeder-img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.dropdown-menu {
+    max-height: 200px; /* Set the max height of the dropdown */
+    overflow-y: auto;  /* Enable vertical scrolling */
+}
+</style>
+
+{% endblock %}

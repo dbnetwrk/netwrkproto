@@ -4,16 +4,17 @@
     <h2>AI Comment Prompts</h2>
     
     <form method="POST" action="{{ url_for('start_seed_job') }}" class="mb-3">
-        <div class="input-group mb-3">
-            <select name="content_type" class="form-control" required>
-                <option value="vault">Vaults</option>
-                <option value="post">Posts</option>
-            </select>
-            <div class="input-group-append">
-                <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
-            </div>
+    <div class="input-group mb-3">
+        <select name="content_type" class="form-control" required>
+            <option value="vault">Vaults</option>
+            <option value="post">Posts</option>
+        </select>
+        <input type="number" name="comments_per_item" class="form-control" placeholder="Number of comments per item" required min="1">
+        <div class="input-group-append">
+            <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
         </div>
-    </form>
+    </div>
+</form>
     
     <!-- Form to Add New Prompt -->
     <form method="POST" action="{{ url_for('add_ai_comment_prompt') }}" class="mb-3">
