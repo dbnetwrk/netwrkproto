@@ -4536,7 +4536,7 @@ def get_five_second_moment(text):
     prompt = (
         "All great stories, regardless of length or depth or tone, tell the story of a five-second moment in a person's life.\n\n"
         "Every great story ever told is essentially about a five-second moment in the life of a human being, and the purpose of the story is to bring that moment to the greatest clarity possible.\n\n"
-        "I'm going to give you a post/story, and I need you to give me the core feeling or realization in the five-second moment in one concise sentence.\n\n"
+        "I'm going to give you a post/story, and I need you to give me the core emotion or realization of the five-second moment in one sentence\n\n"
         f"{text}"
     )
 
@@ -4682,6 +4682,8 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
     else:
         formatted_date = "an unspecified date"
 
+    num_paragraphs = random.randint(1, 3)
+
     user_prompt = (
         f"All great stories, regardless of length or depth or tone, tell the story of a five-second moment in a person's life. And the purpose of that story is to bring that moment to the greatest clarity possible. Everything included in the story should only serve to bring that five-second moment to the greatest possible clarity.\n\n"
         f"I need you to write a story where the following happens:\n\n"
@@ -4697,13 +4699,11 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
         f"   - Living in: {seeder_details['neighborhood']} neighborhood\n"
         f"   - Age: 22-26\n"
         f"8. Write in 8th grade verbiage, and incorporate the seeder's background subtly into the story.\n"
-        f"9. Write in a tone similar to this piece of text: \"Like it's like I've been seeing more and more of older people basically telling women to just have kids. Saying stuff like 'your career won't matter but kids do' brother maybe i like my career maybe I have hopes and dreams. Why would I give that up for a kid?\n"
-        f"Not to mention what if I end up unhappy In my marriage now you got people in my ear telling me to stay for the kids and if I do leave I'm expected to want majority custody or else I'm a terrible mother.\n"
-        f"Also your body is almost always cooked!\n"
+        f"9. Write in a tone that is casual and conversational. \n"
         f"It seems so exhausting being a mother with practically no reward and I feel like the older peeps will hear these issues and just tell you to have kids like why do they do that?\"\n"
-        f"10. The story should be two paragraphs.\n"
+        f"10. The story should be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.\n"
         f"11. Wrap the story in <story> brackets.\n"
-        f"12. Start the story as close to the end as possible.\n"
+        f"12. Start the story close to the ending\n"
         f"13. If the reference data for the backdrop contains specific dates, include them in the story\n"
     )
     current_app.logger.info(f"HERE IS THE USER PROMPT WOOO: {user_prompt}")
@@ -4734,7 +4734,7 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
         else:
             generated_story = "No story found in the generated content."
         
-        return generated_story
+        return generated_story, url
     except Exception as e:
         current_app.logger.error(f"Failed to generate story: {str(e)}")
         return "Failed to generate story."
@@ -4762,8 +4762,8 @@ def generate_story_2():
         formatted_seeder_info = request.form.get('seeder_info')
 
     try:
-        story = generate_story_with_anthropic(five_sec_moment, article_category, formatted_seeder_info, scheduled_date)
-        return jsonify({'story': story})
+        story, article_url = generate_story_with_anthropic(five_sec_moment, article_category, formatted_seeder_info, scheduled_date)
+        return jsonify({'story': story, 'article_url': article_url})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -4825,7 +4825,7 @@ def idea_factory_2():
             State=State,
             Industry=Industry,
             Neighborhood=Neighborhood,
-            community_dict=community_dict  # Pass community_dict to template
+            community_dict=community_dict,  # Pass community_dict to template
         )
 
     return render_template(

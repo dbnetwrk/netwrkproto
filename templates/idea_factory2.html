@@ -162,11 +162,7 @@
                         <button type="button" class="btn btn-success" onclick="generateVenue({{ loop.index }})">
                             Venue
                         </button>
-                        {% if result.article_url %}
-                            <a href="{{ result.article_url }}" target="_blank" class="btn btn-primary">Source</a>
-                        {% else %}
-                            <button type="button" class="btn btn-secondary disabled">No related article available</button>
-                        {% endif %}
+                        <a href="#" class="btn btn-secondary disabled source-button" target="_blank">No related article available</a>
 
                         <div id="generatedStory{{ loop.index }}" class="generated-story mb-3"></div>
 
@@ -234,7 +230,6 @@ function generateStory(index) {
     // Check if we're using a new seeder or an existing one
     const newSeederForm = document.getElementById(`newSeederForm${index}`);
     let seederInfo;
-
     if (newSeederForm.style.display !== 'none') {
         // New seeder form is visible, collect data from it
         seederInfo = {
@@ -254,14 +249,12 @@ function generateStory(index) {
         formData.append('seeder_info', seederInfo);
         formData.append('is_new_seeder', 'false');
     }
-
     // Add other necessary data to formData
     formData.append('index', index);
     
     // Get the content from the textarea
     const content = document.querySelector(`#postCard${index} .ai-content`).textContent;
     formData.append('five_sec_moment', content);
-
     fetch('/generate_story_2', {
         method: 'POST',
         body: formData
@@ -273,6 +266,20 @@ function generateStory(index) {
             document.getElementById(`generatedStory${index}`).innerText = 'Failed to generate story';
         } else {
             document.getElementById(`generatedStory${index}`).innerText = data.story;
+            
+            // Update the source button
+            const sourceButton = document.querySelector(`#postCard${index} .source-button`);
+            if (data.article_url) {
+                sourceButton.href = data.article_url;
+                sourceButton.classList.remove('btn-secondary', 'disabled');
+                sourceButton.classList.add('btn-primary');
+                sourceButton.innerText = 'Source';
+            } else {
+                sourceButton.removeAttribute('href');
+                sourceButton.classList.remove('btn-primary');
+                sourceButton.classList.add('btn-secondary', 'disabled');
+                sourceButton.innerText = 'No related article available';
+            }
         }
     })
     .catch((error) => {
