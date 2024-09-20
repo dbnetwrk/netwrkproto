@@ -880,6 +880,7 @@ class CategoryEnum(enum.Enum):
     FOOD = 'FOOD'
     SCENES = 'SCENES'
     CAREER = 'CAREER'
+    CULTURE = 'CULTURE'
 
 class ScraperResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -898,16 +899,22 @@ class ScraperResult(db.Model):
 class SelectedURLs(db.Model):
     __tablename__ = 'selected_urls'
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(1000), unique=True, nullable=False)
+    url = db.Column(db.String(500), unique=True, nullable=False)
     category = db.Column(db.Enum(CategoryEnum), nullable=False)
     is_eventbrite = db.Column(db.Boolean, default=False)
-    is_active = db.Column(db.Boolean, default=True)  # New field
+    is_active = db.Column(db.Boolean, default=True)
+    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer'), nullable=False, default='Regular')
+    link_selector = db.Column(db.String(200), nullable=True)
+    page_function = db.Column(db.Text, nullable=True)
 
-    def __init__(self, url, category, is_eventbrite=False, is_active=True):
+    def __init__(self, url, category, link_selector, is_eventbrite=False, is_active=True, scraper_type='Regular', page_function=None):
         self.url = url
         self.category = category
         self.is_eventbrite = is_eventbrite
         self.is_active = is_active
+        self.scraper_type = scraper_type
+        self.link_selector = link_selector
+        self.page_function = page_function
 
 
 industry_images = {
@@ -4769,7 +4776,7 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
 
 
 def discussion_question_generator(text):
-    emotions = ["controversial", "anxiety", None]
+    emotions = ["controversial", "anxiety"]
     chosen_emotion = random.choice(emotions)
     
     emotion_prompt = (
@@ -4786,6 +4793,7 @@ def discussion_question_generator(text):
         f"Wrap your response in <question> brackets\n\n"
         f"The community does not know about the article you are referencing\n\n"
         f"The community is recent transplants to Miami that are between 22-26 years old\n\n"
+        f"The discussion question should be at most 12 words\n\n"
         f"{emotion_prompt} <think>"
     )
     try:
@@ -6566,6 +6574,41 @@ def run_scraper():
                         skipped_results += 1
                         current_app.logger.debug(f"Skipped existing LinkedIn job result for company: {company_name}")
 
+            elif url.scraper_type == 'Puppeteer':
+                # Use Puppeteer scraper
+                run_input = {
+                    "startUrls": [{"url": url.url}],
+                    "maxCrawlingDepth": 2,
+                    "linkSelector": url.link_selector,
+                    "pageFunction": url.page_function
+                }
+                
+                run = client.actor("apify/puppeteer-scraper").call(run_input=run_input)
+                
+                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    current_app.logger.debug(f"Processing Puppeteer item: {item.get('url', '')}")
+                    existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                    
+                    if not existing_result:
+                        scraper_result = ScraperResult(
+                            url=item.get('url', ''),
+                            title=item.get('title', ''),
+                            text=item.get('content', ''),  # Assuming 'content' field contains the main text
+                            category=url.category
+                        )
+                        db.session.add(scraper_result)
+                        try:
+                            db.session.commit()
+                            new_results += 1
+                            current_app.logger.debug(f"Added new Puppeteer result: {item.get('url', '')}")
+                        except IntegrityError:
+                            db.session.rollback()
+                            skipped_results += 1
+                            current_app.logger.warning(f"IntegrityError for Puppeteer URL: {item.get('url', '')}")
+                    else:
+                        skipped_results += 1
+                        current_app.logger.debug(f"Skipped existing Puppeteer result: {item.get('url', '')}")
+
             else:
                 # Use website content crawler for other URLs
                 run_input = {
@@ -6776,21 +6819,40 @@ def random_venue2():
 @app.route('/manage-urls', methods=['GET', 'POST'])
 def manage_urls():
     if request.method == 'POST':
-        if 'add_url' in request.form:
+        if 'add_url' in request.form or 'edit_url' in request.form:
             url = request.form.get('url')
             category = request.form.get('category')
             is_eventbrite = request.form.get('is_eventbrite') == 'on'
-            if url and category:
+            scraper_type = request.form.get('scraper_type')
+            link_selector = request.form.get('link_selector')
+            page_function = request.form.get('page_function')
+            
+            if url and category and scraper_type:
                 try:
-                    new_url = SelectedURLs(url=url, category=CategoryEnum[category], is_eventbrite=is_eventbrite)
-                    db.session.add(new_url)
+                    if 'add_url' in request.form:
+                        new_url = SelectedURLs(url=url, category=CategoryEnum[category], is_eventbrite=is_eventbrite,
+                                               scraper_type=scraper_type, link_selector=link_selector, page_function=page_function)
+                        db.session.add(new_url)
+                        flash("URL added successfully!", "success")
+                    else:  # edit_url
+                        url_id = request.form.get('url_id')
+                        url_obj = SelectedURLs.query.get(url_id)
+                        if url_obj:
+                            url_obj.url = url
+                            url_obj.category = CategoryEnum[category]
+                            url_obj.is_eventbrite = is_eventbrite
+                            url_obj.scraper_type = scraper_type
+                            url_obj.link_selector = link_selector
+                            url_obj.page_function = page_function
+                            flash("URL updated successfully!", "success")
+                        else:
+                            flash("URL not found.", "error")
                     db.session.commit()
-                    flash("URL added successfully!", "success")
                 except IntegrityError:
                     db.session.rollback()
                     flash("This URL already exists.", "error")
             else:
-                flash("Please provide both URL and category.", "error")
+                flash("Please provide URL, category, and scraper type.", "error")
         elif 'toggle_active' in request.form:
             url_id = request.form.get('url_id')
             url_obj = SelectedURLs.query.get(url_id)
@@ -6800,7 +6862,16 @@ def manage_urls():
                 flash(f"URL {'activated' if url_obj.is_active else 'deactivated'} successfully!", "success")
             else:
                 flash("URL not found.", "error")
-
+        elif 'delete_url' in request.form:
+            url_id = request.form.get('url_id')
+            url_obj = SelectedURLs.query.get(url_id)
+            if url_obj:
+                db.session.delete(url_obj)
+                db.session.commit()
+                flash("URL deleted successfully!", "success")
+            else:
+                flash("URL not found.", "error")
+    
     urls = SelectedURLs.query.order_by(SelectedURLs.category).all()
     return render_template('manage_urls.html', urls=urls, categories=CategoryEnum)
 

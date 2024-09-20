@@ -3,6 +3,7 @@
 <div class="container mt-5">
     <h2>Manage Selected URLs</h2>
     <form action="{{ url_for('manage_urls') }}" method="POST">
+        <input type="hidden" id="edit_url_id" name="url_id">
         <div class="form-group">
             <label for="url">URL:</label>
             <input type="url" class="form-control" id="url" name="url" required>
@@ -15,11 +16,26 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="form-group">
+            <label for="scraper_type">Scraper Type:</label>
+            <select class="form-control" id="scraper_type" name="scraper_type" required>
+                <option value="Regular">Regular</option>
+                <option value="Puppeteer">Puppeteer</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="link_selector">Link Selector:</label>
+            <input type="text" class="form-control" id="link_selector" name="link_selector">
+        </div>
+        <div class="form-group">
+            <label for="page_function">Page Function:</label>
+            <textarea class="form-control" id="page_function" name="page_function" rows="10"></textarea>
+        </div>
         <div class="form-group form-check">
             <input type="checkbox" class="form-check-input" id="is_eventbrite" name="is_eventbrite">
             <label class="form-check-label" for="is_eventbrite">Is Eventbrite URL?</label>
         </div>
-        <button type="submit" name="add_url" class="btn btn-primary">Add URL</button>
+        <button type="submit" name="add_url" id="submit_button" class="btn btn-primary">Add URL</button>
     </form>
     <h3 class="mt-5">Existing URLs</h3>
     <table class="table">
@@ -27,9 +43,11 @@
             <tr>
                 <th>URL</th>
                 <th>Category</th>
+                <th>Scraper Type</th>
+                <th>Link Selector</th>
                 <th>Eventbrite?</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -37,14 +55,21 @@
             <tr>
                 <td>{{ url.url }}</td>
                 <td>{{ url.category.name }}</td>
+                <td>{{ url.scraper_type }}</td>
+                <td>{{ url.link_selector or 'N/A' }}</td>
                 <td>{{ "Yes" if url.is_eventbrite else "No" }}</td>
                 <td>{{ "Active" if url.is_active else "Inactive" }}</td>
                 <td>
-                    <form action="{{ url_for('manage_urls') }}" method="POST">
+                    <button onclick="editUrl({{ url.id }}, '{{ url.url }}', '{{ url.category.name }}', '{{ url.scraper_type }}', '{{ url.link_selector }}', '{{ url.page_function|replace('\n', '\\n')|replace("'", "\\'") }}', {{ 'true' if url.is_eventbrite else 'false' }})" class="btn btn-sm btn-warning">Edit</button>
+                    <form action="{{ url_for('manage_urls') }}" method="POST" style="display: inline;">
                         <input type="hidden" name="url_id" value="{{ url.id }}">
                         <button type="submit" name="toggle_active" class="btn btn-sm {% if url.is_active %}btn-danger{% else %}btn-success{% endif %}">
                             {% if url.is_active %}Deactivate{% else %}Activate{% endif %}
                         </button>
+                    </form>
+                    <form action="{{ url_for('manage_urls') }}" method="POST" style="display: inline;">
+                        <input type="hidden" name="url_id" value="{{ url.id }}">
+                        <button type="submit" name="delete_url" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this URL?')">Delete</button>
                     </form>
                 </td>
             </tr>
@@ -52,4 +77,18 @@
         </tbody>
     </table>
 </div>
+
+<script>
+function editUrl(id, url, category, scraperType, linkSelector, pageFunction, isEventbrite) {
+    document.getElementById('edit_url_id').value = id;
+    document.getElementById('url').value = url;
+    document.getElementById('category').value = category;
+    document.getElementById('scraper_type').value = scraperType;
+    document.getElementById('link_selector').value = linkSelector;
+    document.getElementById('page_function').value = pageFunction;
+    document.getElementById('is_eventbrite').checked = isEventbrite;
+    document.getElementById('submit_button').name = 'edit_url';
+    document.getElementById('submit_button').textContent = 'Update URL';
+}
+</script>
 {% endblock %}
