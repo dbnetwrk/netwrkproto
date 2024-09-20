@@ -31,6 +31,10 @@
             <label for="page_function">Page Function:</label>
             <textarea class="form-control" id="page_function" name="page_function" rows="10"></textarea>
         </div>
+        <div class="form-group">
+            <label for="max_results">Max Results:</label>
+            <input type="number" class="form-control" id="max_results" name="max_results" value="20" min="1">
+        </div>
         <div class="form-group form-check">
             <input type="checkbox" class="form-check-input" id="is_eventbrite" name="is_eventbrite">
             <label class="form-check-label" for="is_eventbrite">Is Eventbrite URL?</label>
@@ -45,6 +49,7 @@
                 <th>Category</th>
                 <th>Scraper Type</th>
                 <th>Link Selector</th>
+                <th>Max Results</th>
                 <th>Eventbrite?</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -57,10 +62,11 @@
                 <td>{{ url.category.name }}</td>
                 <td>{{ url.scraper_type }}</td>
                 <td>{{ url.link_selector or 'N/A' }}</td>
+                <td>{{ url.max_results }}</td>
                 <td>{{ "Yes" if url.is_eventbrite else "No" }}</td>
                 <td>{{ "Active" if url.is_active else "Inactive" }}</td>
                 <td>
-                    <button onclick="editUrl({{ url.id }}, '{{ url.url }}', '{{ url.category.name }}', '{{ url.scraper_type }}', '{{ url.link_selector }}', '{{ url.page_function|replace('\n', '\\n')|replace("'", "\\'") }}', {{ 'true' if url.is_eventbrite else 'false' }})" class="btn btn-sm btn-warning">Edit</button>
+                    <button onclick="editUrl({{ url.id }}, '{{ url.url }}', '{{ url.category.name }}', '{{ url.scraper_type }}', '{{ url.link_selector }}', '{{ url.page_function|replace('\n', '\\n')|replace("'", "\\'") }}', {{ url.max_results }}, {{ 'true' if url.is_eventbrite else 'false' }})" class="btn btn-sm btn-warning">Edit</button>
                     <form action="{{ url_for('manage_urls') }}" method="POST" style="display: inline;">
                         <input type="hidden" name="url_id" value="{{ url.id }}">
                         <button type="submit" name="toggle_active" class="btn btn-sm {% if url.is_active %}btn-danger{% else %}btn-success{% endif %}">
@@ -79,13 +85,14 @@
 </div>
 
 <script>
-function editUrl(id, url, category, scraperType, linkSelector, pageFunction, isEventbrite) {
+function editUrl(id, url, category, scraperType, linkSelector, pageFunction, maxResults, isEventbrite) {
     document.getElementById('edit_url_id').value = id;
     document.getElementById('url').value = url;
     document.getElementById('category').value = category;
     document.getElementById('scraper_type').value = scraperType;
     document.getElementById('link_selector').value = linkSelector;
     document.getElementById('page_function').value = pageFunction;
+    document.getElementById('max_results').value = maxResults;
     document.getElementById('is_eventbrite').checked = isEventbrite;
     document.getElementById('submit_button').name = 'edit_url';
     document.getElementById('submit_button').textContent = 'Update URL';

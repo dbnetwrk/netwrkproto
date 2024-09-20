@@ -906,8 +906,9 @@ class SelectedURLs(db.Model):
     scraper_type = db.Column(db.Enum('Regular', 'Puppeteer'), nullable=False, default='Regular')
     link_selector = db.Column(db.String(200), nullable=True)
     page_function = db.Column(db.Text, nullable=True)
+    max_results = db.Column(db.Integer, default=20)
 
-    def __init__(self, url, category, link_selector, is_eventbrite=False, is_active=True, scraper_type='Regular', page_function=None):
+    def __init__(self, url, category, link_selector, is_eventbrite=False, is_active=True, scraper_type='Regular', page_function=None, max_results=20):
         self.url = url
         self.category = category
         self.is_eventbrite = is_eventbrite
@@ -915,6 +916,7 @@ class SelectedURLs(db.Model):
         self.scraper_type = scraper_type
         self.link_selector = link_selector
         self.page_function = page_function
+        self.max_results = max_results
 
 
 industry_images = {
@@ -6472,24 +6474,92 @@ import time
 
 def scrape_eventbrite(url):
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        browser = playwright.chromium.launch(headless=True)  # Visible browser
         page = browser.new_page()
-        page.goto(url)
-        page.wait_for_selector(".eds-structure__main")
-        for _ in range(5):
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(2)
+        page.goto(url, wait_until='domcontentloaded')
+        page.wait_for_timeout(10000)  # Initial wait for content
+
+        # Incremental scrolling
+        step_size = 100  # Smaller step size for finer control
+        last_height = page.evaluate("document.body.scrollHeight")
+        element_found = False
+
+        while True:
+            page.evaluate(f"window.scrollBy(0, {step_size})")
+            # Wait after each scroll to allow content to load
+            page.wait_for_timeout(3000)
+            # Check for the specific element
+            if page.query_selector('div[data-event-bucket-label="this_weekend"]'):
+                element_found = True
+                page.wait_for_timeout(10000)  # Extended wait after finding the element
+                break
+            new_height = page.evaluate("document.body.scrollHeight")
+            if new_height == last_height and element_found:
+                break  # Stop if no new content is loaded and element was previously found
+            last_height = new_height
+
+        # Extract links
         links = page.evaluate("""
             () => {
                 const links = [];
-                document.querySelectorAll('a[href*="/e/"][class*="event-card-link"]').forEach(link => {
+                document.querySelectorAll('div[data-event-bucket-label="this_weekend"] a.event-card-link').forEach(link => {
                     links.push(link.href);
                 });
                 return links;
             }
         """)
+
         browser.close()
         return list(set(links))
+
+
+def scrape_groupon(url):
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=False)  # Visible browser
+        page = browser.new_page()
+        page.goto(url, wait_until='domcontentloaded')
+        # Wait a few seconds to let additional resources load
+        page.wait_for_timeout(15000)  # Initial wait for content
+
+        # Incremental scrolling
+        step_size = 1000  # Scroll step size
+        attempts = 0  # to avoid infinite loops
+
+        while True:
+            last_height = page.evaluate("document.body.scrollHeight")
+            page.evaluate(f"window.scrollBy(0, {step_size})")
+            # Wait for network to be idle or a maximum of 5 seconds after each scroll
+            try:
+                page.wait_for_timeout(15000)
+            except:
+                # Timeout implies no significant network activity after 5 seconds
+                pass
+            new_height = page.evaluate("document.body.scrollHeight")
+            
+            # Stop if no new content is loaded or if we have tried too many times
+            if new_height == last_height or attempts > 10:
+                break
+            attempts += 1
+
+        # Extract links
+        links = page.evaluate("""
+            () => {
+                const links = [];
+                document.querySelectorAll('div[data-item-type="card"] a').forEach(link => {
+                    links.push(link.href);
+                });
+                return links;
+            }
+        """)
+
+        # Save HTML content
+        html_content = page.content()
+        with open('groupon.html', 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        browser.close()
+        return list(set(links))
+
 
 import logging
 from flask import current_app
@@ -6530,7 +6600,7 @@ def run_scraper():
                         ]
                     },
                     "publishedAt": "r604800",
-                    "rows": 200,
+                    "rows": url.max_results,
                     "workType": "1",
                     "title": ""
                 }
@@ -6580,7 +6650,8 @@ def run_scraper():
                     "startUrls": [{"url": url.url}],
                     "maxCrawlingDepth": 2,
                     "linkSelector": url.link_selector,
-                    "pageFunction": url.page_function
+                    "pageFunction": url.page_function,
+                    "maxResultsPerCrawl": url.max_results
                 }
                 
                 run = client.actor("apify/puppeteer-scraper").call(run_input=run_input)
@@ -6613,7 +6684,8 @@ def run_scraper():
                 # Use website content crawler for other URLs
                 run_input = {
                     "startUrls": [{"url": url.url}],
-                    "maxCrawlDepth": 1 if not url.is_eventbrite else 0
+                    "maxCrawlDepth": 1 if not url.is_eventbrite else 0,
+                    "maxResults": url.max_results
                 }
                 
                 if url.is_eventbrite:
@@ -6826,12 +6898,14 @@ def manage_urls():
             scraper_type = request.form.get('scraper_type')
             link_selector = request.form.get('link_selector')
             page_function = request.form.get('page_function')
+            max_results = request.form.get('max_results', type=int, default=20)
             
             if url and category and scraper_type:
                 try:
                     if 'add_url' in request.form:
                         new_url = SelectedURLs(url=url, category=CategoryEnum[category], is_eventbrite=is_eventbrite,
-                                               scraper_type=scraper_type, link_selector=link_selector, page_function=page_function)
+                                               scraper_type=scraper_type, link_selector=link_selector, 
+                                               page_function=page_function, max_results=max_results)
                         db.session.add(new_url)
                         flash("URL added successfully!", "success")
                     else:  # edit_url
@@ -6844,6 +6918,7 @@ def manage_urls():
                             url_obj.scraper_type = scraper_type
                             url_obj.link_selector = link_selector
                             url_obj.page_function = page_function
+                            url_obj.max_results = max_results
                             flash("URL updated successfully!", "success")
                         else:
                             flash("URL not found.", "error")
