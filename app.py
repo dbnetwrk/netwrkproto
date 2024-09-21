@@ -896,6 +896,7 @@ class ScraperResult(db.Model):
         self.text = text
         self.category = category
 
+
 class SelectedURLs(db.Model):
     __tablename__ = 'selected_urls'
     id = db.Column(db.Integer, primary_key=True)
@@ -903,7 +904,7 @@ class SelectedURLs(db.Model):
     category = db.Column(db.Enum(CategoryEnum), nullable=False)
     is_eventbrite = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
-    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer'), nullable=False, default='Regular')
+    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer', 'Groupon', name='scraper_type_enum'), nullable=False, default='Regular')
     link_selector = db.Column(db.String(200), nullable=True)
     page_function = db.Column(db.Text, nullable=True)
     max_results = db.Column(db.Integer, default=20)
@@ -917,7 +918,6 @@ class SelectedURLs(db.Model):
         self.link_selector = link_selector
         self.page_function = page_function
         self.max_results = max_results
-
 
 industry_images = {
     1: '/images/education.png',
@@ -4100,11 +4100,14 @@ def resolve_prompt_template(prompt, post_content):
     if not items:
         return prompt.prompt  # Fallback to original prompt if no recommendations found
 
-    # Create a formatted string representation of all items
-    items_info = "\n\n".join([format_item_info(item) for item in items])
+    # Select one item randomly from the list
+    selected_item = random.choice(items)
 
-    # Replace the placeholder in the prompt with the formatted items info
-    resolved_prompt = prompt.prompt.replace('{item}', items_info)
+    # Create a formatted string representation of the selected item
+    item_info = format_item_info(selected_item)
+
+    # Replace the placeholder in the prompt with the formatted item info
+    resolved_prompt = prompt.prompt.replace('{item}', item_info)
 
     current_app.logger.debug(f"Here is the resolved prompt: {resolved_prompt}")
 
@@ -4569,7 +4572,7 @@ def get_five_second_moment(text):
     prompt = (
         "All great stories, regardless of length or depth or tone, tell the story of a five-second moment in a person's life.\n\n"
         "Every great story ever told is essentially about a five-second moment in the life of a human being, and the purpose of the story is to bring that moment to the greatest clarity possible.\n\n"
-        "I'm going to give you a post/story, and I need you to give me the core emotion or realization of the five-second moment in one sentence\n\n"
+        "I'm going to give you a post/story, and I need you to give me the core emotion or realization of the five-second moment in one sentence.\n\n"
         f"{text}"
     )
 
@@ -4734,7 +4737,7 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
         f"8. Write in 8th grade verbiage, and incorporate the seeder's background subtly into the story.\n"
         f"9. Write in a tone that is casual and conversational. \n"
         f"It seems so exhausting being a mother with practically no reward and I feel like the older peeps will hear these issues and just tell you to have kids like why do they do that?\"\n"
-        f"10. The story should be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.\n"
+        f"10. The story must be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.\n"
         f"11. Wrap the story in <story> brackets.\n"
         f"12. Start the story close to the ending\n"
         f"13. If the reference data for the backdrop contains specific dates, include them in the story\n"
@@ -4747,7 +4750,7 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20240620",
-            max_tokens=500,  # Adjust as needed
+            max_tokens=5000,  # Adjust as needed
             temperature=0.75,
             system=super_prompt,
             messages=[
@@ -6552,10 +6555,6 @@ def scrape_groupon(url):
             }
         """)
 
-        # Save HTML content
-        html_content = page.content()
-        with open('groupon.html', 'w', encoding='utf-8') as f:
-            f.write(html_content)
 
         browser.close()
         return list(set(links))
@@ -6684,7 +6683,7 @@ def run_scraper():
                 # Use website content crawler for other URLs
                 run_input = {
                     "startUrls": [{"url": url.url}],
-                    "maxCrawlDepth": 1 if not url.is_eventbrite else 0,
+                    "maxCrawlDepth": 1 if not (url.is_eventbrite or url.scraper_type == 'Groupon') else 0,
                     "maxResults": url.max_results
                 }
                 
@@ -6693,6 +6692,14 @@ def run_scraper():
                     eventbrite_links = scrape_eventbrite(url.url)
                     
                     run_input["startUrls"] = [{"url": link} for link in eventbrite_links]
+
+                if url.scraper_type == 'Groupon':
+
+                    groupon_links = scrape_groupon(url.url)
+                    
+                    run_input["startUrls"] = [{"url": link} for link in groupon_links]
+
+
                 
                 
                 run = client.actor("apify/website-content-crawler").call(run_input=run_input)
