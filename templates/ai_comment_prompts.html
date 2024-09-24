@@ -5,11 +5,17 @@
     
     <form method="POST" action="{{ url_for('start_seed_job') }}" class="mb-3">
     <div class="input-group mb-3">
-        <select name="content_type" class="form-control" required>
+        <select name="content_type" class="form-control" required id="content-type-select">
             <option value="vault">Vaults</option>
             <option value="post">Posts</option>
         </select>
         <input type="number" name="comments_per_item" class="form-control" placeholder="Number of comments per item" required min="1">
+        <select name="item_id" class="form-control" id="item-select">
+            <option value="">All Vaults</option>
+            {% for vault in unposted_vaults %}
+                <option value="{{ vault.id }}">{{ vault.title }}</option>
+            {% endfor %}
+        </select>
         <div class="input-group-append">
             <button class="btn btn-outline-success" type="submit">Start Seed Job</button>
         </div>
@@ -90,4 +96,21 @@
     {% endfor %}
 
 </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const contentTypeSelect = document.getElementById('content-type-select');
+    const itemSelect = document.getElementById('item-select');
+    
+    contentTypeSelect.addEventListener('change', function() {
+        if (this.value === 'vault') {
+            itemSelect.style.display = 'block';
+        } else {
+            itemSelect.style.display = 'none';
+            itemSelect.value = '';
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -46,6 +46,19 @@ from langchain_community.utilities import ApifyWrapper
 
 import enum
 
+from flask import Flask, render_template, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+import numpy as np
+import faiss
+import pickle
+import os
+import json
+
+
 
 load_dotenv()
 
@@ -3980,6 +3993,8 @@ def show_delete_page():
 
 from sqlalchemy import case
 
+from sqlalchemy import case, nullsfirst
+
 @app.route('/ai_comment_prompts')
 def ai_comment_prompts():
     # Query and sort top-level prompts
@@ -3987,19 +4002,26 @@ def ai_comment_prompts():
         case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
         AICommentPrompt.id  # Then sort by ID
     ).all()
-
+    
     # Query and sort reply prompts
     reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply').order_by(
         case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
         AICommentPrompt.id  # Then sort by ID
     ).all()
-
+    
     communities = Community.query.all()
+    
+    # Query and sort unposted vaults
+    unposted_vaults = Vault.query.filter_by(is_posted=False).order_by(
+        nullsfirst(Vault.scheduled_at),  # Null values (unscheduled) first
+        Vault.scheduled_at.asc()  # Then sort by scheduled_at in ascending order
+    ).all()
     
     return render_template('ai_comment_prompts.html', 
                            top_level_prompts=top_level_prompts, 
                            reply_prompts=reply_prompts, 
-                           communities=communities)
+                           communities=communities,
+                           unposted_vaults=unposted_vaults)
 
 @app.route('/add_ai_comment_prompt', methods=['POST'])
 def add_ai_comment_prompt():
@@ -4061,6 +4083,7 @@ from threading import Thread
 def start_seed_job():
     content_type = request.form.get('content_type')
     comments_per_item = int(request.form.get('comments_per_item', 1))
+    item_id = request.form.get('item_id')
     
     if content_type not in ['post', 'vault']:
         flash('Invalid content type selected.')
@@ -4070,11 +4093,21 @@ def start_seed_job():
         flash('Number of comments per item must be at least 1.')
         return redirect(url_for('ai_comment_prompts'))
     
+    if item_id:
+        try:
+            item_id = int(item_id)
+        except ValueError:
+            flash('Invalid item ID.')
+            return redirect(url_for('ai_comment_prompts'))
+    
     # Start the job in a background thread
-    thread = Thread(target=generate_comments_for_all_items, args=(content_type, comments_per_item))
+    thread = Thread(target=generate_comments_for_all_items, args=(content_type, comments_per_item, item_id))
     thread.start()
     
-    flash('Comment generation started!')
+    if item_id:
+        flash(f'Comment generation started for {content_type} with ID {item_id}!')
+    else:
+        flash(f'Comment generation started for all {content_type}s!')
     return redirect(url_for('ai_comment_prompts'))
 
 import logging
@@ -4084,32 +4117,16 @@ from sqlalchemy.exc import SQLAlchemyError
 #prompt functionality for pulling venues and such
 import json
 
-def resolve_prompt_template(prompt, post_content):
-    if prompt.data_type == 'none':
-        return prompt.prompt
+def resolve_prompt_template(prompt, recommendation=None):
+    
+    if not recommendation:
+        return prompt.prompt  # Fallback to original prompt if no recommendation provided
 
-    if prompt.data_type == 'venue':
-        items = find_diverse_recommendations(post_content, 'venue', num_recommendations=10)
-        current_app.logger.debug(f"Found venues: {[item.title for item in items if item]}")
-    elif prompt.data_type == 'scraper_result':
-        items = find_diverse_recommendations(post_content, 'event', num_recommendations=10)
-        current_app.logger.debug(f"Found events: {[item.title if hasattr(item, 'title') else 'None' for item in items]}")
-    else:
-        return prompt.prompt  # Fallback to original prompt if data_type is not recognized
-
-    if not items:
-        return prompt.prompt  # Fallback to original prompt if no recommendations found
-
-    # Select one item randomly from the list
-    selected_item = random.choice(items)
-
-    # Create a formatted string representation of the selected item
-    item_info = format_item_info(selected_item)
+    # Create a formatted string representation of the recommendation
+    item_info = format_item_info(recommendation)
 
     # Replace the placeholder in the prompt with the formatted item info
     resolved_prompt = prompt.prompt.replace('{item}', item_info)
-
-    current_app.logger.debug(f"Here is the resolved prompt: {resolved_prompt}")
 
     return resolved_prompt
 
@@ -4155,17 +4172,82 @@ def toggle_ai_comment_prompt(id):
     return redirect(url_for('ai_comment_prompts'))
 
 
-def generate_comments_for_all_items(content_type='post', comments_per_item=1):
+
+def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_threshold=0.7, num_recommendations=5, is_career=False):
+    logging.info(f"Finding diverse recommendations for {item_type}. Is career: {is_career}")
+    
+    if item_type == 'venue':
+        top_items = find_top_k_similar_venues(post_text, k)
+    else:
+        if is_career:
+            top_items = find_top_k_similar_events_career(post_text, k)
+        else:
+            top_items = find_top_k_similar_events(post_text, k, exclude_career=True)
+    
+    logging.info(f"Found {len(top_items)} initial {item_type} items")
+    
+    if not top_items:
+        logging.info("No top items found. Returning empty list.")
+        return []
+    
+    post_embedding = model.encode(post_text)
+    item_embeddings = [model.encode(get_item_text(item)) for item in top_items]
+    
+    # Calculate similarities to the post
+    similarities_to_post = [np.dot(post_embedding, item_emb) / (np.linalg.norm(post_embedding) * np.linalg.norm(item_emb)) for item_emb in item_embeddings]
+    
+    # Calculate diversity scores
+    diversity_scores = []
+    for i, item_emb in enumerate(item_embeddings):
+        other_embeddings = item_embeddings[:i] + item_embeddings[i+1:]
+        similarities = [np.dot(item_emb, other_emb) / (np.linalg.norm(item_emb) * np.linalg.norm(other_emb)) for other_emb in other_embeddings]
+        diversity_score = 1 - (sum(similarities) / len(similarities) if similarities else 0)
+        diversity_scores.append(diversity_score)
+    
+    # Combine similarity to post and diversity
+    combined_scores = [sim * div for sim, div in zip(similarities_to_post, diversity_scores)]
+    
+    # Filter items that are sufficiently similar to the post
+    valid_items = [(item, score) for item, sim, score in zip(top_items, similarities_to_post, combined_scores) if sim >= similarity_threshold]
+    
+    logging.info(f"Found {len(valid_items)} items meeting similarity threshold")
+    
+    if not valid_items:
+        logging.info("No items meet similarity threshold. Returning top similar items.")
+        return top_items[:num_recommendations]
+    
+    # Sort by combined score
+    sorted_items = sorted(valid_items, key=lambda x: x[1], reverse=True)
+    
+    # If we have fewer than num_recommendations, pad with the most similar items from top_items
+    if len(sorted_items) < num_recommendations:
+        logging.info(f"Only {len(sorted_items)} valid items. Padding with similar items.")
+        sorted_items.extend((item, 0) for item in top_items if item not in [x[0] for x in sorted_items])
+    
+    # Return exactly num_recommendations items
+    result = [item for item, _ in sorted_items[:num_recommendations]]
+    logging.info(f"Returning {len(result)} diverse recommendations")
+    return result
+
+
+
+def generate_comments_for_all_items(content_type='post', comments_per_item=1, item_id=None):
     with app.app_context():
-        top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level', is_active=True).all()
-        reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply', is_active=True).all()
+        # Get the Career community
+        career_community = Community.query.filter_by(name='Career').first()
         
         if content_type == 'post':
             ItemModel = Post
-            items = ItemModel.query.all()
+            if item_id:
+                items = ItemModel.query.filter_by(id=item_id).all()
+            else:
+                items = ItemModel.query.all()
         elif content_type == 'vault':
             ItemModel = Vault
-            items = ItemModel.query.filter(Vault.is_posted == False).all()  # Changed this line
+            if item_id:
+                items = ItemModel.query.filter(Vault.is_posted == False, Vault.id == item_id).all()
+            else:
+                items = ItemModel.query.filter(Vault.is_posted == False).all()
         else:
             logging.error("Invalid content type.")
             return "Invalid content type."
@@ -4173,18 +4255,64 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1):
         if not items:
             logging.warning(f"No unscheduled {content_type}s available.")
             return f"No unscheduled {content_type}s available."
-        if not top_level_prompts or not reply_prompts:
-            logging.warning("No prompts available.")
-            return "No prompts available."
         
         results = []
         
         for item in items:
             item_context = f"You're in a conversation with your friend. Your friend just said this: {item.title}\nContent: {item.content}\n\n"
 
-            selected_prompts = random.sample(top_level_prompts, min(comments_per_item, len(top_level_prompts)))
+            # Check if the item is in the Career community
+            is_career = item.community_id == career_community.id if career_community else False
+
+            if is_career:
+                top_level_prompts = AICommentPrompt.query.filter(
+                    AICommentPrompt.prompt_type == 'top_level',
+                    AICommentPrompt.is_active == True,
+                    AICommentPrompt.data_type != 'venue'
+                ).all()
+                reply_prompts = AICommentPrompt.query.filter(
+                    AICommentPrompt.prompt_type == 'reply',
+                    AICommentPrompt.is_active == True,
+                    AICommentPrompt.data_type != 'venue'
+                ).all()
+            else:
+                top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level', is_active=True).all()
+                reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply', is_active=True).all()
+
+            if not top_level_prompts or not reply_prompts:
+                logging.warning("No prompts available.")
+                results.append(f"No prompts available for {content_type} {item.id}")
+                continue
+
+
+            #Get our recs
+
+            event_recommendations = find_diverse_recommendations(item.content, 'event', num_recommendations=10, is_career=is_career)
+
+            if is_career:
+                all_recommendations = event_recommendations
+            else:
+                venue_recommendations = find_diverse_recommendations(item.content, 'venue', num_recommendations=10)
+                all_recommendations = venue_recommendations + event_recommendations
+
+            random.shuffle(all_recommendations) 
+
+            used_recommendations = set() 
+
+            selected_prompts = [top_level_prompts[i % len(top_level_prompts)] for i in range(comments_per_item)]
             
             for prompt in selected_prompts:
+                if all_recommendations:
+                    available_recommendations = [rec for rec in all_recommendations if rec.id not in used_recommendations]
+                    if not available_recommendations:
+                        used_recommendations.clear()
+                        available_recommendations = all_recommendations
+                    chain_recommendation = random.choice(available_recommendations)
+                else:
+                    chain_recommendation = None
+
+                recommendation_used = False
+
                 if content_type == 'post':
                     commenter = User.query.filter(User.seeder == True, User.id != item.user_id).order_by(func.random()).first()
                 else:  # vault
@@ -4194,10 +4322,18 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1):
                     logging.warning(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
                     results.append(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
                     continue
+
+                # First comment
+                if prompt.data_type != 'none':
+                    resolved_prompt = resolve_prompt_template(prompt, chain_recommendation)
+                    recommendation_used = True
+                else:
+                    resolved_prompt = resolve_prompt_template(prompt)
                 
-                resolved_prompt = resolve_prompt_template(prompt, item.content)
                 combined_prompt = f"{item_context} {resolved_prompt}"
+
                 
+
                 try:
                     # First comment
                     response = client.chat.completions.create(
@@ -4223,7 +4359,12 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1):
                     
                     # Second comment (reply from original creator)
                     reply_prompt = random.choice(reply_prompts)
-                    resolved_reply_prompt = resolve_prompt_template(reply_prompt, item.content)
+                    if reply_prompt.data_type != 'none':
+                        resolved_reply_prompt = resolve_prompt_template(reply_prompt, chain_recommendation)
+                        recommendation_used = True
+                    else:
+                        resolved_reply_prompt = resolve_prompt_template(reply_prompt)
+                    
                     reply_context = f"Your friend just said this: {generated_comment}, which is a reply to you saying this {item.title}\nContent: {item.content}\n\n"
                     combined_reply_prompt = f"{reply_context} {resolved_reply_prompt}"
                     
@@ -4253,14 +4394,18 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1):
                     
                     # Third comment (reply from original commenter)
                     third_reply_prompt = random.choice(reply_prompts)
-                    resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt, item.content)
+                    if third_reply_prompt.data_type != 'none':
+                        resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt, chain_recommendation)
+                        recommendation_used = True
+                    else:
+                        resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt)
+                    
                     third_reply_context = f"""Here's the conversation so far:
                     Original post: {item.title}\nContent: {item.content}
                     Your first comment: {generated_comment}
                     Their reply: {generated_reply}
                     Now, \n\n"""
                     combined_third_reply_prompt = f"{third_reply_context} {resolved_third_reply_prompt}"
-                    
                     
                     third_reply_response = client.chat.completions.create(
                         model="gpt-4o",
@@ -4282,6 +4427,9 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1):
                         parent_id=new_reply.id
                     )
                     db.session.add(new_third_reply)
+
+                    if recommendation_used and chain_recommendation:
+                        used_recommendations.add(chain_recommendation.id)
                     
                     try:
                         db.session.commit()
@@ -4296,7 +4444,6 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1):
                     results.append(f"Failed to generate comment chain for {content_type} {item.id}: {str(e)}")
         
         return results
-
 
 
 
@@ -5873,15 +6020,19 @@ def vault_interface():
     unscheduled_vaults = [v for v in vaults if not v.scheduled_at and not v.is_posted]
     posted_vaults = [v for v in vaults if v.is_posted]
 
-    # Group scheduled vaults by date
     grouped_scheduled_vaults = {
-        date: list(items) for date, items in groupby(sorted(scheduled_vaults, key=lambda x: x.scheduled_at.date()), key=lambda x: x.scheduled_at.date())
+        date: list(items) for date, items in groupby(
+            sorted(scheduled_vaults, key=lambda x: x.scheduled_at.date()),
+            key=lambda x: x.scheduled_at.date()
+        )
     }
     sorted_grouped_scheduled_vaults = OrderedDict(sorted(grouped_scheduled_vaults.items(), key=lambda x: x[0]))
 
-    # Group posted vaults by scheduled date
     grouped_posted_vaults = {
-        date: list(items) for date, items in groupby(sorted(posted_vaults, key=lambda x: x.scheduled_at.date() if x.scheduled_at else x.created_at.date()), key=lambda x: x.scheduled_at.date() if x.scheduled_at else x.created_at.date())
+        date: list(items) for date, items in groupby(
+            sorted(posted_vaults, key=lambda x: x.scheduled_at.date() if x.scheduled_at else x.created_at.date()),
+            key=lambda x: x.scheduled_at.date() if x.scheduled_at else x.created_at.date()
+        )
     }
     sorted_grouped_posted_vaults = OrderedDict(sorted(grouped_posted_vaults.items(), key=lambda x: x[0], reverse=True))
 
@@ -5901,10 +6052,11 @@ def vault_interface():
     # Process daily breakdown
     daily_breakdown = {}
     for date, community_id, count in stats['current_week_daily']:
-        date_str = date.strftime('%Y-%m-%d')
-        if date_str not in daily_breakdown:
-            daily_breakdown[date_str] = {}
-        daily_breakdown[date_str][community_id] = count
+        if isinstance(date, str):
+            date = datetime.strptime(date, '%Y-%m-%d').date()
+        if date not in daily_breakdown:
+            daily_breakdown[date] = {}
+        daily_breakdown[date][community_id] = count
     
     posted_this_week = stats['posted_this_week']
     
@@ -6477,41 +6629,45 @@ import time
 
 def scrape_eventbrite(url):
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)  # Visible browser
+        browser = playwright.chromium.launch(headless=False)  # Visible browser
         page = browser.new_page()
         page.goto(url, wait_until='domcontentloaded')
         page.wait_for_timeout(10000)  # Initial wait for content
 
-        # Incremental scrolling
-        step_size = 100  # Smaller step size for finer control
-        last_height = page.evaluate("document.body.scrollHeight")
-        element_found = False
-
+        # Scroll down the page in chunks
+        viewport_height = page.viewport_size['height']
+        scroll_step = viewport_height * 0.8  # Scroll 80% of the viewport height each time
+        last_height = 0
         while True:
-            page.evaluate(f"window.scrollBy(0, {step_size})")
-            # Wait after each scroll to allow content to load
-            page.wait_for_timeout(3000)
-            # Check for the specific element
-            if page.query_selector('div[data-event-bucket-label="this_weekend"]'):
-                element_found = True
-                page.wait_for_timeout(10000)  # Extended wait after finding the element
-                break
+            last_height = page.evaluate("document.body.scrollHeight")
+
+            # Scroll down by one step
+            page.evaluate(f"window.scrollBy(0, {scroll_step})")
+            page.wait_for_timeout(3000)  # Wait for content to load
+
+            # Check if we've reached the bottom
             new_height = page.evaluate("document.body.scrollHeight")
-            if new_height == last_height and element_found:
-                break  # Stop if no new content is loaded and element was previously found
-            last_height = new_height
+            if new_height == last_height:
+                # If no new content loaded, try scrolling to the very bottom
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(3000)
+                final_height = page.evaluate("document.body.scrollHeight")
+                if final_height == new_height:
+                    # If still no change, we've reached the bottom
+                    break
+
+            
 
         # Extract links
         links = page.evaluate("""
             () => {
                 const links = [];
-                document.querySelectorAll('div[data-event-bucket-label="this_weekend"] a.event-card-link').forEach(link => {
+                document.querySelectorAll('a.event-card-link').forEach(link => {
                     links.push(link.href);
                 });
                 return links;
             }
         """)
-
         browser.close()
         return list(set(links))
 
@@ -7052,17 +7208,6 @@ def admin_scrape():
 ##comment similarity yuhh ###
 
 
-from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-import numpy as np
-import faiss
-import pickle
-import os
-import json
 
 
 
@@ -7169,11 +7314,19 @@ def find_top_k_similar_venues(post_text, k=5):
     D, I = venue_index.search(np.array([post_embedding]), k)
     return [Venue.query.get(venue_ids[i]) for i in I[0]]
 
-def find_top_k_similar_events(post_text, k=5):
+def find_top_k_similar_events(post_text, k=5, exclude_career=True):
     post_embedding = model.encode(post_text)
-    D, I = event_index.search(np.array([post_embedding]), k)
-    return [ScraperResult.query.get(event_ids[i]) for i in I[0]]
-
+    D, I = event_index.search(np.array([post_embedding]), k * 2)  # Get more results initially
+    
+    events = []
+    for i in I[0]:
+        event = ScraperResult.query.get(event_ids[i])
+        if event and (not exclude_career or event.category != 'CAREER'):
+            events.append(event)
+        if len(events) == k:
+            break
+    
+    return events
 
 
 def semantic_similarity(item1, item2):
@@ -7221,40 +7374,25 @@ def select_diverse_item(items, post_text, similarity_threshold=0.7):
     return max(valid_items, key=lambda x: x[1])[0]
 
 
-def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_threshold=0.7, num_recommendations=10):
-    if item_type == 'venue':
-        top_items = find_top_k_similar_venues(post_text, k)
-    else:
-        top_items = find_top_k_similar_events(post_text, k)
-    
-    if not top_items:
-        return []
-
+def find_top_k_similar_events_career(post_text, k):
     post_embedding = model.encode(post_text)
-    item_embeddings = [model.encode(get_item_text(item)) for item in top_items]
     
-    # Calculate similarities to the post
-    similarities_to_post = [np.dot(post_embedding, item_emb) / (np.linalg.norm(post_embedding) * np.linalg.norm(item_emb)) for item_emb in item_embeddings]
+    # Query for CAREER category scraper results
+    career_events = ScraperResult.query.filter_by(category='CAREER').all()
     
-    # Calculate diversity scores
-    diversity_scores = []
-    for i, item_emb in enumerate(item_embeddings):
-        other_embeddings = item_embeddings[:i] + item_embeddings[i+1:]
-        similarities = [np.dot(item_emb, other_emb) / (np.linalg.norm(item_emb) * np.linalg.norm(other_emb)) for other_emb in other_embeddings]
-        diversity_score = 1 - (sum(similarities) / len(similarities) if similarities else 0)
-        diversity_scores.append(diversity_score)
+    event_embeddings = [(event, model.encode(get_item_text(event))) for event in career_events]
     
-    # Combine similarity to post and diversity
-    combined_scores = [sim * div for sim, div in zip(similarities_to_post, diversity_scores)]
+    # Calculate similarities
+    similarities = [
+        (event, np.dot(post_embedding, event_emb) / (np.linalg.norm(post_embedding) * np.linalg.norm(event_emb)))
+        for event, event_emb in event_embeddings
+    ]
     
-    # Filter items that are sufficiently similar to the post
-    valid_items = [(item, score) for item, sim, score in zip(top_items, similarities_to_post, combined_scores) if sim >= similarity_threshold]
+    # Sort by similarity and return top k
+    top_k = sorted(similarities, key=lambda x: x[1], reverse=True)[:k]
     
-    if not valid_items:
-        return top_items[:num_recommendations]  # Return the most similar items if no items meet the threshold
-    
-    # Sort by combined score and return the top num_recommendations
-    return [item for item, _ in sorted(valid_items, key=lambda x: x[1], reverse=True)[:num_recommendations]]
+    return [event for event, _ in top_k]
+
 
 @app.route('/generate_comment', methods=['POST'])
 def generate_comment():
