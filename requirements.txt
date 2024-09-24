@@ -1,6 +1,7 @@
 alembic==1.13.1
 amqp==5.2.0
 annotated-types==0.6.0
+scrapy==2.11.1
 anyio==4.3.0
 APScheduler==3.10.4
 bidict==0.23.1
