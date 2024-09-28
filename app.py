@@ -44,6 +44,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from langchain_community.utilities import ApifyWrapper
 
+from sqlalchemy import Enum as SQLEnum
 import enum
 
 from flask import Flask, render_template, request, jsonify
@@ -63,7 +64,7 @@ import json
 load_dotenv()
 
 
-from enum import Enum
+import enum
 
 
 
@@ -239,7 +240,7 @@ answer the above question with Y or N at each output.
 """
 
 
-class State(Enum):
+class State(enum.Enum):
     AL = "Alabama"
     AK = "Alaska"
     AZ = "Arizona"
@@ -293,8 +294,31 @@ class State(Enum):
     WY = "Wyoming"
 
 
+class CharacterTraitEnum(enum.Enum):
+    Sarcastic = 'Sarcastic'
+    Enthusiastic = 'Enthusiastic'
+    Pessimistic = 'Pessimistic'
+    Empathetic = 'Empathetic'
+    Logical = 'Logical'
+    Impulsive = 'Impulsive'
+    Curious = 'Curious'
+    Anxious = 'Anxious'
+    Humorous = 'Humorous'
+    Stubborn = 'Stubborn'
+    Optimistic = 'Optimistic'
+    Analytical = 'Analytical'
+    Compassionate = 'Compassionate'
+    Skeptical = 'Skeptical'
+    Confident = 'Confident'
 
-class Industry(Enum):
+
+class CategoryEnum(enum.Enum):
+    Health = 'Health'
+    Career = 'Career'
+    Relationships = 'Relationships'
+    Lifestyle = 'Lifestyle'
+
+class Industry(enum.Enum):
     FINANCE = "Finance"
     CONSULTING = "Consulting"
     MARKETING = "Marketing"
@@ -305,7 +329,7 @@ class Industry(Enum):
     HOSPITALITY = "Hospitality"
     RETAIL = "Retail"
 
-class Neighborhood(Enum):
+class Neighborhood(enum.Enum):
     BRICKELL = "Brickell"
     EDGEWATER = "Edgewater"
     DOWNTOWN = "Downtown"
@@ -431,7 +455,7 @@ class User(db.Model):
     burner_username = db.Column(db.String(50), nullable=True)
     communities = db.relationship('Community', secondary=user_community_association, backref=db.backref('members', lazy='dynamic'))
     interests = db.relationship('Interest', secondary=user_interest_association, backref=db.backref('users', lazy='dynamic'))
-    industry = db.Column(db.Enum(Industry), nullable=True)  # Changed this line
+    industry = db.Column(SQLEnum(Industry), nullable=True)  # Changed this line
     about_me = db.Column(db.Text, nullable=True)
     karma = db.Column(db.Integer, default=0)
     background_color = db.Column(db.String(7))
@@ -530,6 +554,7 @@ class Community(db.Model):
     is_anonymous = db.Column(db.Boolean, default=False, nullable=False)
     color = db.Column(db.String(7), nullable=True)
     header_pic_url = db.Column(db.String(255), nullable=True)
+    category = db.Column(SQLEnum(CategoryEnum), nullable=False)
     
     creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
     interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
@@ -616,6 +641,7 @@ class AICommentPrompt(db.Model):
     prompt_type = db.Column(db.String(20), nullable=False)
     data_type = db.Column(db.String(20), nullable=False, default='none')
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    category = db.Column(SQLEnum(CategoryEnum), nullable=False)
 
 
 
@@ -653,18 +679,34 @@ class Vault(db.Model):
     reddit_post_id = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))
-    is_posted = db.Column(db.Boolean, default=False)  # New column to track if the vault has been posted
-
-    official_seeder = relationship('OfficialSeeder', backref='vaults')
+    is_posted = db.Column(db.Boolean, default=False)
+    official_seeder = db.relationship('OfficialSeeder', backref='vaults')
     comments = db.relationship('Comment', backref='vault', lazy=True, cascade="all, delete-orphan")
-
     scheduled_at = db.Column(db.DateTime, nullable=True)
+    
+    # Add nullable foreign keys for ScraperResult and Venue
+    scraper_result_id = db.Column(db.Integer, db.ForeignKey('scraper_result.id'), nullable=True)
+    venue_id = db.Column(db.Integer, db.ForeignKey('venue.id'), nullable=True)
+    
+    # Relationships to ScraperResult and Venue
+    scraper_result = db.relationship('ScraperResult', backref=db.backref('vault', uselist=False))
+    venue = db.relationship('Venue', backref=db.backref('vault', uselist=False))
+
+    moment_of_realization_id = db.Column(db.Integer, db.ForeignKey('moment_of_realization.id'), nullable=True)
+    moment_of_realization = db.relationship('MomentOfRealization', backref=db.backref('vaults', lazy=True))
 
     def __repr__(self):
         return '<Vault %r>' % self.title
 
 
+class MomentOfRealization(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    category = db.Column(db.Enum(CategoryEnum), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def __repr__(self):
+        return f'<MomentOfRealization {self.id}: {self.category.value}>'
 
 
 
@@ -705,6 +747,8 @@ class OfficialSeeder(db.Model):
     industry = db.Column(db.Enum(Industry), nullable=True)
     neighborhood = db.Column(db.Enum(Neighborhood), nullable=True) 
     facts = db.relationship('Fact', backref='official_seeder', lazy=True)
+    character_traits = db.Column(db.ARRAY(SQLEnum(CharacterTraitEnum)), nullable=True)
+    
 
 class Fact(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -887,13 +931,7 @@ class Review(db.Model):
 
 
 
-from enum import Enum
 
-class CategoryEnum(enum.Enum):
-    FOOD = 'FOOD'
-    SCENES = 'SCENES'
-    CAREER = 'CAREER'
-    CULTURE = 'CULTURE'
 
 class ScraperResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -902,12 +940,18 @@ class ScraperResult(db.Model):
     text = db.Column(db.Text)
     scrape_date = db.Column(db.DateTime, default=datetime.utcnow)
     category = db.Column(db.Enum(CategoryEnum), nullable=False)
+    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', name='scraper_source'), nullable=False, default='Regular')
+    price = db.Column(db.Numeric(10, 2))
+    event_date = db.Column(db.DateTime)
 
-    def __init__(self, url, title, text, category):
+    def __init__(self, url, title, text, category, source, price=None, event_date=None):
         self.url = url
         self.title = title
         self.text = text
         self.category = category
+        self.source = source
+        self.price = price
+        self.event_date = event_date
 
 
 class SelectedURLs(db.Model):
@@ -915,17 +959,15 @@ class SelectedURLs(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), unique=True, nullable=False)
     category = db.Column(db.Enum(CategoryEnum), nullable=False)
-    is_eventbrite = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
-    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer', 'Groupon', name='scraper_type_enum'), nullable=False, default='Regular')
+    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer', 'Groupon', 'Instagram', 'Eventbrite', name='scraper_type'), nullable=False, default='Regular')
     link_selector = db.Column(db.String(200), nullable=True)
     page_function = db.Column(db.Text, nullable=True)
     max_results = db.Column(db.Integer, default=20)
 
-    def __init__(self, url, category, link_selector, is_eventbrite=False, is_active=True, scraper_type='Regular', page_function=None, max_results=20):
+    def __init__(self, url, category, link_selector, is_active=True, scraper_type='Regular', page_function=None, max_results=20):
         self.url = url
         self.category = category
-        self.is_eventbrite = is_eventbrite
         self.is_active = is_active
         self.scraper_type = scraper_type
         self.link_selector = link_selector
@@ -3997,13 +4039,12 @@ from sqlalchemy import case, nullsfirst
 
 @app.route('/ai_comment_prompts')
 def ai_comment_prompts():
-    # Query and sort top-level prompts
+    # Your existing queries
     top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level').order_by(
         case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
         AICommentPrompt.id  # Then sort by ID
     ).all()
     
-    # Query and sort reply prompts
     reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply').order_by(
         case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
         AICommentPrompt.id  # Then sort by ID
@@ -4011,31 +4052,33 @@ def ai_comment_prompts():
     
     communities = Community.query.all()
     
-    # Query and sort unposted vaults
     unposted_vaults = Vault.query.filter_by(is_posted=False).order_by(
         nullsfirst(Vault.scheduled_at),  # Null values (unscheduled) first
         Vault.scheduled_at.asc()  # Then sort by scheduled_at in ascending order
     ).all()
     
+    # Include CategoryEnum in the render_template call
     return render_template('ai_comment_prompts.html', 
                            top_level_prompts=top_level_prompts, 
                            reply_prompts=reply_prompts, 
                            communities=communities,
-                           unposted_vaults=unposted_vaults)
+                           unposted_vaults=unposted_vaults,
+                           CategoryEnum=CategoryEnum)  # Passing the enum to the template
+
 
 @app.route('/add_ai_comment_prompt', methods=['POST'])
 def add_ai_comment_prompt():
     prompt_text = request.form.get('prompt')
     prompt_type = request.form.get('prompt_type')
     data_type = request.form.get('data_type', 'none')
-
-    if prompt_text and prompt_type:
-        new_prompt = AICommentPrompt(prompt=prompt_text, prompt_type=prompt_type)
+    category = request.form.get('category')
+    if prompt_text and prompt_type and category:
+        new_prompt = AICommentPrompt(prompt=prompt_text, prompt_type=prompt_type, data_type=data_type, category=CategoryEnum[category])
         db.session.add(new_prompt)
         db.session.commit()
         flash('New prompt added successfully.')
     else:
-        flash('Prompt text and type are required.')
+        flash('Prompt text, type, and category are required.')
     return redirect(url_for('ai_comment_prompts'))
 
 @app.route('/edit_ai_comment_prompt/<int:id>', methods=['GET', 'POST'])
@@ -4046,10 +4089,11 @@ def edit_ai_comment_prompt(id):
         prompt.prompt_type = request.form.get('prompt_type')
         prompt.data_type = request.form.get('data_type', 'none')
         prompt.is_active = request.form.get('is_active') == '1'
+        prompt.category = CategoryEnum[request.form.get('category')]
         db.session.commit()
         flash('AI Comment Prompt updated successfully!', 'success')
         return redirect(url_for('ai_comment_prompts'))
-    return render_template('edit_ai_comment_prompt.html', prompt=prompt)
+    return render_template('edit_ai_comment_prompt.html', prompt=prompt, CategoryEnum=CategoryEnum)
 
 @app.route('/update_ai_comment_prompt/<int:id>', methods=['POST'])
 def update_ai_comment_prompt(id):
@@ -4100,8 +4144,11 @@ def start_seed_job():
             flash('Invalid item ID.')
             return redirect(url_for('ai_comment_prompts'))
     
-    # Start the job in a background thread
-    thread = Thread(target=generate_comments_for_all_items, args=(content_type, comments_per_item, item_id))
+    # Create a copy of the current application context
+    ctx = current_app.app_context()
+    
+    # Start the job in a background thread with the app context
+    thread = Thread(target=run_with_context, args=(ctx, generate_comments_for_all_items, content_type, comments_per_item, item_id))
     thread.start()
     
     if item_id:
@@ -4109,6 +4156,10 @@ def start_seed_job():
     else:
         flash(f'Comment generation started for all {content_type}s!')
     return redirect(url_for('ai_comment_prompts'))
+
+def run_with_context(context, func, *args, **kwargs):
+    with context:
+        func(*args, **kwargs)
 
 import logging
 from sqlalchemy.exc import SQLAlchemyError
@@ -4136,25 +4187,15 @@ def format_item_info(item):
 Venue Information:
 - Title: {item.title}
 - Description: {item.description}
-- Price: {item.price}
 - Category: {item.category_name}
 - Neighborhood: {item.neighborhood}
-- Address: {item.street}, {item.city}, {item.postal_code}
-- Website: {item.website}
 - Menu: {json.dumps(item.menu) if item.menu else 'Not available'}
-- Permanently Closed: {'Yes' if item.permanently_closed else 'No'}
-- Temporarily Closed: {'Yes' if item.temporarily_closed else 'No'}
-- Total Score: {item.total_score}
-- Number of Reviews: {item.reviews_count}
-- Google Search URL: {item.google_search_url}
 """
     elif isinstance(item, ScraperResult):
         info = f"""
 Event Information:
 - Title: {item.title if hasattr(item, 'title') else 'Not available'}
 - Content: {item.text}
-- Date: {item.date if hasattr(item, 'date') else 'Not available'}
-- URL: {item.url if hasattr(item, 'url') else 'Not available'}
 """
     else:
         info = str(item)
@@ -4173,28 +4214,50 @@ def toggle_ai_comment_prompt(id):
 
 
 
-def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_threshold=0.7, num_recommendations=5, is_career=False):
-    logging.info(f"Finding diverse recommendations for {item_type}. Is career: {is_career}")
+import logging
+import numpy as np
+
+def find_top_k_similar_events_by_category(post_text, category, k):
+    post_embedding = model.encode(post_text)
     
-    if item_type == 'venue':
-        top_items = find_top_k_similar_venues(post_text, k)
-    else:
-        if is_career:
-            top_items = find_top_k_similar_events_career(post_text, k)
-        else:
-            top_items = find_top_k_similar_events(post_text, k, exclude_career=True)
+    # Query for events in the specified category
+    category_events = ScraperResult.query.filter_by(category=category).all()
     
-    logging.info(f"Found {len(top_items)} initial {item_type} items")
+    event_embeddings = [(event, model.encode(get_item_text(event))) for event in category_events]
+    
+    # Calculate similarities
+    similarities = [
+        (event, np.dot(post_embedding, event_emb) / (np.linalg.norm(post_embedding) * np.linalg.norm(event_emb)))
+        for event, event_emb in event_embeddings
+    ]
+    
+    # Sort by similarity and return top k
+    top_k = sorted(similarities, key=lambda x: x[1], reverse=True)[:k]
+    
+    return [event for event, _ in top_k]
+
+def find_diverse_recommendations(post_text, category, k=10, similarity_threshold=0.7, num_recommendations=5):
+    logging.info(f"Finding diverse recommendations for category: {category}")
+    logging.info(f"Parameters: k={k}, similarity_threshold={similarity_threshold}, num_recommendations={num_recommendations}")
+    
+    top_items = find_top_k_similar_events_by_category(post_text, category, k)
+    
+    logging.info(f"Found {len(top_items)} initial items")
+    logging.debug(f"Top items: {[item.id for item in top_items]}")
     
     if not top_items:
         logging.info("No top items found. Returning empty list.")
         return []
     
     post_embedding = model.encode(post_text)
+    logging.debug(f"Post embedding shape: {post_embedding.shape}")
+    
     item_embeddings = [model.encode(get_item_text(item)) for item in top_items]
+    logging.debug(f"Item embeddings shapes: {[emb.shape for emb in item_embeddings]}")
     
     # Calculate similarities to the post
     similarities_to_post = [np.dot(post_embedding, item_emb) / (np.linalg.norm(post_embedding) * np.linalg.norm(item_emb)) for item_emb in item_embeddings]
+    logging.debug(f"Similarities to post: {similarities_to_post}")
     
     # Calculate diversity scores
     diversity_scores = []
@@ -4203,14 +4266,18 @@ def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_
         similarities = [np.dot(item_emb, other_emb) / (np.linalg.norm(item_emb) * np.linalg.norm(other_emb)) for other_emb in other_embeddings]
         diversity_score = 1 - (sum(similarities) / len(similarities) if similarities else 0)
         diversity_scores.append(diversity_score)
+    logging.debug(f"Diversity scores: {diversity_scores}")
     
     # Combine similarity to post and diversity
     combined_scores = [sim * div for sim, div in zip(similarities_to_post, diversity_scores)]
+    logging.debug(f"Combined scores: {combined_scores}")
     
     # Filter items that are sufficiently similar to the post
     valid_items = [(item, score) for item, sim, score in zip(top_items, similarities_to_post, combined_scores) if sim >= similarity_threshold]
     
     logging.info(f"Found {len(valid_items)} items meeting similarity threshold")
+    if len(valid_items) == 0:
+        logging.warning(f"No items meet similarity threshold. Max similarity: {max(similarities_to_post) if similarities_to_post else 'N/A'}")
     
     if not valid_items:
         logging.info("No items meet similarity threshold. Returning top similar items.")
@@ -4218,6 +4285,7 @@ def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_
     
     # Sort by combined score
     sorted_items = sorted(valid_items, key=lambda x: x[1], reverse=True)
+    logging.debug(f"Sorted items scores: {[score for _, score in sorted_items]}")
     
     # If we have fewer than num_recommendations, pad with the most similar items from top_items
     if len(sorted_items) < num_recommendations:
@@ -4227,11 +4295,254 @@ def find_diverse_recommendations(post_text, item_type='venue', k=10, similarity_
     # Return exactly num_recommendations items
     result = [item for item, _ in sorted_items[:num_recommendations]]
     logging.info(f"Returning {len(result)} diverse recommendations")
+    logging.debug(f"Returned item IDs: {[item.id for item in result]}")  # Assuming items have an id attribute
     return result
 
 
+def get_item_text(item):
+    """
+    Returns a text representation of the item, using associated ScraperResult or Venue if available.
+    """
+    if item.scraper_result_id:
+        scraper_result = item.scraper_result
+        if scraper_result:
+            # Flatten ScraperResult fields into text
+            text = (
+                f"Title: {scraper_result.title}\n"
+                f"Content: {scraper_result.text}\n"
+                
+            )
+            return text
+        else:
+            logging.warning(f"ScraperResult with id {item.scraper_result_id} not found for Vault {item.id}")
+    elif item.venue_id:
+        venue = item.venue
+        if venue:
+            # Flatten Venue fields into text
+            text = (
+                f"Title: {venue.title}\n"
+                f"Description: {venue.description}\n"
+                f"Category: {venue.category_name}\n"
+            )
+            return text
+        else:
+            logging.warning(f"Venue with id {item.venue_id} not found for Vault {item.id}")
+    else:
+        # Use item.content if no associated ScraperResult or Venue
+        return item.content or ""
 
-def generate_comments_for_all_items(content_type='post', comments_per_item=1, item_id=None):
+
+
+
+
+
+
+
+def generate_comments_for_all_items(content_type='post', chains_per_item=1, item_id=None):
+    if content_type == 'post':
+        ItemModel = Post
+        items = ItemModel.query.filter_by(id=item_id).all() if item_id else ItemModel.query.all()
+    elif content_type == 'vault':
+        ItemModel = Vault
+        items = ItemModel.query.filter(Vault.is_posted == False, Vault.id == item_id).all() if item_id else ItemModel.query.filter(Vault.is_posted == False).all()
+    else:
+        current_app.logger.error("Invalid content type.")
+        return "Invalid content type."
+    
+    if not items:
+        current_app.logger.warning(f"No unscheduled {content_type}s available.")
+        return f"No unscheduled {content_type}s available."
+    
+    results = []
+    
+    for item in items:
+        community = Community.query.get(item.community_id)
+        category = community.category if community else None
+
+        if not category:
+            current_app.logger.warning(f"No category found for item {item.id}")
+            continue
+
+        for _ in range(chains_per_item):
+            num_levels = random.randint(2, 5)
+            num_comments = random.randint(2, 8)
+            
+            commenters = select_random_commenters(2, 4, item, content_type)
+            
+            chain_prompt = construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type)
+            
+            try:
+                generated_chain = generate_comment_chain(chain_prompt)
+                save_comment_chain_to_database(generated_chain, item, content_type)
+                results.append(f"Generated and posted comment chain successfully for {content_type} {item.id}")
+            except Exception as e:
+                current_app.logger.error(f"Error generating comment chain: {str(e)}")
+                results.append(f"Failed to generate comment chain for {content_type} {item.id}: {str(e)}")
+    
+    return results
+
+
+
+def select_random_commenters(min_commenters, max_commenters, item, content_type):
+    num_commenters = random.randint(min_commenters, max_commenters)
+    if content_type == 'vault':
+        original_seeder = OfficialSeeder.query.get(item.seeder_id)
+        commenters = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id).order_by(func.random()).limit(num_commenters).all()
+        return [original_seeder] + commenters
+    else:  # post
+        return OfficialSeeder.query.order_by(func.random()).limit(num_commenters).all()
+
+
+def select_ai_comment_prompt(category):
+    return AICommentPrompt.query.filter_by(
+        category=category,
+        prompt_type='top_level',
+        is_active=True
+    ).order_by(func.random()).first()
+
+
+def get_name_with_indicator(name, types_lowercase):
+    if types_lowercase:
+        parts = name.rsplit(' ', 1)
+        if len(parts) > 1:
+            return f"{parts[0]} Mc{parts[1]}"
+        else:
+            return f"Mc{name}"
+    return name
+
+
+def construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type):
+    # Get the five-second moment if it exists
+    five_second_moment = item.five_second_moment if hasattr(item, 'five_second_moment') else None
+
+    # Get one of each type of scraper result
+    scraper_results = {
+        'Groupon': ScraperResult.query.filter_by(category=category, source='Groupon').order_by(func.random()).first(),
+        'Instagram': ScraperResult.query.filter_by(category=category, source='Instagram').order_by(func.random()).first(),
+        'Eventbrite': ScraperResult.query.filter_by(category=category, source='Eventbrite').order_by(func.random()).first(),
+        'Regular': ScraperResult.query.filter_by(category=category, source='Regular').order_by(func.random()).first()
+    }
+
+    current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
+
+    # Prepare additional info from scraper results
+    additional_info = []
+    for source, result in scraper_results.items():
+        if result:
+            info = f"{source}: {result.title}"
+            
+            if result.price is not None:
+                info += f" - Price: ${result.price:.2f}"
+            
+            if result.event_date is not None:
+                info += f" - Date: {result.event_date.strftime('%B %d, %Y')}"
+            
+            info += f" - {result.text}"
+            
+            additional_info.append(info)
+
+    additional_info_str = "\n".join(additional_info)
+    current_app.logger.debug(f"Additional info prepared: {len(additional_info)} items")
+
+    original_seeder = OfficialSeeder.query.get(item.seeder_id).full_name
+    current_app.logger.debug(f"Original seeder: {original_seeder}")
+    commenter_info = []
+    for i, commenter in enumerate(commenters):
+        traits = ", ".join([trait.value for trait in commenter.character_traits]) if commenter.character_traits else "no specific traits"
+        full_name_with_indicator = get_name_with_indicator(commenter.full_name, commenter.types_lowercase)
+        
+        if commenter.full_name == original_seeder:
+            commenter_info.append(f"{full_name_with_indicator} ({commenter.alias}) (Original Poster): {traits}")
+        else:
+            commenter_info.append(f"{full_name_with_indicator} ({commenter.alias}): {traits}")
+    
+    commenter_info_str = "\n-".join(commenter_info)
+
+    current_app.logger.debug(f"Commenters prepared: {len(commenters)} commenters")
+
+    ai_prompt = select_ai_comment_prompt(category)
+    first_comment_prompt = ai_prompt.prompt if ai_prompt else "Respond to the original post"
+    current_app.logger.debug(f"First comment prompt: {first_comment_prompt[:50]}...")
+    
+    prompt = f"""Generate a realistic comment chain for a Miami discussion board about {category}. The original post is:
+
+{item.title}
+Content: {item.content}
+
+{"The problem/main idea of the post is: " + five_second_moment if five_second_moment else ""}
+
+Create a conversation with {num_comments} comments total and {num_levels} nested levels of replies, involving these characters:
+{commenter_info_str}
+
+Guidelines:
+
+1. Start with one top-level comment responding to {original_seeder}s post. For the first comment, use the following guideline: {first_comment_prompt}
+2. All subsequent comments should be replies to this first comment
+3. {original_seeder} (OP) should participate in the conversation, but not dominate it. Her comments should seek clarification or respond to advice.
+4. Each character's comments should reflect their traits. 
+5. Use '-' to denote comment levels (e.g., '-', '--', '---').
+6. Keep comments concise and in casual, 8th-grade level language with occasional imperfections.
+7. Ensure a natural conversation flow, with each comment building on previous ones and some disagreement or conflicting opinions.
+8. Make each comment one concise sentence
+9. Subtly incorporate this additional information where relevant:
+{additional_info_str}
+10. When mentioning events, activities, or deals, include specific details such as the exact name, date, price, and source (Groupon, Eventbrite, Instagram, etc.)
+
+Format:
+-[First comment] By: [Author]
+--[Reply] By: [Different Author]
+---[Reply to reply] By: [Another Author]
+(Continue this pattern for all {num_comments} comments)
+
+Aim for a conversation that feels authentic, engaging, and natural, while addressing the original post's concerns and subtly incorporating the additional information.
+"""
+
+    current_app.logger.debug(f"Prompt constructed: {len(prompt)} characters")
+
+    return prompt
+
+
+
+def generate_comment_chain(prompt):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "system", "content": prompt}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        current_app.logger.error(f"Error in GPT-4 API call: {str(e)}")
+        raise
+
+def save_comment_chain_to_database(chain, item, content_type):
+    try:
+        new_comment = Comment(
+            content=chain,
+            user_id=item.user_id if content_type == 'post' else None,
+            official_seeder_id=item.seeder_id if content_type == 'vault' else None,
+            post_id=item.id if content_type == 'post' else None,
+            vault_id=item.id if content_type == 'vault' else None,
+            posted_time=datetime.utcnow(),
+            is_burner=False
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.error(f"Database error when adding comment chain: {str(e)}")
+        raise
+
+
+
+
+
+
+
+
+
+
+
+def generate_comments_for_all_items_2(content_type='post', comments_per_item=1, item_id=None):
     with app.app_context():
         # Get the Career community
         career_community = Community.query.filter_by(name='Career').first()
@@ -4259,12 +4570,26 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
         results = []
         
         for item in items:
-            item_context = f"You're in a conversation with your friend. Your friend just said this: {item.title}\nContent: {item.content}\n\n"
 
             # Check if the item is in the Career community
-            is_career = item.community_id == career_community.id if career_community else False
+            community = Community.query.get(item.community_id)
+            category = community.category if community else None
 
-            if is_career:
+            item_context = f"You're browsing a local to Miami discussion board that has the topic {category}. You see someone has just posted this: {item.title}\nContent: {item.content}\n\n"
+
+            # Check for associations and log the presence of venue or scraper_result
+            if hasattr(item, 'venue') and item.venue:
+                current_app.logger.debug(f"Item {item.id} has an associated venue.")
+            elif hasattr(item, 'scraper_result') and item.scraper_result:
+                current_app.logger.debug(f"Item {item.id} has an associated scraper_result.")
+            else:
+                current_app.logger.debug(f"Item {item.id} has no associated venue or scraper_result.")
+
+            item_text = get_item_text(item)
+
+            
+            
+            if category:
                 top_level_prompts = AICommentPrompt.query.filter(
                     AICommentPrompt.prompt_type == 'top_level',
                     AICommentPrompt.is_active == True,
@@ -4276,24 +4601,18 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
                     AICommentPrompt.data_type != 'venue'
                 ).all()
             else:
-                top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level', is_active=True).all()
-                reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply', is_active=True).all()
-
+                logging.warning(f"No category found for item {item.id}")
+                continue
+            
             if not top_level_prompts or not reply_prompts:
                 logging.warning("No prompts available.")
                 results.append(f"No prompts available for {content_type} {item.id}")
                 continue
 
 
-            #Get our recs
+           #Get our recs
 
-            event_recommendations = find_diverse_recommendations(item.content, 'event', num_recommendations=10, is_career=is_career)
-
-            if is_career:
-                all_recommendations = event_recommendations
-            else:
-                venue_recommendations = find_diverse_recommendations(item.content, 'venue', num_recommendations=10)
-                all_recommendations = venue_recommendations + event_recommendations
+            all_recommendations = find_diverse_recommendations(item.content, category, num_recommendations=20)
 
             random.shuffle(all_recommendations) 
 
@@ -4302,16 +4621,17 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
             selected_prompts = [top_level_prompts[i % len(top_level_prompts)] for i in range(comments_per_item)]
             
             for prompt in selected_prompts:
-                if all_recommendations:
+                use_recommendation = prompt.data_type != 'none'
+                chain_recommendation = None
+
+                if use_recommendation and all_recommendations:
                     available_recommendations = [rec for rec in all_recommendations if rec.id not in used_recommendations]
                     if not available_recommendations:
                         used_recommendations.clear()
                         available_recommendations = all_recommendations
                     chain_recommendation = random.choice(available_recommendations)
-                else:
-                    chain_recommendation = None
 
-                recommendation_used = False
+                current_app.logger.debug(f"Current chain rec: {chain_recommendation}")
 
                 if content_type == 'post':
                     commenter = User.query.filter(User.seeder == True, User.id != item.user_id).order_by(func.random()).first()
@@ -4323,16 +4643,32 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
                     results.append(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
                     continue
 
+                
+
+                poster_character_traits = []
+                if content_type == 'vault':
+                    poster = OfficialSeeder.query.filter_by(id=item.seeder_id).order_by(func.random()).first()
+                    poster_character_traits = poster.character_traits or []
+
+                # Prepare character traits string
+                poster_traits_string = ", ".join(trait.value for trait in poster_character_traits) if poster_character_traits else "no specific traits"
+
+                character_traits = []
+                if content_type == 'vault' and hasattr(commenter, 'character_traits'):
+                    character_traits = commenter.character_traits or []
+
+                # Prepare character traits string
+                traits_string = ", ".join(trait.value for trait in character_traits) if character_traits else "no specific traits"
+
                 # First comment
-                if prompt.data_type != 'none':
+                if use_recommendation:
                     resolved_prompt = resolve_prompt_template(prompt, chain_recommendation)
-                    recommendation_used = True
                 else:
                     resolved_prompt = resolve_prompt_template(prompt)
-                
-                combined_prompt = f"{item_context} {resolved_prompt}"
 
-                
+                combined_prompt = f"{item_context} As a commenter with the following traits: {traits_string}, {resolved_prompt}"
+
+                logging.info(f"Here is the poster traits {poster_traits_string} and here is the commenter traits {traits_string}")
 
                 try:
                     # First comment
@@ -4358,15 +4694,20 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
                     db.session.flush()  # This assigns an ID to new_comment
                     
                     # Second comment (reply from original creator)
-                    reply_prompt = random.choice(reply_prompts)
-                    if reply_prompt.data_type != 'none':
+                    if use_recommendation:
+                        filtered_reply_prompts = [p for p in reply_prompts if p.data_type != 'none']
+                    else:
+                        filtered_reply_prompts = [p for p in reply_prompts if p.data_type == 'none']
+
+                    # Second comment (reply from original creator)
+                    reply_prompt = random.choice(filtered_reply_prompts)
+                    if use_recommendation:
                         resolved_reply_prompt = resolve_prompt_template(reply_prompt, chain_recommendation)
-                        recommendation_used = True
                     else:
                         resolved_reply_prompt = resolve_prompt_template(reply_prompt)
                     
-                    reply_context = f"Your friend just said this: {generated_comment}, which is a reply to you saying this {item.title}\nContent: {item.content}\n\n"
-                    combined_reply_prompt = f"{reply_context} {resolved_reply_prompt}"
+                    reply_context = f"On a Miami discussion board of the topic {category} where you made a post, someone just said this: {generated_comment}, which is a reply to your original post {item.title}\nContent: {item.content}\n\n"
+                    combined_reply_prompt = f"{reply_context} As a person with the following traits: {poster_traits_string} {resolved_reply_prompt}"
                     
                     reply_response = client.chat.completions.create(
                         model="gpt-4o",
@@ -4393,19 +4734,18 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
                     db.session.flush()  # This assigns an ID to new_reply
                     
                     # Third comment (reply from original commenter)
-                    third_reply_prompt = random.choice(reply_prompts)
-                    if third_reply_prompt.data_type != 'none':
+                    third_reply_prompt = random.choice(filtered_reply_prompts)
+                    if use_recommendation:
                         resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt, chain_recommendation)
-                        recommendation_used = True
                     else:
                         resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt)
                     
-                    third_reply_context = f"""Here's the conversation so far:
+                    third_reply_context = f"""You are on a Miami based discussion board of the topic {category}, participating in a comment chain. Here's the chain so far:
                     Original post: {item.title}\nContent: {item.content}
                     Your first comment: {generated_comment}
-                    Their reply: {generated_reply}
-                    Now, \n\n"""
-                    combined_third_reply_prompt = f"{third_reply_context} {resolved_third_reply_prompt}"
+                    Their reply to your comment: {generated_reply}
+                    \n\n"""
+                    combined_third_reply_prompt = f"{third_reply_context} As a commenter with the following traits: {traits_string}, {resolved_third_reply_prompt}"
                     
                     third_reply_response = client.chat.completions.create(
                         model="gpt-4o",
@@ -4428,7 +4768,7 @@ def generate_comments_for_all_items(content_type='post', comments_per_item=1, it
                     )
                     db.session.add(new_third_reply)
 
-                    if recommendation_used and chain_recommendation:
+                    if use_recommendation and chain_recommendation:
                         used_recommendations.add(chain_recommendation.id)
                     
                     try:
@@ -5810,54 +6150,44 @@ def get_vault_counts_by_week_and_community():
     current_week_start, current_week_end = week_ranges['current_week']
     next_week_start, next_week_end = week_ranges['next_week']
     
-    # Current Week Scheduled (Using < next_week_start)
-    current_week_scheduled = db.session.query(
+    # Current Week Scheduled and Posted
+    current_week_counts = db.session.query(
         Vault.community_id,
-        func.count(Vault.id)
+        func.sum(case((Vault.scheduled_at.isnot(None) & (Vault.is_posted == False), 1), else_=0)).label('scheduled_count'),
+        func.sum(case((Vault.is_posted == True, 1), else_=0)).label('posted_count')
     ).filter(
         Vault.scheduled_at >= current_week_start,
-        Vault.scheduled_at < current_week_end,  # Changed from <= to <
-        Vault.is_posted == False
+        Vault.scheduled_at < current_week_end
     ).group_by(Vault.community_id).all()
     
-    # Next Week Scheduled
-    next_week_scheduled = db.session.query(
+    # Next Week Scheduled and Posted
+    next_week_counts = db.session.query(
         Vault.community_id,
-        func.count(Vault.id)
+        func.sum(case((Vault.scheduled_at.isnot(None) & (Vault.is_posted == False), 1), else_=0)).label('scheduled_count'),
+        func.sum(case((Vault.is_posted == True, 1), else_=0)).label('posted_count')
     ).filter(
         Vault.scheduled_at >= next_week_start,
-        Vault.scheduled_at < next_week_end,  # Ensure similar logic
-        Vault.is_posted == False
+        Vault.scheduled_at < next_week_end
     ).group_by(Vault.community_id).all()
     
     # Day-by-Day Breakdown for Current Week
     current_week_daily = db.session.query(
         func.date(Vault.scheduled_at).label('scheduled_date'),
         Vault.community_id,
-        func.count(Vault.id)
+        func.sum(case((Vault.scheduled_at.isnot(None) & (Vault.is_posted == False), 1), else_=0)).label('scheduled_count'),
+        func.sum(case((Vault.is_posted == True, 1), else_=0)).label('posted_count')
     ).filter(
         Vault.scheduled_at >= current_week_start,
-        Vault.scheduled_at < current_week_end,  # Changed from <= to <
-        Vault.is_posted == False
+        Vault.scheduled_at < current_week_end
     ).group_by(
         func.date(Vault.scheduled_at),
         Vault.community_id
     ).all()
     
-    # Posted Vaults This Week
-    posted_this_week = db.session.query(
-        func.count(Vault.id)
-    ).filter(
-        Vault.created_at >= current_week_start,
-        Vault.created_at < current_week_end,  # Changed from <= to <
-        Vault.is_posted == True
-    ).scalar()
-    
     return {
-        'current_week_scheduled': current_week_scheduled,
-        'next_week_scheduled': next_week_scheduled,
-        'current_week_daily': current_week_daily,
-        'posted_this_week': posted_this_week
+        'current_week_counts': current_week_counts,
+        'next_week_counts': next_week_counts,
+        'current_week_daily': current_week_daily
     }
 
 def get_daily_community_breakdown():
@@ -5881,6 +6211,21 @@ def get_daily_community_breakdown():
 
 
 from flask import jsonify
+
+
+@app.route('/delete-comments/<int:vault_id>', methods=['POST'])
+def delete_comments(vault_id):
+    try:
+        # Fetch the comments associated with the given vault
+        comments_to_delete = Comment.query.filter_by(vault_id=vault_id).all()
+        for comment in comments_to_delete:
+            db.session.delete(comment)
+        db.session.commit()
+        return jsonify(success=True)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(success=False, error=str(e))
+
 
 @app.route('/api/vault_scheduling_stats')
 def vault_scheduling_stats():
@@ -6040,39 +6385,42 @@ def vault_interface():
     # Fetch scheduling statistics
     stats = get_vault_counts_by_week_and_community()
     
-    # Process for template
-    current_week_scheduled = {c.id: 0 for c in communities}
-    for community_id, count in stats['current_week_scheduled']:
-        current_week_scheduled[community_id] = count
+    current_week_counts = {c.id: {'scheduled': 0, 'posted': 0} for c in communities}
+    for item in stats['current_week_counts']:
+        current_week_counts[item.community_id] = {
+            'scheduled': item.scheduled_count,
+            'posted': item.posted_count
+        }
     
-    next_week_scheduled = {c.id: 0 for c in communities}
-    for community_id, count in stats['next_week_scheduled']:
-        next_week_scheduled[community_id] = count
+    next_week_counts = {c.id: {'scheduled': 0, 'posted': 0} for c in communities}
+    for item in stats['next_week_counts']:
+        next_week_counts[item.community_id] = {
+            'scheduled': item.scheduled_count,
+            'posted': item.posted_count
+        }
     
-    # Process daily breakdown
     daily_breakdown = {}
-    for date, community_id, count in stats['current_week_daily']:
-        if isinstance(date, str):
-            date = datetime.strptime(date, '%Y-%m-%d').date()
-        if date not in daily_breakdown:
-            daily_breakdown[date] = {}
-        daily_breakdown[date][community_id] = count
+    for item in stats['current_week_daily']:
+        if item.scheduled_date not in daily_breakdown:
+            daily_breakdown[item.scheduled_date] = {}
+        daily_breakdown[item.scheduled_date][item.community_id] = {
+            'scheduled': item.scheduled_count,
+            'posted': item.posted_count
+        }
     
-    posted_this_week = stats['posted_this_week']
     
 
 
 
     return render_template('vault_interface.html', 
-                           grouped_scheduled_vaults=sorted_grouped_scheduled_vaults,
-                           grouped_posted_vaults=sorted_grouped_posted_vaults,
-                           unscheduled_vaults=unscheduled_vaults, 
-                           communities=communities,
-                           community_dict=community_dict,
-                           current_week_scheduled=current_week_scheduled,
-                           next_week_scheduled=next_week_scheduled,
-                           daily_breakdown=daily_breakdown,
-                           posted_this_week=posted_this_week)
+                       grouped_scheduled_vaults=sorted_grouped_scheduled_vaults,
+                       grouped_posted_vaults=sorted_grouped_posted_vaults,
+                       unscheduled_vaults=unscheduled_vaults, 
+                       communities=communities,
+                       community_dict=community_dict,
+                       daily_breakdown=daily_breakdown,
+                       current_week_counts=current_week_counts,
+                       next_week_counts=next_week_counts)
 
 @app.route('/delete_vault/<int:vault_id>', methods=['POST'])
 def delete_vault(vault_id):
@@ -6632,32 +6980,26 @@ def scrape_eventbrite(url):
         browser = playwright.chromium.launch(headless=False)  # Visible browser
         page = browser.new_page()
         page.goto(url, wait_until='domcontentloaded')
-        page.wait_for_timeout(10000)  # Initial wait for content
+        # Wait a few seconds to let additional resources load
+        page.wait_for_timeout(15000)  # Initial wait for content
 
-        # Scroll down the page in chunks
-        viewport_height = page.viewport_size['height']
-        scroll_step = viewport_height * 0.8  # Scroll 80% of the viewport height each time
-        last_height = 0
-        while True:
+        # Incremental scrolling
+        step_size = 1000  # Scroll step size
+        attempts = 0  # to avoid infinite loops
+
+        while attempts < 2:
             last_height = page.evaluate("document.body.scrollHeight")
-
-            # Scroll down by one step
-            page.evaluate(f"window.scrollBy(0, {scroll_step})")
-            page.wait_for_timeout(3000)  # Wait for content to load
-
-            # Check if we've reached the bottom
+            page.evaluate(f"window.scrollBy(0, {step_size})")
+            # Wait for network to be idle or a maximum of 5 seconds after each scroll
+            try:
+                page.wait_for_timeout(10000)
+            except:
+                # Timeout implies no significant network activity after 5 seconds
+                pass
             new_height = page.evaluate("document.body.scrollHeight")
-            if new_height == last_height:
-                # If no new content loaded, try scrolling to the very bottom
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(3000)
-                final_height = page.evaluate("document.body.scrollHeight")
-                if final_height == new_height:
-                    # If still no change, we've reached the bottom
-                    break
-
             
-
+            attempts += 1
+        
         # Extract links
         links = page.evaluate("""
             () => {
@@ -6669,7 +7011,28 @@ def scrape_eventbrite(url):
             }
         """)
         browser.close()
-        return list(set(links))
+        content_data = []
+        for link in set(links):
+            content_data.append(scrape_individual_eventbrite_page(link, playwright))
+        return content_data
+
+def scrape_individual_eventbrite_page(url, playwright):
+    browser = playwright.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto(url, wait_until='domcontentloaded')
+    
+    title_element = page.query_selector('h1.event-title')
+    title = title_element.text_content() if title_element else "Title Not Found"
+    
+    date_element = page.query_selector('time.start-date')
+    date = date_element.get_attribute('datetime') if date_element else None
+    
+    paragraphs = page.query_selector_all('p')
+    description = ' '.join(p.text_content().strip() for p in paragraphs if p.text_content().strip())
+    
+    browser.close()
+    
+    return {'url': url, 'title': title, 'description': description, 'event_date': date}
 
 
 def scrape_groupon(url):
@@ -6684,36 +7047,69 @@ def scrape_groupon(url):
         step_size = 1000  # Scroll step size
         attempts = 0  # to avoid infinite loops
 
-        while True:
+        while attempts < 10:
             last_height = page.evaluate("document.body.scrollHeight")
             page.evaluate(f"window.scrollBy(0, {step_size})")
             # Wait for network to be idle or a maximum of 5 seconds after each scroll
             try:
-                page.wait_for_timeout(15000)
+                page.wait_for_timeout(10000)
             except:
                 # Timeout implies no significant network activity after 5 seconds
                 pass
             new_height = page.evaluate("document.body.scrollHeight")
             
-            # Stop if no new content is loaded or if we have tried too many times
-            if new_height == last_height or attempts > 10:
-                break
             attempts += 1
 
-        # Extract links
-        links = page.evaluate("""
+        items = page.evaluate("""
             () => {
-                const links = [];
-                document.querySelectorAll('div[data-item-type="card"] a').forEach(link => {
-                    links.push(link.href);
+                const items = [];
+                document.querySelectorAll('div[data-item-type="card"]').forEach(card => {
+                    const link = card.querySelector('a');
+                    const priceElement = card.querySelector('div[data-testid="green-price"]');
+                    if (link && priceElement) {
+                        const priceText = priceElement.textContent.trim().replace(/[^0-9.]/g, '');
+                        items.push({
+                            url: link.href,
+                            price: parseFloat(priceText) || null
+                        });
+                    }
                 });
-                return links;
+                return items;
             }
         """)
-
-
+        
         browser.close()
-        return list(set(links))
+        
+        # Now process each item
+        content_data = []
+        for item in items:
+            result = scrape_individual_page(item['url'], playwright)
+            result['price'] = item['price']
+            content_data.append(result)
+        
+        return content_data
+
+def scrape_individual_page(url, playwright):
+    """Function to scrape individual pages with adaptive title extraction."""
+    browser = playwright.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto(url, wait_until='domcontentloaded')
+    
+    # Attempt to extract the title in a more flexible manner
+    title_element = page.query_selector('h1[data-testid="deal-title"]')
+    if not title_element:  # Fallback to a more generic selector if specific one fails
+        title_element = page.query_selector('h1')
+    
+    # Get text content from the selected title element
+    title = title_element.text_content() if title_element else "Title Not Found"
+    
+    # Extract all paragraphs and concatenate them into one description string
+    paragraphs = page.query_selector_all('p')  # This gets all paragraph elements
+    description = ' '.join(p.text_content().strip() for p in paragraphs if p.text_content().strip())
+    
+    browser.close()
+    
+    return {'url': url, 'title': title, 'description': description}
 
 
 import logging
@@ -6784,7 +7180,8 @@ def run_scraper():
                                  f"Contract Type: {item.get('contractType', '')}\n"
                                  f"Experience Level: {item.get('experienceLevel', '')}\n"
                                  f"Description: {item.get('description', '')}",
-                            category=CategoryEnum.CAREER
+                            category=CategoryEnum.CAREER,
+                            source = 'Regular'
                         )
                         db.session.add(scraper_result)
                         try:
@@ -6835,27 +7232,103 @@ def run_scraper():
                         skipped_results += 1
                         current_app.logger.debug(f"Skipped existing Puppeteer result: {item.get('url', '')}")
 
+            elif url.scraper_type == 'Instagram':
+                # Use Instagram scraper
+                client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
+                run_input = {
+                    "username": [url.url],  # Assuming the URL is the Instagram username
+                    "resultsLimit": url.max_results,
+                    "onlyPostsNewerThan": (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+                }
+                run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
+                
+                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                    
+                    if not existing_result:
+                        scraper_result = ScraperResult(
+                            url=item.get('url', ''),
+                            title=f"Instagram post by {item.get('ownerUsername', '')}",
+                            text=f"Caption: {item.get('caption', '')}\n",
+                            category=url.category,
+                            source='Instagram'
+                        )
+                        db.session.add(scraper_result)
+                        try:
+                            db.session.commit()
+                            new_results += 1
+                        except IntegrityError:
+                            db.session.rollback()
+                            skipped_results += 1
+                    else:
+                        skipped_results += 1
+
+            elif url.scraper_type == 'Groupon':
+                # New Groupon scraping logic
+                content_data = scrape_groupon(url.url)
+                
+                for item in content_data:
+                    existing_result = ScraperResult.query.filter_by(url=item['url']).first()
+                    
+                    if not existing_result:
+                        scraper_result = ScraperResult(
+                            url=item['url'],
+                            title=item['title'],
+                            text=item['description'],
+                            category=url.category,
+                            source='Groupon',
+                            price=item['price']
+
+                        )
+                        db.session.add(scraper_result)
+                        try:
+                            db.session.commit()
+                            new_results += 1
+                            current_app.logger.debug(f"Added new Groupon result: {item['url']}")
+                        except IntegrityError:
+                            db.session.rollback()
+                            skipped_results += 1
+                            current_app.logger.warning(f"IntegrityError for Groupon URL: {item['url']}")
+                    else:
+                        skipped_results += 1
+                        current_app.logger.debug(f"Skipped existing Groupon result: {item['url']}")
+
+            elif url.scraper_type == 'Eventbrite':
+                # New Eventbrite scraping logic
+                content_data = scrape_eventbrite(url.url)
+                
+                for item in content_data:
+                    existing_result = ScraperResult.query.filter_by(url=item['url']).first()
+                    
+                    if not existing_result:
+                        scraper_result = ScraperResult(
+                            url=item['url'],
+                            title=item['title'],
+                            text=item['description'],
+                            category=url.category,
+                            source='Eventbrite',
+                            event_date=item['event_date']
+                        )
+                        db.session.add(scraper_result)
+                        try:
+                            db.session.commit()
+                            new_results += 1
+                            current_app.logger.debug(f"Added new Eventbrite result: {item['url']}")
+                        except IntegrityError:
+                            db.session.rollback()
+                            skipped_results += 1
+                            current_app.logger.warning(f"IntegrityError for Eventbrite URL: {item['url']}")
+                    else:
+                        skipped_results += 1
+                        current_app.logger.debug(f"Skipped existing Eventbrite result: {item['url']}")
+
             else:
                 # Use website content crawler for other URLs
                 run_input = {
                     "startUrls": [{"url": url.url}],
-                    "maxCrawlDepth": 1 if not (url.is_eventbrite or url.scraper_type == 'Groupon') else 0,
+                    "maxCrawlDepth": 1,
                     "maxResults": url.max_results
                 }
-                
-                if url.is_eventbrite:
-                    
-                    eventbrite_links = scrape_eventbrite(url.url)
-                    
-                    run_input["startUrls"] = [{"url": link} for link in eventbrite_links]
-
-                if url.scraper_type == 'Groupon':
-
-                    groupon_links = scrape_groupon(url.url)
-                    
-                    run_input["startUrls"] = [{"url": link} for link in groupon_links]
-
-
                 
                 
                 run = client.actor("apify/website-content-crawler").call(run_input=run_input)
@@ -6870,7 +7343,8 @@ def run_scraper():
                             url=item.get('url', ''),
                             title=item.get('title', ''),
                             text=item.get('text', ''),
-                            category=url.category
+                            category=url.category,
+                            source= 'Regular'
                         )
                         db.session.add(scraper_result)
                         try:
@@ -6914,6 +7388,7 @@ def run_instagram_scraper():
     run_input = {
         "username": [organizer.instagram_username],
         "resultsLimit": 30,
+        "onlyPostsNewerThan": "2024-09-19" 
     }
     run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
     
@@ -7057,7 +7532,6 @@ def manage_urls():
         if 'add_url' in request.form or 'edit_url' in request.form:
             url = request.form.get('url')
             category = request.form.get('category')
-            is_eventbrite = request.form.get('is_eventbrite') == 'on'
             scraper_type = request.form.get('scraper_type')
             link_selector = request.form.get('link_selector')
             page_function = request.form.get('page_function')
@@ -7066,7 +7540,7 @@ def manage_urls():
             if url and category and scraper_type:
                 try:
                     if 'add_url' in request.form:
-                        new_url = SelectedURLs(url=url, category=CategoryEnum[category], is_eventbrite=is_eventbrite,
+                        new_url = SelectedURLs(url=url, category=CategoryEnum[category], 
                                                scraper_type=scraper_type, link_selector=link_selector, 
                                                page_function=page_function, max_results=max_results)
                         db.session.add(new_url)
@@ -7077,7 +7551,6 @@ def manage_urls():
                         if url_obj:
                             url_obj.url = url
                             url_obj.category = CategoryEnum[category]
-                            url_obj.is_eventbrite = is_eventbrite
                             url_obj.scraper_type = scraper_type
                             url_obj.link_selector = link_selector
                             url_obj.page_function = page_function
@@ -7277,7 +7750,6 @@ def generate_and_save_venue_embeddings(index_file='venue_index.faiss', id_file='
     
     return index, ids
 
-
 def generate_and_save_event_embeddings(index_file='event_index.faiss', id_file='event_ids.pkl'):
     events = ScraperResult.query.all()
     embeddings = []
@@ -7313,6 +7785,9 @@ def find_top_k_similar_venues(post_text, k=5):
     post_embedding = model.encode(post_text)
     D, I = venue_index.search(np.array([post_embedding]), k)
     return [Venue.query.get(venue_ids[i]) for i in I[0]]
+
+    
+
 
 def find_top_k_similar_events(post_text, k=5, exclude_career=True):
     post_embedding = model.encode(post_text)
@@ -7482,6 +7957,96 @@ def categorize_route(category):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+###Random Script Caller
+
+
+@app.route('/script_executer', methods=['POST', 'GET'])
+def script_executer():
+    try:
+        # Fetch all seeders
+        seeders = OfficialSeeder.query.all()
+        traits = list(CharacterTraitEnum)
+
+        # Assign random traits
+        for seeder in seeders:
+            seeder.character_traits = random.choices(traits, k=random.randint(1, 3))
+            db.session.add(seeder)
+
+        db.session.commit()
+        flash('Traits successfully assigned!', 'success')
+    except Exception as e:
+        db.session.rollback()  # Important to handle failures gracefully
+        flash(f'An error occurred: {str(e)}', 'error')
+
+    return redirect(url_for('manage_traits'))  # Redirect to an appropriate admin panel or dashboard
+
+
+#manage_traits
+
+@app.route('/manage-traits', methods=['GET'])
+def manage_traits():
+    return render_template('manage_traits.html', CharacterTraitEnum=CharacterTraitEnum)
+
+
+@app.route('/update-traits', methods=['POST'])
+def update_traits():
+    selected_traits = request.form.getlist('traits')  # Retrieve list of selected trait names from the form
+    try:
+        seeder_id = 1  # For example, we're updating the first seeder; replace with dynamic fetching logic as needed
+        seeder = OfficialSeeder.query.get(seeder_id)
+        if seeder:
+            seeder.character_traits = [CharacterTraitEnum[trait] for trait in selected_traits]
+            db.session.commit()
+            flash('Character traits updated successfully.', 'success')
+        else:
+            flash('Official Seeder not found.', 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'An error occurred: {str(e)}', 'error')
+
+    return redirect(url_for('manage_traits'))
+
+
+
+#moments of realization
+
+
+@app.route('/admin/moments', methods=['GET'])
+def moments_of_realization():
+    moments = MomentOfRealization.query.all()
+    categories = CategoryEnum
+    return render_template('moments_of_realization.html', moments=moments, categories=categories)
+
+@app.route('/admin/moments/add', methods=['POST'])
+def add_moment():
+    text = request.form['text']
+    category = CategoryEnum(request.form['category'])
+    new_moment = MomentOfRealization(text=text, category=category)
+    db.session.add(new_moment)
+    db.session.commit()
+    flash('Moment of realization added successfully', 'success')
+    return redirect(url_for('moments_of_realization'))
+
+@app.route('/admin/moments/edit/<int:id>', methods=['GET', 'POST'])
+def edit_moment(id):
+    moment = MomentOfRealization.query.get_or_404(id)
+    if request.method == 'POST':
+        moment.text = request.form['text']
+        moment.category = CategoryEnum(request.form['category'])
+        db.session.commit()
+        flash('Moment of realization updated successfully', 'success')
+        return redirect(url_for('moments_of_realization'))
+    categories = CategoryEnum
+    return render_template('edit_moment.html', moment=moment, categories=categories)
+
+@app.route('/admin/moments/delete/<int:id>', methods=['POST'])
+def delete_moment(id):
+    moment = MomentOfRealization.query.get_or_404(id)
+    db.session.delete(moment)
+    db.session.commit()
+    flash('Moment of realization deleted successfully', 'success')
+    return redirect(url_for('moments_of_realization'))
 
 
 if __name__ == '__main__':

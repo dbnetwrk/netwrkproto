@@ -15,87 +15,94 @@
         <h2 class="mt-5">Vault Scheduling Statistics</h2>
         <div class="row">
             <!-- Current Week Scheduled -->
-            <div class="col-md-6">
-                <h4>Current Week Scheduled Vaults</h4>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Community</th>
-                            <th>Number of Vaults</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for community in communities %}
-                        <tr>
-                            <td>{{ community.name }}</td>
-                            <td>{{ current_week_scheduled.get(community.id, 0) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<div class="col-md-6">
+    <h4>Current Week Vaults</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Community</th>
+                <th>Scheduled</th>
+                <th>Posted</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for community in communities %}
+            <tr>
+                <td>{{ community.name }}</td>
+                <td>{{ current_week_counts.get(community.id, {}).get('scheduled', 0) }}</td>
+                <td>{{ current_week_counts.get(community.id, {}).get('posted', 0) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
             
             <!-- Next Week Scheduled -->
-            <div class="col-md-6">
-                <h4>Next Week Scheduled Vaults</h4>
-                <table class="table table-bordered">
+<div class="col-md-6">
+    <h4>Next Week Vaults</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Community</th>
+                <th>Scheduled</th>
+                <th>Posted</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for community in communities %}
+            <tr>
+                <td>{{ community.name }}</td>
+                <td>{{ next_week_counts.get(community.id, {}).get('scheduled', 0) }}</td>
+                <td>{{ next_week_counts.get(community.id, {}).get('posted', 0) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+        <!-- Day-by-Day Breakdown -->
+<h4 class="mt-4">Day-by-Day Breakdown (Current Week)</h4>
+<div class="accordion" id="dailyBreakdownAccordion">
+    {% for date, communities_counts in daily_breakdown.items() %}
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="heading{{ loop.index }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                {{ date.strftime('%A, %m-%d-%Y') }} 
+            </button>
+        </h2>
+        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#dailyBreakdownAccordion">
+            <div class="accordion-body">
+                <table class="table table-sm">
                     <thead>
                         <tr>
                             <th>Community</th>
-                            <th>Number of Vaults</th>
+                            <th>Scheduled</th>
+                            <th>Posted</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for community in communities %}
                         <tr>
                             <td>{{ community.name }}</td>
-                            <td>{{ next_week_scheduled.get(community.id, 0) }}</td>
+                            <td>{{ communities_counts.get(community.id, {}).get('scheduled', 0) }}</td>
+                            <td>{{ communities_counts.get(community.id, {}).get('posted', 0) }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-
-        <!-- Day-by-Day Breakdown -->
-        <h4 class="mt-4">Day-by-Day Breakdown (Current Week)</h4>
-        <div class="accordion" id="dailyBreakdownAccordion">
-            {% for date, communities_counts in daily_breakdown.items() %}
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="heading{{ loop.index }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
-    {{ date.strftime('%A, %m-%d-%Y') }} 
-</button>
-                </h2>
-                <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#dailyBreakdownAccordion">
-                    <div class="accordion-body">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Community</th>
-                                    <th>Number of Vaults</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for community in communities %}
-                                <tr>
-                                    <td>{{ community.name }}</td>
-                                    <td>{{ communities_counts.get(community.id, 0) }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+    </div>
+    {% endfor %}
+</div>
 
         <!-- Posted Vaults This Week -->
         <div class="mt-4">
             <h4>Posted Vaults This Week: {{ posted_this_week }}</h4>
         </div>
     </div>
+
+</div>
 
     <!-- Display Unscheduled Vault Posts (Conditional) -->
     {% if unscheduled_vaults %}
@@ -309,6 +316,30 @@
             alert('Error marking vault as posted. See console for details.');
         });
     }
+
+function deleteAllComments(vaultId) {
+    if (confirm('Are you sure you want to delete all comments for this vault?')) {
+        fetch('/delete-comments/' + vaultId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('All comments deleted successfully.');
+                window.location.reload();  // Reload the page to reflect changes
+            } else {
+                alert('Failed to delete comments: ' + data.error);
+            }
+        }).catch(error => {
+            console.error('Error deleting comments:', error);
+            alert('Error deleting comments. See console for details.');
+        });
+    }
+}
+
 </script>
 {% endblock %}
 

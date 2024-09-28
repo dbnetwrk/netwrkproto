@@ -21,121 +21,76 @@
     <div class="container-fluid">
         <div class="row">
             <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <ul class="nav flex-column">
-                        
-                       
-
-                        <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-        Events
-    </a>
-    <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-        <li><a class="dropdown-item" href="{{ url_for('scraper_page') }}">Scraper</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('events') }}">Loader</a></li>
-    </ul>
-</li>
-
-<li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-        Food
-    </a>
-    <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-        
-        <li><a class="dropdown-item" href="{{ url_for('run_scraper') }}">Restaurant Scraper</a></li>
-    </ul>
-</li>
-
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('run_scraper') }}">Ultimate Scraper</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin_scrape') }}">Menu scraper</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('manage_urls') }}">Scraper URLs</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('upload_venues') }}">Upload Venues</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('random_venue') }}">Random Venue</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('instagram_scraper_page') }}">Instagram Scraper</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('organizers') }}">Organizers</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('person_generator') }}">Person Generator</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('subreddits') }}">Subreddit Manager</a>
-                        </li>
-
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('idea_factory') }}">Idea Factory</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('idea_factory_2') }}">Story Factory</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('discussion_factory') }}">Discussion Factory</a>
-                        </li>
-
-                        <li class = "nav-item"><a class="nav-link" href="{{ url_for('ai_comment_prompts') }}">Comment Generator</a></li>
-
-                        
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('add_writing_style') }}">Add Writing Style</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('add_official_seeder') }}">Seeder Management ({{ total_seeders }})</a>
-                        </li>
-                        <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('vault_interface') }}">Content Vault ({{ total_vaults }})</a>
-</li>
-<li class="nav-item">
-                <a class="nav-link" href="{{ url_for('pre_invites') }}">Invite List ({{ total_invites }})</a>
+    <div class="position-sticky pt-3">
+        <ul class="nav flex-column">
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="contentDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Content Management
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="contentDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('vault_interface') }}">Content Vault ({{ total_vaults }})</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('moments_of_realization') }}">Moments of Realization</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('idea_factory') }}">Idea Factory</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('idea_factory_2') }}">Story Factory</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('discussion_factory') }}">Discussion Factory</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('ai_comment_prompts') }}">Comment Generator</a></li>
+                </ul>
             </li>
 
-                        
-                        <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-        Prototype Tools
-    </a>
-    <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-        <li><a class="dropdown-item" href="{{ url_for('reddit_scraper_proto') }}">Image Populator</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('upvote_randomizer') }}">Upvote Randomizer</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('show_post_randomizer') }}">Post Randomizer</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('show_delete_page') }}">Mass Post Deleter</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('manage_communities') }}">Community Manager</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('reddit_scraper') }}">Reddit Scraper</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('ai_generator_prompts_community') }}">AI Discussion Generator</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('get_seeders') }}">Seeders</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('seeder_messages') }}">Seeder Messages</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('schedule_post') }}">Post Scheduler (Manual)</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('manage_posts') }}">Post Manager</a></li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="scraperDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Scrapers & Data
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="scraperDropdown">
+                    
+                    <li><a class="dropdown-item" href="{{ url_for('run_scraper') }}">Ultimate Scraper</a></li>
+                    
+                    <li><a class="dropdown-item" href="{{ url_for('manage_urls') }}">Scraper URLs</a></li>
+                    
+                </ul>
+            </li>
 
-        
-    </ul>
-</li>
+            
 
-                    </ul>
-                </div>
-            </nav>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    User Management
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('person_generator') }}">Person Generator</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('add_official_seeder') }}">Seeder Management ({{ total_seeders }})</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('manage_traits') }}">Trait Manager</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('pre_invites') }}">Invite List ({{ total_invites }})</a></li>
+                </ul>
+            </li>
+
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="communityDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Community Management
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="communityDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('subreddits') }}">Subreddit Manager</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('manage_communities') }}">Community Manager</a></li>
+                </ul>
+            </li>
+
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Tools
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="toolsDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('reddit_scraper_proto') }}">Image Populator</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('upvote_randomizer') }}">Upvote Randomizer</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('show_post_randomizer') }}">Post Randomizer</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('show_delete_page') }}">Mass Post Deleter</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('ai_generator_prompts_community') }}">AI Discussion Generator</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('schedule_post') }}">Post Scheduler (Manual)</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('manage_posts') }}">Post Manager</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</nav>
             <!-- Main content area where content from child templates will be injected -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 {% block content %}

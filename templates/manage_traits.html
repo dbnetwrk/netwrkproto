@@ -1,0 +1,16 @@
+{% extends "admin_panel_base.html" %}
+
+{% block content %}
+<div class="trait-management">
+    <h1>Manage Character Traits</h1>
+    <form action="/update-traits" method="post">
+        <label for="trait-select">Select Traits:</label>
+        <select multiple name="traits" id="trait-select">
+            {% for trait in CharacterTraitEnum %}
+            <option value="{{ trait.name }}">{{ trait.value }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Update Traits</button>
+    </form>
+</div>
+{% endblock %}

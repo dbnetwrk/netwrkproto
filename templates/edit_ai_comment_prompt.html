@@ -22,14 +22,21 @@
                 <option value="scraper_result" {% if prompt.data_type == 'scraper_result' %}selected{% endif %}>Scraper Result</option>
             </select>
         </div>
-
         <div class="form-group">
-    <label for="is_active">Status:</label>
-    <select name="is_active" id="is_active" class="form-control" required>
-        <option value="1" {% if prompt.is_active %}selected{% endif %}>Active</option>
-        <option value="0" {% if not prompt.is_active %}selected{% endif %}>Inactive</option>
-    </select>
-</div>
+            <label for="category">Category:</label>
+            <select name="category" id="category" class="form-control" required>
+                {% for category in CategoryEnum %}
+                    <option value="{{ category.name }}" {% if prompt.category == category %}selected{% endif %}>{{ category.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="is_active">Status:</label>
+            <select name="is_active" id="is_active" class="form-control" required>
+                <option value="1" {% if prompt.is_active %}selected{% endif %}>Active</option>
+                <option value="0" {% if not prompt.is_active %}selected{% endif %}>Inactive</option>
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary">Update Prompt</button>
     </form>
 </div>

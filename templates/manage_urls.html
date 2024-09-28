@@ -5,9 +5,10 @@
     <form action="{{ url_for('manage_urls') }}" method="POST">
         <input type="hidden" id="edit_url_id" name="url_id">
         <div class="form-group">
-            <label for="url">URL:</label>
-            <input type="url" class="form-control" id="url" name="url" required>
-        </div>
+    <label for="url">URL or Text:</label>
+    <input type="text" class="form-control" id="url" name="url" required>
+</div>
+
         <div class="form-group">
             <label for="category">Category:</label>
             <select class="form-control" id="category" name="category" required>
@@ -22,6 +23,8 @@
                 <option value="Regular">Regular</option>
                 <option value="Puppeteer">Puppeteer</option>
                 <option value="Groupon">Groupon</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Eventbrite">Eventbrite</option>
             </select>
         </div>
         <div class="form-group">
@@ -36,10 +39,7 @@
             <label for="max_results">Max Results:</label>
             <input type="number" class="form-control" id="max_results" name="max_results" value="20" min="1">
         </div>
-        <div class="form-group form-check">
-            <input type="checkbox" class="form-check-input" id="is_eventbrite" name="is_eventbrite">
-            <label class="form-check-label" for="is_eventbrite">Is Eventbrite URL?</label>
-        </div>
+        
         <button type="submit" name="add_url" id="submit_button" class="btn btn-primary">Add URL</button>
     </form>
     <h3 class="mt-5">Existing URLs</h3>
@@ -51,7 +51,6 @@
                 <th>Scraper Type</th>
                 <th>Link Selector</th>
                 <th>Max Results</th>
-                <th>Eventbrite?</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -64,7 +63,6 @@
                 <td>{{ url.scraper_type }}</td>
                 <td>{{ url.link_selector or 'N/A' }}</td>
                 <td>{{ url.max_results }}</td>
-                <td>{{ "Yes" if url.is_eventbrite else "No" }}</td>
                 <td>{{ "Active" if url.is_active else "Inactive" }}</td>
                 <td>
                     <button onclick="editUrl({{ url.id }}, '{{ url.url }}', '{{ url.category.name }}', '{{ url.scraper_type }}', '{{ url.link_selector }}', '{{ url.page_function|replace('\n', '\\n')|replace("'", "\\'") }}', {{ url.max_results }}, {{ 'true' if url.is_eventbrite else 'false' }})" class="btn btn-sm btn-warning">Edit</button>
@@ -94,7 +92,6 @@ function editUrl(id, url, category, scraperType, linkSelector, pageFunction, max
     document.getElementById('link_selector').value = linkSelector;
     document.getElementById('page_function').value = pageFunction;
     document.getElementById('max_results').value = maxResults;
-    document.getElementById('is_eventbrite').checked = isEventbrite;
     document.getElementById('submit_button').name = 'edit_url';
     document.getElementById('submit_button').textContent = 'Update URL';
 }

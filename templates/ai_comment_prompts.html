@@ -35,6 +35,11 @@
                 <option value="venue">Venue</option>
                 <option value="scraper_result">Scraper Result</option>
             </select>
+            <select name="category" class="form-control" required>
+    {% for category in CategoryEnum %}
+        <option value="{{ category.name }}">{{ category.value }}</option>
+    {% endfor %}
+</select>
             <div class="input-group-append">
                 <button class="btn btn-outline-primary" type="submit">Add Prompt</button>
             </div>

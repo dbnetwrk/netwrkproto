@@ -1,0 +1,25 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Moment of Realization</h2>
+    
+    <form action="{{ url_for('edit_moment', id=moment.id) }}" method="post">
+        <div class="form-group">
+            <label for="text">Text:</label>
+            <textarea class="form-control" id="text" name="text" required>{{ moment.text }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="category">Category:</label>
+            <select class="form-control" id="category" name="category" required>
+                {% for category in categories %}
+                <option value="{{ category.value }}" {% if category == moment.category %}selected{% endif %}>
+                    {{ category.value }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Update Moment</button>
+        <a href="{{ url_for('moments_of_realization') }}" class="btn btn-secondary mt-3">Cancel</a>
+    </form>
+</div>
+{% endblock %}

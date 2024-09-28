@@ -36,8 +36,11 @@
                 <tr>
                     <th>URL</th>
                     <th>Text</th>
+                    <th>Source</th>
                     <th>Scrape Date</th>
                     <th>Category</th>
+                    <th>Event date</th>
+                    <th>Price</th>
                 </tr>
             </thead>
             <tbody>
@@ -45,8 +48,11 @@
                 <tr>
                     <td>{{ result.url }}</td>
                     <td>{{ result.text[:100] }}{% if result.text|length > 100 %}...{% endif %}</td>
+                    <td>{{ result.source }}</td>
                     <td>{{ result.scrape_date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                     <td>{{ result.category.value }}</td>
+                    <td>{{ result.event_date }}</td>
+                    <td>{{ result.price }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
