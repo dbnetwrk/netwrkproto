@@ -5,15 +5,15 @@
     <form action="{{ url_for('manage_urls') }}" method="POST">
         <input type="hidden" id="edit_url_id" name="url_id">
         <div class="form-group">
-    <label for="url">URL or Text:</label>
-    <input type="text" class="form-control" id="url" name="url" required>
-</div>
+            <label for="url">URL or Text:</label>
+            <input type="text" class="form-control" id="url" name="url" required>
+        </div>
 
         <div class="form-group">
-            <label for="category">Category:</label>
-            <select class="form-control" id="category" name="category" required>
+            <label for="categories">Categories:</label>
+            <select multiple class="form-control" id="categories" name="categories" required>
                 {% for category in categories %}
-                <option value="{{ category.name }}">{{ category.name }}</option>
+                <option value="{{ category.id }}">{{ category.name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -47,7 +47,7 @@
         <thead>
             <tr>
                 <th>URL</th>
-                <th>Category</th>
+                <th>Categories</th>
                 <th>Scraper Type</th>
                 <th>Link Selector</th>
                 <th>Max Results</th>
@@ -59,13 +59,13 @@
             {% for url in urls %}
             <tr>
                 <td>{{ url.url }}</td>
-                <td>{{ url.category.name }}</td>
+                <td>{{ url.categories|map(attribute='name')|join(', ') }}</td>
                 <td>{{ url.scraper_type }}</td>
                 <td>{{ url.link_selector or 'N/A' }}</td>
                 <td>{{ url.max_results }}</td>
                 <td>{{ "Active" if url.is_active else "Inactive" }}</td>
                 <td>
-                    <button onclick="editUrl({{ url.id }}, '{{ url.url }}', '{{ url.category.name }}', '{{ url.scraper_type }}', '{{ url.link_selector }}', '{{ url.page_function|replace('\n', '\\n')|replace("'", "\\'") }}', {{ url.max_results }}, {{ 'true' if url.is_eventbrite else 'false' }})" class="btn btn-sm btn-warning">Edit</button>
+                    <button onclick="editUrl({{ url.id }}, '{{ url.url }}', {{ url.categories|map(attribute='id')|list|tojson }}, '{{ url.scraper_type }}', '{{ url.link_selector }}', '{{ url.page_function|replace('\n', '\\n')|replace("'", "\\'") }}', {{ url.max_results }})" class="btn btn-sm btn-warning">Edit</button>
                     <form action="{{ url_for('manage_urls') }}" method="POST" style="display: inline;">
                         <input type="hidden" name="url_id" value="{{ url.id }}">
                         <button type="submit" name="toggle_active" class="btn btn-sm {% if url.is_active %}btn-danger{% else %}btn-success{% endif %}">
@@ -84,10 +84,19 @@
 </div>
 
 <script>
-function editUrl(id, url, category, scraperType, linkSelector, pageFunction, maxResults, isEventbrite) {
+function editUrl(id, url, categoryIds, scraperType, linkSelector, pageFunction, maxResults) {
     document.getElementById('edit_url_id').value = id;
     document.getElementById('url').value = url;
-    document.getElementById('category').value = category;
+    
+    // Clear all selected options
+    Array.from(document.getElementById('categories').options).forEach(option => option.selected = false);
+    
+    // Select the categories for this URL
+    categoryIds.forEach(categoryId => {
+        let option = document.querySelector(`#categories option[value="${categoryId}"]`);
+        if (option) option.selected = true;
+    });
+    
     document.getElementById('scraper_type').value = scraperType;
     document.getElementById('link_selector').value = linkSelector;
     document.getElementById('page_function').value = pageFunction;

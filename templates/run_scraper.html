@@ -4,10 +4,10 @@
     <h2>Run Scraper</h2>
     <form id="scraperForm" action="{{ url_for('run_scraper') }}" method="POST" class="mb-4">
         <div class="form-group">
-            <label for="category">Select Category:</label>
-            <select name="category" id="category" class="form-control">
+            <label for="categories">Select Categories:</label>
+            <select name="categories" id="categories" class="form-control" multiple>
                 {% for category in categories %}
-                    <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>
+                    <option value="{{ category }}" {% if category in selected_categories %}selected{% endif %}>
                         {{ category }}
                     </option>
                 {% endfor %}
@@ -29,7 +29,7 @@
         {% endif %}
     {% endwith %}
     
-    <h3 class="mt-5">{% if selected_category == 'ALL' %}All{% else %}{{ selected_category }}{% endif %} Scraper Results</h3>
+    <h3 class="mt-5">{% if 'ALL' in selected_categories %}All{% else %}{{ selected_categories|join(', ') }}{% endif %} Scraper Results</h3>
     <div id="resultsTable">
         <table class="table mt-3">
             <thead>
@@ -38,7 +38,7 @@
                     <th>Text</th>
                     <th>Source</th>
                     <th>Scrape Date</th>
-                    <th>Category</th>
+                    <th>Categories</th>
                     <th>Event date</th>
                     <th>Price</th>
                 </tr>
@@ -50,7 +50,7 @@
                     <td>{{ result.text[:100] }}{% if result.text|length > 100 %}...{% endif %}</td>
                     <td>{{ result.source }}</td>
                     <td>{{ result.scrape_date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                    <td>{{ result.category.value }}</td>
+                    <td>{{ result.categories|map(attribute='name')|join(', ') }}</td>
                     <td>{{ result.event_date }}</td>
                     <td>{{ result.price }}</td>
                 </tr>
@@ -60,15 +60,16 @@
     </div>
 </div>
 <script>
-document.getElementById('category').addEventListener('change', function() {
-    var category = this.value;
-    fetch(`{{ url_for('run_scraper') }}?category=${category}`)
+document.getElementById('categories').addEventListener('change', function() {
+    var categories = Array.from(this.selectedOptions).map(option => option.value);
+    var queryString = categories.map(category => `categories=${encodeURIComponent(category)}`).join('&');
+    fetch(`{{ url_for('run_scraper') }}?${queryString}`)
         .then(response => response.text())
         .then(html => {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             document.getElementById('resultsTable').innerHTML = doc.getElementById('resultsTable').innerHTML;
-            document.querySelector('h3').textContent = category === 'ALL' ? 'All Scraper Results' : `${category} Scraper Results`;
+            document.querySelector('h3').textContent = categories.includes('ALL') ? 'All Scraper Results' : `${categories.join(', ')} Scraper Results`;
         });
 });
 </script>

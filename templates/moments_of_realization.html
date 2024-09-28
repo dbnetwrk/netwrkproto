@@ -13,13 +13,13 @@
             <label for="category">Category:</label>
             <select class="form-control" id="category" name="category" required>
                 {% for category in categories %}
-                <option value="{{ category.value }}">{{ category.value }}</option>
+                <option value="{{ category.id }}">{{ category.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Add Moment</button>
     </form>
-
+    
     <!-- List of existing moments -->
     <table class="table">
         <thead>
@@ -35,7 +35,7 @@
             <tr>
                 <td>{{ moment.id }}</td>
                 <td>{{ moment.text }}</td>
-                <td>{{ moment.category.value }}</td>
+                <td>{{ moment.category.name }}</td>
                 <td>
                     <a href="{{ url_for('edit_moment', id=moment.id) }}" class="btn btn-sm btn-warning">Edit</a>
                     <form action="{{ url_for('delete_moment', id=moment.id) }}" method="post" style="display: inline;">

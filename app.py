@@ -22,6 +22,9 @@ import random
 from flask import request
 import boto3
 import pytz
+from sqlalchemy import case
+
+from sqlalchemy import case, nullsfirst
 import uuid
 import requests
 import praw
@@ -58,6 +61,8 @@ import faiss
 import pickle
 import os
 import json
+
+
 
 
 
@@ -318,6 +323,9 @@ class CategoryEnum(enum.Enum):
     Relationships = 'Relationships'
     Lifestyle = 'Lifestyle'
 
+
+
+
 class Industry(enum.Enum):
     FINANCE = "Finance"
     CONSULTING = "Consulting"
@@ -418,6 +426,8 @@ def list_jobs():
 
 
 
+
+
 user_community_association = db.Table('user_community',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
     db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True)
@@ -444,6 +454,14 @@ community_subreddit_association = db.Table('community_subreddit',
     db.Column('community_id', db.Integer, db.ForeignKey('community.id'), primary_key=True),
     db.Column('subreddit_id', db.Integer, db.ForeignKey('subreddits.id'), primary_key=True)
 )
+
+class ContentCategory(db.Model):
+    __tablename__ = 'content_category'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<ContentCategory {self.name}>'
 
 
 class User(db.Model):
@@ -554,7 +572,8 @@ class Community(db.Model):
     is_anonymous = db.Column(db.Boolean, default=False, nullable=False)
     color = db.Column(db.String(7), nullable=True)
     header_pic_url = db.Column(db.String(255), nullable=True)
-    category = db.Column(SQLEnum(CategoryEnum), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('content_category.id'), nullable=False)
+    category = db.relationship('ContentCategory', backref=db.backref('communities', lazy='dynamic'))
     
     creator = db.relationship('User', backref=db.backref('created_communities', lazy=True))
     interests = db.relationship('Interest', secondary=community_interest_association, backref=db.backref('communities', lazy='dynamic'))
@@ -641,7 +660,8 @@ class AICommentPrompt(db.Model):
     prompt_type = db.Column(db.String(20), nullable=False)
     data_type = db.Column(db.String(20), nullable=False, default='none')
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    category = db.Column(SQLEnum(CategoryEnum), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('content_category.id'), nullable=False)
+    category = db.relationship('ContentCategory', backref=db.backref('ai_comment_prompts', lazy='dynamic'))
 
 
 
@@ -702,11 +722,14 @@ class Vault(db.Model):
 class MomentOfRealization(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
-    category = db.Column(db.Enum(CategoryEnum), nullable=False)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    category_id = db.Column(db.Integer, db.ForeignKey('content_category.id'), nullable=False)
+    category = db.relationship('ContentCategory', backref=db.backref('moments_of_realization', lazy='dynamic'))
+
     def __repr__(self):
-        return f'<MomentOfRealization {self.id}: {self.category.value}>'
+        return f'<MomentOfRealization {self.id}: {self.category.name}>'
 
 
 
@@ -747,7 +770,10 @@ class OfficialSeeder(db.Model):
     industry = db.Column(db.Enum(Industry), nullable=True)
     neighborhood = db.Column(db.Enum(Neighborhood), nullable=True) 
     facts = db.relationship('Fact', backref='official_seeder', lazy=True)
-    character_traits = db.Column(db.ARRAY(SQLEnum(CharacterTraitEnum)), nullable=True)
+    character_traits = db.Column(
+        ARRAY(SQLEnum(CharacterTraitEnum, name='character_trait_enum')),  # Specify the enum type name
+        nullable=True
+    )
     
 
 class Fact(db.Model):
@@ -928,51 +954,45 @@ class Review(db.Model):
         self.published_at_date = published_at_date
 
 
+selected_urls_categories = db.Table('selected_urls_categories',
+    db.Column('selected_url_id', db.Integer, db.ForeignKey('selected_urls.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('content_category.id'), primary_key=True)
+)
+
+scraper_result_categories = db.Table('scraper_result_categories',
+    db.Column('scraper_result_id', db.Integer, db.ForeignKey('scraper_result.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('content_category.id'), primary_key=True)
+)
 
 
-
-
-
-class ScraperResult(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(1000))
-    title = db.Column(db.String(500))
-    text = db.Column(db.Text)
-    scrape_date = db.Column(db.DateTime, default=datetime.utcnow)
-    category = db.Column(db.Enum(CategoryEnum), nullable=False)
-    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', name='scraper_source'), nullable=False, default='Regular')
-    price = db.Column(db.Numeric(10, 2))
-    event_date = db.Column(db.DateTime)
-
-    def __init__(self, url, title, text, category, source, price=None, event_date=None):
-        self.url = url
-        self.title = title
-        self.text = text
-        self.category = category
-        self.source = source
-        self.price = price
-        self.event_date = event_date
 
 
 class SelectedURLs(db.Model):
     __tablename__ = 'selected_urls'
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), unique=True, nullable=False)
-    category = db.Column(db.Enum(CategoryEnum), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     scraper_type = db.Column(db.Enum('Regular', 'Puppeteer', 'Groupon', 'Instagram', 'Eventbrite', name='scraper_type'), nullable=False, default='Regular')
     link_selector = db.Column(db.String(200), nullable=True)
     page_function = db.Column(db.Text, nullable=True)
     max_results = db.Column(db.Integer, default=20)
+    categories = db.relationship('ContentCategory', secondary=selected_urls_categories, 
+                                 backref=db.backref('selected_urls', lazy='dynamic'))
 
-    def __init__(self, url, category, link_selector, is_active=True, scraper_type='Regular', page_function=None, max_results=20):
-        self.url = url
-        self.category = category
-        self.is_active = is_active
-        self.scraper_type = scraper_type
-        self.link_selector = link_selector
-        self.page_function = page_function
-        self.max_results = max_results
+
+class ScraperResult(db.Model):
+    __tablename__ = 'scraper_result'
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(1000))
+    title = db.Column(db.String(500))
+    text = db.Column(db.Text)
+    scrape_date = db.Column(db.DateTime, default=datetime.utcnow)
+    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', name='scraper_source'), nullable=False, default='Regular')
+    price = db.Column(db.Numeric(10, 2))
+    event_date = db.Column(db.DateTime)
+    categories = db.relationship('ContentCategory', secondary=scraper_result_categories,
+                                 backref=db.backref('scraper_results', lazy='dynamic'))
+
 
 industry_images = {
     1: '/images/education.png',
@@ -4033,50 +4053,52 @@ def show_delete_page():
 #ai comment prompt management
 
 
-from sqlalchemy import case
 
-from sqlalchemy import case, nullsfirst
 
 @app.route('/ai_comment_prompts')
 def ai_comment_prompts():
-    # Your existing queries
     top_level_prompts = AICommentPrompt.query.filter_by(prompt_type='top_level').order_by(
-        case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
-        AICommentPrompt.id  # Then sort by ID
+        case((AICommentPrompt.is_active, 0), else_=1),
+        AICommentPrompt.id
     ).all()
     
     reply_prompts = AICommentPrompt.query.filter_by(prompt_type='reply').order_by(
-        case((AICommentPrompt.is_active, 0), else_=1),  # Active prompts first
-        AICommentPrompt.id  # Then sort by ID
+        case((AICommentPrompt.is_active, 0), else_=1),
+        AICommentPrompt.id
     ).all()
     
     communities = Community.query.all()
     
     unposted_vaults = Vault.query.filter_by(is_posted=False).order_by(
-        nullsfirst(Vault.scheduled_at),  # Null values (unscheduled) first
-        Vault.scheduled_at.asc()  # Then sort by scheduled_at in ascending order
+        nullsfirst(Vault.scheduled_at),
+        Vault.scheduled_at.asc()
     ).all()
     
-    # Include CategoryEnum in the render_template call
+    # Fetch all content categories
+    categories = ContentCategory.query.all()
+    
     return render_template('ai_comment_prompts.html', 
                            top_level_prompts=top_level_prompts, 
                            reply_prompts=reply_prompts, 
                            communities=communities,
                            unposted_vaults=unposted_vaults,
-                           CategoryEnum=CategoryEnum)  # Passing the enum to the template
-
+                           categories=categories)  # Pass categories 
 
 @app.route('/add_ai_comment_prompt', methods=['POST'])
 def add_ai_comment_prompt():
     prompt_text = request.form.get('prompt')
     prompt_type = request.form.get('prompt_type')
     data_type = request.form.get('data_type', 'none')
-    category = request.form.get('category')
-    if prompt_text and prompt_type and category:
-        new_prompt = AICommentPrompt(prompt=prompt_text, prompt_type=prompt_type, data_type=data_type, category=CategoryEnum[category])
-        db.session.add(new_prompt)
-        db.session.commit()
-        flash('New prompt added successfully.')
+    category_id = request.form.get('category')
+    if prompt_text and prompt_type and category_id:
+        category = ContentCategory.query.get(category_id)
+        if category:
+            new_prompt = AICommentPrompt(prompt=prompt_text, prompt_type=prompt_type, data_type=data_type, category=category)
+            db.session.add(new_prompt)
+            db.session.commit()
+            flash('New prompt added successfully.')
+        else:
+            flash('Invalid category selected.')
     else:
         flash('Prompt text, type, and category are required.')
     return redirect(url_for('ai_comment_prompts'))
@@ -4089,11 +4111,17 @@ def edit_ai_comment_prompt(id):
         prompt.prompt_type = request.form.get('prompt_type')
         prompt.data_type = request.form.get('data_type', 'none')
         prompt.is_active = request.form.get('is_active') == '1'
-        prompt.category = CategoryEnum[request.form.get('category')]
-        db.session.commit()
-        flash('AI Comment Prompt updated successfully!', 'success')
+        category_id = request.form.get('category')
+        category = ContentCategory.query.get(category_id)
+        if category:
+            prompt.category = category
+            db.session.commit()
+            flash('AI Comment Prompt updated successfully!', 'success')
+        else:
+            flash('Invalid category selected.', 'error')
         return redirect(url_for('ai_comment_prompts'))
-    return render_template('edit_ai_comment_prompt.html', prompt=prompt, CategoryEnum=CategoryEnum)
+    categories = ContentCategory.query.all()
+    return render_template('edit_ai_comment_prompt.html', prompt=prompt, categories=categories)
 
 @app.route('/update_ai_comment_prompt/<int:id>', methods=['POST'])
 def update_ai_comment_prompt(id):
@@ -4394,10 +4422,10 @@ def select_random_commenters(min_commenters, max_commenters, item, content_type)
 
 
 def select_ai_comment_prompt(category):
-    return AICommentPrompt.query.filter_by(
-        category=category,
-        prompt_type='top_level',
-        is_active=True
+    return AICommentPrompt.query.filter(
+        AICommentPrompt.category_id == category.id,
+        AICommentPrompt.prompt_type == 'top_level',
+        AICommentPrompt.is_active == True
     ).order_by(func.random()).first()
 
 
@@ -4416,12 +4444,13 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     five_second_moment = item.five_second_moment if hasattr(item, 'five_second_moment') else None
 
     # Get one of each type of scraper result
-    scraper_results = {
-        'Groupon': ScraperResult.query.filter_by(category=category, source='Groupon').order_by(func.random()).first(),
-        'Instagram': ScraperResult.query.filter_by(category=category, source='Instagram').order_by(func.random()).first(),
-        'Eventbrite': ScraperResult.query.filter_by(category=category, source='Eventbrite').order_by(func.random()).first(),
-        'Regular': ScraperResult.query.filter_by(category=category, source='Regular').order_by(func.random()).first()
-    }
+    scraper_results = {}
+    for source in ['Groupon', 'Instagram', 'Eventbrite', 'Regular']:
+        result = ScraperResult.query.filter(
+            ScraperResult.categories.any(ContentCategory.id == category.id),
+            ScraperResult.source == source
+        ).order_by(func.random()).first()
+        scraper_results[source] = result
 
     current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
 
@@ -4464,7 +4493,7 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     first_comment_prompt = ai_prompt.prompt if ai_prompt else "Respond to the original post"
     current_app.logger.debug(f"First comment prompt: {first_comment_prompt[:50]}...")
     
-    prompt = f"""Generate a realistic comment chain for a Miami discussion board about {category}. The original post is:
+    prompt = f"""Generate a realistic comment chain for a Miami discussion board about {category.name}. The original post is:
 
 {item.title}
 Content: {item.content}
@@ -5119,81 +5148,56 @@ def parse_seeder_info(seeder_info):
     }
 
 
-def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info, scheduled_date):
-    
-
-    
+def generate_story_with_anthropic(five_sec_moment, category, seeder_info, scheduled_date):
     # Initialize context variables
     context = ""
     context_type = ""
     url = None
+
+    # Get one of each type of scraper result
+    scraper_results = {}
+    for source in ['Groupon', 'Instagram', 'Eventbrite', 'Regular']:
+        result = ScraperResult.query.filter(
+            ScraperResult.categories.any(id=category.id),
+            ScraperResult.source == source
+        ).order_by(func.random()).first()
+        scraper_results[source] = result
     
+    current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
 
-    if article_category in ["VENUE", "RESTAURANTS"]:
-
-        # Fetch a random venue
-        venue_query = Venue.query.filter(Venue.permanently_closed == False, Venue.temporarily_closed == False)
-        
-        # Add filter for restaurants if the category is RESTAURANT
-        if article_category == "RESTAURANTS":
-            venue_query = venue_query.filter(Venue.main_category == "Restaurant")
-        
-        # Fetch a random venue
-        random_venue = venue_query.order_by(func.random()).first()
-        if random_venue:
-            # Format the total score correctly
-            total_score_str = f"{random_venue.total_score:.1f}" if random_venue.total_score is not None else "N/A"
+    # Prepare additional info from scraper results
+    additional_info = []
+    for source, result in scraper_results.items():
+        if result:
+            info = f"{source}: {result.title}"
             
-            context = (
-                f"Local Venue Spotlight: '{random_venue.title or 'Unnamed Venue'}' "
-                f"in {random_venue.neighborhood or 'an unknown neighborhood'}. "
-                f"Category: {random_venue.category_name or 'Uncategorized'}. "
-                f"Description: {(random_venue.description or 'No description available.')[:100]}... "
-                f"Address: {random_venue.street or 'Unknown street'}, "
-                f"{random_venue.city or 'Unknown city'}, {random_venue.postal_code or 'No postal code'}. "
-                f"Price Range: {random_venue.price or 'Unknown'}. "
-                f"Overall Score: {total_score_str}/5 "
-                f"based on {random_venue.reviews_count or 0} reviews. "
-                f"Status: {'Open' if not random_venue.permanently_closed and not random_venue.temporarily_closed else 'Temporarily Closed' if random_venue.temporarily_closed else 'Permanently Closed'}. "
-            )
-
-
-            if random_venue.menu:
-                context += f"\nHere is the menu: {random_venue.menu}\n"
-            else:
-                context += "Menu information is not available for this venue.\n"
+            if result.price is not None:
+                info += f" - Price: ${result.price:.2f}"
             
-            # Fetch a recent review for the venue
-            recent_review = Review.query.filter_by(venue_id=random_venue.id).order_by(Review.published_at_date.desc()).first()
-            if recent_review:
-                context += (
-                    f"Recent Review: '{(recent_review.text or 'No review text')[:100]}...' "
-                    f"- Posted on {recent_review.published_at_date.strftime('%B %d, %Y') if recent_review.published_at_date else 'Unknown date'}"
-                )
+            if result.event_date is not None:
+                info += f" - Date: {result.event_date.strftime('%B %d, %Y')}"
             
-            context_type = "Local Venue"
-            url = random_venue.google_search_url
-        else:
-            context = "No local venue information available."
-            context_type = "Local Venue"
+            info += f" - {result.text}"
+            
+            additional_info.append(info)
+    additional_info_str = "\n".join(additional_info)
+
+    # Use the first non-None result as the main context
+    random_article = next((result for result in scraper_results.values() if result is not None), None)
+    
+    if random_article:
+        context = (
+            f"Recent news/event/jobpost from Miami: '{random_article.title}'. "
+            f"Summary: {random_article.text}..."
+        )
+        context_type = "Local Event/News/Job Post"
+        url = random_article.url
     else:
-        # Fetch a random article for other categories
-        random_article = ScraperResult.query.filter_by(category=CategoryEnum[article_category]).order_by(func.random()).first()
-        
-        if random_article:
-            context = (
-                f"Recent news/event/jobpost from Miami: '{random_article.title}'. "
-                f"Summary: {random_article.text}..."
-            )
-            context_type = "Local Event/News/Job Post"
-            url = random_article.url
-        else:
-            context = "No recent news available."
-            context_type = "Local Event/News/Job Post"
+        context = f"No recent news available for category {category.name}."
+        context_type = "Local Event/News/Job Post"
     
     seeder_details = parse_seeder_info(seeder_info)
     current_app.logger.debug(f"HERE IS SEEDER_DETAILS IN GENERATE STORY: {seeder_details}")
-
 
     # Format the scheduled date
     if scheduled_date:
@@ -5213,7 +5217,7 @@ def generate_story_with_anthropic(five_sec_moment, article_category, seeder_info
         f"1. The five-second moment is this: {five_sec_moment}\n"
         f"2. The five-second moment is realized towards the end of the story.\n"
         f"3. The beginning starts with the opposite of the five-second moment.\n"
-        f"4. Use this local event/job posting/news article/restaurant/place as the backdrop for the story: {context}\n"
+        f"4. Use the following information as potential backdrop or context for the story. Feel free to incorporate elements that naturally fit with the five-second moment, but don't force all details if they don't enhance the story: \n{additional_info_str}\n"
         f"5. The story is written on {formatted_date}.\n"
         f"6. Write the story in the first person, in the style of a reddit post, where you ask a question to spark engagement at the end.\n"
         f"7. Write it as though it is coming from a recent transplant to Miami with the following characteristics:\n"
@@ -5411,9 +5415,14 @@ from collections import defaultdict
 @app.route('/generate_story_2', methods=['POST'])
 def generate_story_2():
     five_sec_moment = request.form.get('five_sec_moment')
-    article_category = request.form.get('article_category')
+    category_id = request.form.get('category_id')
     is_new_seeder = request.form.get('is_new_seeder') == 'true'
     scheduled_date = request.form.get('scheduled_at')
+
+
+    category = ContentCategory.query.get(category_id)
+    if not category:
+        return jsonify({'error': 'Invalid category ID'}), 400
 
     if is_new_seeder:
         seeder_info = json.loads(request.form.get('seeder_info'))
@@ -5423,81 +5432,43 @@ def generate_story_2():
         formatted_seeder_info = request.form.get('seeder_info')
 
     try:
-        story, article_url = generate_story_with_anthropic(five_sec_moment, article_category, formatted_seeder_info, scheduled_date)
+        story, article_url = generate_story_with_anthropic(five_sec_moment, category, formatted_seeder_info, scheduled_date)
         return jsonify({'story': story, 'article_url': article_url})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/get_random_moment/', methods=['POST'])
+def get_random_moment():
+    category_id = request.form.get('category_id')
+    moment = MomentOfRealization.query.filter_by(category_id=category_id).order_by(func.random()).first()
+    if moment:
+        return jsonify({'success': True, 'text': moment.text, 'category': moment.category.name})
+    else:
+        return jsonify({'success': False, 'error': 'No moment found for this category'})
+
+
 @app.route('/idea_factory_2/', methods=['GET', 'POST'])
 def idea_factory_2():
-    communities = Community.query.options(joinedload(Community.subreddits)).all()
-    community_dict = {c.id: c.name for c in communities}  # Create community_dict
-
+    communities = Community.query.all()
+    community_dict = {c.id: c.name for c in communities}
+    categories = ContentCategory.query.all()
+    
     # Fetch seeders with their vault counts, ordered by the count
     seeders_with_counts = db.session.query(
         OfficialSeeder,
         func.count(Vault.id).label('vault_count')
     ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
 
-    if request.method == 'POST':
-        clear_image_directory()
-        selected_community_id = request.form.get('community_id')
-        subreddit_name = request.form.get('subreddit')
-        number_of_posts = int(request.form.get('number_of_posts', 100))
-        sort_option = request.form.get('sort_option', 'hot')
-        article_category = request.form.get('article_category')
-
-        session_data = {
-            'subreddit_name': subreddit_name,
-            'number_of_posts': number_of_posts,
-            'sort_option': sort_option,
-            'selected_community_id': selected_community_id
-        }
-        session.update(session_data)
-
-        results = []
-        if subreddit_name:
-            results = scrape_reddit_posts(subreddit_name, number_of_posts, sort_option)
-        elif selected_community_id:
-            community = Community.query.get(selected_community_id)
-            for subreddit in community.subreddits:
-                results.extend(scrape_reddit_posts(subreddit.prompt, number_of_posts, sort_option))
-
-        # Modify text content using OpenAI
-        for post in results:
-            if post['image'] is None:  # Process only text posts
-                full_text = f"Title: {post.get('title', '')}\n\n{post['content']}"
-                modified_content = get_five_second_moment(full_text)
-                post['ai_content'] = modified_content
-                post['article_url'] = "bleh"
-
-        text_results = [post for post in results if post['image'] is None]
-
-        if text_results:
-            flash(f"Scraped and processed {len(text_results)} text posts")
-
-        return render_template(
-            'idea_factory2.html',
-            results=text_results,
-            communities=communities,
-            session=session,
-            seeders_with_counts=seeders_with_counts,
-            State=State,
-            Industry=Industry,
-            Neighborhood=Neighborhood,
-            community_dict=community_dict,  # Pass community_dict to template
-        )
-
     return render_template(
         'idea_factory2.html',
         communities=communities,
-        session=session,
+        categories=categories,
         seeders_with_counts=seeders_with_counts,
         State=State,
         Industry=Industry,
         Neighborhood=Neighborhood,
-        community_dict=community_dict  # Pass community_dict to template
+        community_dict=community_dict
     )
 
 
@@ -6275,8 +6246,12 @@ def vault_post():
         content = request.form['content']
         community_id = request.form['community_id']
         seeder_id = request.form['seeder_id']
-        reddit_post_id = request.form['reddit_post_id']
+        reddit_post_id = str(random.randint(1, 1000000))
         scheduled_at = request.form.get('scheduled_at')
+
+        logging.debug('vault_post called')
+        logging.debug(f'request.form: {request.form}')
+        logging.debug(f'request.files: {request.files}')
 
 
         if scheduled_at:
@@ -6334,6 +6309,7 @@ def vault_post():
         return jsonify({"success": True, "message": "Post vaulted successfully"})
     except Exception as e:
         db.session.rollback()
+        logging.debug(f'Failure because: {e}')
         return jsonify({"success": False, "message": str(e)}), 400
 
 
@@ -7117,28 +7093,31 @@ from flask import current_app
 
 @app.route('/run-scraper', methods=['GET', 'POST'])
 def run_scraper():
-    categories = [category.value for category in CategoryEnum]
-    categories.insert(0, 'ALL')
-    selected_category = request.form.get('category') or request.args.get('category') or categories[0]
-    
-    
+    categories = ContentCategory.query.all()
+    category_names = [category.name for category in categories]
+    category_names.insert(0, 'ALL')
+    selected_categories = request.form.getlist('categories') or request.args.getlist('categories') or ['ALL']    
     
     if request.method == 'POST' and 'run_scraper' in request.form:
         client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
         
         # Get URLs for the selected category (or all categories) from SelectedURLs
-        if selected_category == 'ALL':
+        if 'ALL' in selected_categories:
             urls = SelectedURLs.query.filter_by(is_active=True).all()
         else:
-            urls = SelectedURLs.query.filter_by(category=selected_category, is_active=True).all()
+            urls = SelectedURLs.query.filter(
+                SelectedURLs.is_active==True,
+                SelectedURLs.categories.any(ContentCategory.name.in_(selected_categories))
+            ).all()
 
-        
-        
         new_results = 0
         skipped_results = 0
         
         for url in urls:
-            if url.url == "https://www.JobTrigger.com" and url.category == CategoryEnum.CAREER:
+
+            print(f"URL {url.url} Categories: {url.categories}")
+
+            if url.url == "https://www.JobTrigger.com" and url.category == CategoryEnum.CAREER in url.categories:
                 # Use LinkedIn jobs scraper
                 run_input = {
                     "contractType": "F",
@@ -7180,7 +7159,7 @@ def run_scraper():
                                  f"Contract Type: {item.get('contractType', '')}\n"
                                  f"Experience Level: {item.get('experienceLevel', '')}\n"
                                  f"Description: {item.get('description', '')}",
-                            category=CategoryEnum.CAREER,
+                            categories=url.categories,
                             source = 'Regular'
                         )
                         db.session.add(scraper_result)
@@ -7217,7 +7196,7 @@ def run_scraper():
                             url=item.get('url', ''),
                             title=item.get('title', ''),
                             text=item.get('content', ''),  # Assuming 'content' field contains the main text
-                            category=url.category
+                            categories=url.categories
                         )
                         db.session.add(scraper_result)
                         try:
@@ -7250,7 +7229,7 @@ def run_scraper():
                             url=item.get('url', ''),
                             title=f"Instagram post by {item.get('ownerUsername', '')}",
                             text=f"Caption: {item.get('caption', '')}\n",
-                            category=url.category,
+                            categories=url.categories,
                             source='Instagram'
                         )
                         db.session.add(scraper_result)
@@ -7275,7 +7254,7 @@ def run_scraper():
                             url=item['url'],
                             title=item['title'],
                             text=item['description'],
-                            category=url.category,
+                            categories=url.categories,
                             source='Groupon',
                             price=item['price']
 
@@ -7305,7 +7284,7 @@ def run_scraper():
                             url=item['url'],
                             title=item['title'],
                             text=item['description'],
-                            category=url.category,
+                            categories=url.categories,
                             source='Eventbrite',
                             event_date=item['event_date']
                         )
@@ -7326,7 +7305,7 @@ def run_scraper():
                 # Use website content crawler for other URLs
                 run_input = {
                     "startUrls": [{"url": url.url}],
-                    "maxCrawlDepth": 1,
+                    "maxCrawlDepth": 0,
                     "maxResults": url.max_results
                 }
                 
@@ -7343,7 +7322,7 @@ def run_scraper():
                             url=item.get('url', ''),
                             title=item.get('title', ''),
                             text=item.get('text', ''),
-                            category=url.category,
+                            categories=url.categories,
                             source= 'Regular'
                         )
                         db.session.add(scraper_result)
@@ -7360,15 +7339,17 @@ def run_scraper():
                         current_app.logger.debug(f"Skipped existing result: {item.get('url', '')}")
         
         current_app.logger.info(f"Scraper completed. New results: {new_results}, Skipped: {skipped_results}")
-        flash(f"Scraper completed for {selected_category}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")
+        flash(f"Scraper completed for {', '.join(selected_categories)}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")
     
     # Fetch results based on selected category
-    if selected_category == 'ALL':
+    if 'ALL' in selected_categories:
         results = ScraperResult.query.order_by(ScraperResult.scrape_date.desc()).all()
     else:
-        results = ScraperResult.query.filter_by(category=selected_category).order_by(ScraperResult.scrape_date.desc()).all()
-    current_app.logger.info(f"Fetched {len(results)} results for display")
-    return render_template('run_scraper.html', categories=categories, selected_category=selected_category, results=results)
+        results = ScraperResult.query.filter(
+            ScraperResult.categories.any(ContentCategory.name.in_(selected_categories))
+        ).order_by(ScraperResult.scrape_date.desc()).all()
+    
+    return render_template('run_scraper.html', categories=category_names, selected_categories=selected_categories, results=results)
 
 #instagram scraper
 @app.route('/instagram-scraper')
@@ -7531,16 +7512,17 @@ def manage_urls():
     if request.method == 'POST':
         if 'add_url' in request.form or 'edit_url' in request.form:
             url = request.form.get('url')
-            category = request.form.get('category')
+            category_ids = request.form.getlist('categories')
             scraper_type = request.form.get('scraper_type')
             link_selector = request.form.get('link_selector')
             page_function = request.form.get('page_function')
             max_results = request.form.get('max_results', type=int, default=20)
             
-            if url and category and scraper_type:
+            if url and category_ids and scraper_type:
                 try:
+                    categories = ContentCategory.query.filter(ContentCategory.id.in_(category_ids)).all()
                     if 'add_url' in request.form:
-                        new_url = SelectedURLs(url=url, category=CategoryEnum[category], 
+                        new_url = SelectedURLs(url=url, categories=categories, 
                                                scraper_type=scraper_type, link_selector=link_selector, 
                                                page_function=page_function, max_results=max_results)
                         db.session.add(new_url)
@@ -7550,7 +7532,7 @@ def manage_urls():
                         url_obj = SelectedURLs.query.get(url_id)
                         if url_obj:
                             url_obj.url = url
-                            url_obj.category = CategoryEnum[category]
+                            url_obj.categories = categories
                             url_obj.scraper_type = scraper_type
                             url_obj.link_selector = link_selector
                             url_obj.page_function = page_function
@@ -7563,7 +7545,7 @@ def manage_urls():
                     db.session.rollback()
                     flash("This URL already exists.", "error")
             else:
-                flash("Please provide URL, category, and scraper type.", "error")
+                flash("Please provide URL, at least one category, and scraper type.", "error")
         elif 'toggle_active' in request.form:
             url_id = request.form.get('url_id')
             url_obj = SelectedURLs.query.get(url_id)
@@ -7583,8 +7565,9 @@ def manage_urls():
             else:
                 flash("URL not found.", "error")
     
-    urls = SelectedURLs.query.order_by(SelectedURLs.category).all()
-    return render_template('manage_urls.html', urls=urls, categories=CategoryEnum)
+    urls = SelectedURLs.query.order_by(SelectedURLs.id).all()
+    categories = ContentCategory.query.all()
+    return render_template('manage_urls.html', urls=urls, categories=categories)
 
 
 
@@ -8015,17 +7998,21 @@ def update_traits():
 @app.route('/admin/moments', methods=['GET'])
 def moments_of_realization():
     moments = MomentOfRealization.query.all()
-    categories = CategoryEnum
+    categories = ContentCategory.query.all()
     return render_template('moments_of_realization.html', moments=moments, categories=categories)
 
 @app.route('/admin/moments/add', methods=['POST'])
 def add_moment():
     text = request.form['text']
-    category = CategoryEnum(request.form['category'])
-    new_moment = MomentOfRealization(text=text, category=category)
-    db.session.add(new_moment)
-    db.session.commit()
-    flash('Moment of realization added successfully', 'success')
+    category_id = request.form['category']
+    category = ContentCategory.query.get(category_id)
+    if category:
+        new_moment = MomentOfRealization(text=text, category=category)
+        db.session.add(new_moment)
+        db.session.commit()
+        flash('Moment of realization added successfully', 'success')
+    else:
+        flash('Invalid category selected', 'error')
     return redirect(url_for('moments_of_realization'))
 
 @app.route('/admin/moments/edit/<int:id>', methods=['GET', 'POST'])
@@ -8033,11 +8020,16 @@ def edit_moment(id):
     moment = MomentOfRealization.query.get_or_404(id)
     if request.method == 'POST':
         moment.text = request.form['text']
-        moment.category = CategoryEnum(request.form['category'])
-        db.session.commit()
-        flash('Moment of realization updated successfully', 'success')
+        category_id = request.form['category']
+        category = ContentCategory.query.get(category_id)
+        if category:
+            moment.category = category
+            db.session.commit()
+            flash('Moment of realization updated successfully', 'success')
+        else:
+            flash('Invalid category selected', 'error')
         return redirect(url_for('moments_of_realization'))
-    categories = CategoryEnum
+    categories = ContentCategory.query.all()
     return render_template('edit_moment.html', moment=moment, categories=categories)
 
 @app.route('/admin/moments/delete/<int:id>', methods=['POST'])

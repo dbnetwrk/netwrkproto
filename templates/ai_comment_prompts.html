@@ -36,10 +36,10 @@
                 <option value="scraper_result">Scraper Result</option>
             </select>
             <select name="category" class="form-control" required>
-    {% for category in CategoryEnum %}
-        <option value="{{ category.name }}">{{ category.value }}</option>
-    {% endfor %}
-</select>
+                {% for category in categories %}
+                    <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
             <div class="input-group-append">
                 <button class="btn btn-outline-primary" type="submit">Add Prompt</button>
             </div>
@@ -54,6 +54,7 @@
             {{ prompt.prompt }}
             <span class="badge bg-primary">Top Level</span>
             <span class="badge bg-info">{{ prompt.data_type.capitalize() }}</span>
+            <span class="badge bg-secondary">{{ prompt.category.name }}</span>
             <span class="badge {% if prompt.is_active %}bg-success{% else %}bg-danger{% endif %}">
                 {% if prompt.is_active %}Active{% else %}Inactive{% endif %}
             </span>
@@ -81,6 +82,7 @@
             {{ prompt.prompt }}
             <span class="badge bg-primary">Reply</span>
             <span class="badge bg-info">{{ prompt.data_type.capitalize() }}</span>
+            <span class="badge bg-secondary">{{ prompt.category.name }}</span>
             <span class="badge {% if prompt.is_active %}bg-success{% else %}bg-danger{% endif %}">
                 {% if prompt.is_active %}Active{% else %}Inactive{% endif %}
             </span>

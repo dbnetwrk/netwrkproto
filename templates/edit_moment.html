@@ -12,8 +12,8 @@
             <label for="category">Category:</label>
             <select class="form-control" id="category" name="category" required>
                 {% for category in categories %}
-                <option value="{{ category.value }}" {% if category == moment.category %}selected{% endif %}>
-                    {{ category.value }}
+                <option value="{{ category.id }}" {% if category == moment.category %}selected{% endif %}>
+                    {{ category.name }}
                 </option>
                 {% endfor %}
             </select>
