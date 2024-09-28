@@ -5149,53 +5149,29 @@ def parse_seeder_info(seeder_info):
 
 
 def generate_story_with_anthropic(five_sec_moment, category, seeder_info, scheduled_date):
-    # Initialize context variables
-    context = ""
-    context_type = ""
-    url = None
-
-    # Get one of each type of scraper result
-    scraper_results = {}
-    for source in ['Groupon', 'Instagram', 'Eventbrite', 'Regular']:
-        result = ScraperResult.query.filter(
-            ScraperResult.categories.any(id=category.id),
-            ScraperResult.source == source
-        ).order_by(func.random()).first()
-        scraper_results[source] = result
+    # Get one random result for the category
+    random_article = ScraperResult.query.filter(
+        ScraperResult.categories.any(id=category.id)
+    ).order_by(func.random()).first()
     
-    current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
+    current_app.logger.debug(f"Random article: {random_article.id if random_article else None}")
 
-    # Prepare additional info from scraper results
-    additional_info = []
-    for source, result in scraper_results.items():
-        if result:
-            info = f"{source}: {result.title}"
-            
-            if result.price is not None:
-                info += f" - Price: ${result.price:.2f}"
-            
-            if result.event_date is not None:
-                info += f" - Date: {result.event_date.strftime('%B %d, %Y')}"
-            
-            info += f" - {result.text}"
-            
-            additional_info.append(info)
-    additional_info_str = "\n".join(additional_info)
-
-    # Use the first non-None result as the main context
-    random_article = next((result for result in scraper_results.values() if result is not None), None)
-    
+    # Prepare additional info from the single result
     if random_article:
-        context = (
-            f"Recent news/event/jobpost from Miami: '{random_article.title}'. "
-            f"Summary: {random_article.text}..."
-        )
-        context_type = "Local Event/News/Job Post"
+        additional_info = f"{random_article.source}: {random_article.title}"
+        
+        if random_article.price is not None:
+            additional_info += f" - Price: ${random_article.price:.2f}"
+        
+        if random_article.event_date is not None:
+            additional_info += f" - Date: {random_article.event_date.strftime('%B %d, %Y')}"
+        
+        additional_info += f" - {random_article.text}"
         url = random_article.url
     else:
-        context = f"No recent news available for category {category.name}."
-        context_type = "Local Event/News/Job Post"
-    
+        additional_info = f"No recent information available for category {category.name}."
+        url = None
+
     seeder_details = parse_seeder_info(seeder_info)
     current_app.logger.debug(f"HERE IS SEEDER_DETAILS IN GENERATE STORY: {seeder_details}")
 
@@ -5211,29 +5187,32 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
 
     num_paragraphs = random.randint(1, 3)
 
-    user_prompt = (
-        f"All great stories, regardless of length or depth or tone, tell the story of a five-second moment in a person's life. And the purpose of that story is to bring that moment to the greatest clarity possible. Everything included in the story should only serve to bring that five-second moment to the greatest possible clarity.\n\n"
-        f"I need you to write a story where the following happens:\n\n"
-        f"1. The five-second moment is this: {five_sec_moment}\n"
-        f"2. The five-second moment is realized towards the end of the story.\n"
-        f"3. The beginning starts with the opposite of the five-second moment.\n"
-        f"4. Use the following information as potential backdrop or context for the story. Feel free to incorporate elements that naturally fit with the five-second moment, but don't force all details if they don't enhance the story: \n{additional_info_str}\n"
-        f"5. The story is written on {formatted_date}.\n"
-        f"6. Write the story in the first person, in the style of a reddit post, where you ask a question to spark engagement at the end.\n"
-        f"7. Write it as though it is coming from a recent transplant to Miami with the following characteristics:\n"
-        f"   - From: {seeder_details['state']}\n"
-        f"   - Works in: {seeder_details['industry']}\n"
-        f"   - Living in: {seeder_details['neighborhood']} neighborhood\n"
-        f"   - Age: 22-26\n"
-        f"8. Write in 8th grade verbiage, and incorporate the seeder's background subtly into the story.\n"
-        f"9. Write in a tone that is casual and conversational. \n"
-        f"It seems so exhausting being a mother with practically no reward and I feel like the older peeps will hear these issues and just tell you to have kids like why do they do that?\"\n"
-        f"10. The story must be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.\n"
-        f"11. Wrap the story in <story> brackets.\n"
-        f"12. Start the story close to the ending\n"
-        f"13. If the reference data for the backdrop contains specific dates, include them in the story\n"
-        f"<think>\n"
-    )
+    user_prompt = f"""
+    Create a story that captures a five-second moment in someone's life, bringing it to the greatest clarity possible. Every element of the story should serve to illuminate this moment.
+
+    Key elements:
+    1. Five-second moment: {five_sec_moment}
+    2. This moment should be realized towards the end of the story.
+    3. The story should begin with a situation or feeling opposite to the five-second moment.
+    4. Use the following information as potential backdrop or context for the story. Incorporate elements that naturally fit with the five-second moment:
+
+    {additional_info}
+
+    5. The story is set on {formatted_date}.
+    6. Write in first-person, like a Reddit post. End with a question to engage readers.
+    7. The narrator is a recent Miami transplant:
+       - From: {seeder_details['state']}
+       - Works in: {seeder_details['industry']}
+       - Living in: {seeder_details['neighborhood']} neighborhood
+       - Age: 22-26
+    8. Use 8th grade level language. Subtly incorporate the narrator's background.
+    9. Maintain a casual, conversational tone.
+    10. The story should be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.
+    11. Start the story close to its ending.
+    12. If any specific dates are mentioned in the backdrop information, include them naturally in the story if relevant.
+
+    Wrap the final story in <story> tags. <think>
+    """
     current_app.logger.info(f"HERE IS THE USER PROMPT WOOO: {user_prompt}")
 
 
@@ -5241,7 +5220,7 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20240620",
-            max_tokens=5000,  # Adjust as needed
+            max_tokens=8000,  # Adjust as needed
             temperature=0.75,
             system=super_prompt,
             messages=[
