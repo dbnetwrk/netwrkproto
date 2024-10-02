@@ -4449,7 +4449,7 @@ def select_random_commenters(min_commenters, max_commenters, item, content_type)
         
         commenters = []
         for _ in range(num_commenters):
-            use_profile_picture = random.random() < 0.8
+            use_profile_picture = random.random() < 0.7
             current_app.logger.debug(f"Selecting commenter with profile picture: {use_profile_picture}")
             
             query = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id)
@@ -4470,7 +4470,7 @@ def select_random_commenters(min_commenters, max_commenters, item, content_type)
         current_app.logger.debug("Processing for post content type")
         commenters = []
         for _ in range(num_commenters):
-            use_profile_picture = random.random() < 0.8
+            use_profile_picture = random.random() < 0.7
             current_app.logger.debug(f"Selecting commenter with profile picture: {use_profile_picture}")
             
             query = OfficialSeeder.query
@@ -4644,6 +4644,7 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     #{"The problem/main idea of the post is: " + five_second_moment if five_second_moment else ""}
     #and {num_levels} nested levels of replies
     #8. Use 8th grade verbiage 
+    #For the first comment, use the following guideline: {first_comment_prompt}
 
     prompt = f"""Generate a realistic comment chain for a Miami discussion board about {category.name}. The original post is:
 
@@ -4657,25 +4658,28 @@ Create a conversation with {num_comments} comments total, involving these charac
 
 Guidelines:
 
-1. Start with one top-level comment responding to {original_seeder.full_name}s post. For the first comment, use the following guideline: {first_comment_prompt}
+1. Start with one top-level comment responding to {original_seeder.full_name}s post. 
 2. All subsequent comments should be replies to this first comment
-3. {original_seeder.full_name} (OP) should participate in the conversation, but not dominate it. Her comments should seek clarification or respond to advice.
+3. {original_seeder.full_name} (OP) should participate in the conversation, but not dominate it. His/Her comments should seek clarification or respond to advice.
 4. Each character's comments should be written in their writing styles
 5. Incorporate disagreement and controversy into the comment chain
 6. Each comment should be at most one, concise sentence
 7. Use '-' to denote comment levels (e.g., '-', '--', '---').
 8. Ensure a natural conversation flow, with each comment building on previous ones
-9. Subtly incorporate this information from the additional_info_string where relevant:
-{additional_info_str}
-10. When mentioning events, activities, deals, etc. from the additional_info_string, include specific details such as the exact name, date, price, and source
+9. Naturally weave in elements from the following additional information where it fits the conversation flow:
+[{additional_info_str}]
+10. When mentioning events, activities, or places from the additional information:
+-Vary how much detail you provide
+-Make references feel casual and incidental
+-Ensure the information is findable but not overly specific
 
-Format:
+11. Use this format for output:
 -[First comment] By: [Author] 
 --[Reply] By: [Different Author]
 ---[Reply to reply] By: [Another Author]
 (Continue this pattern for all {num_comments} comments)
 
-Aim for a conversation that feels authentic, engaging, and natural, while addressing the original post's concerns and subtly incorporating the additional information.
+Aim for a conversation that feels authentic and natural. Address the original post's concerns while occasionally alluding to the additional information as if it's something the commenter genuinely knows or has experienced. The goal is to make these references feel like organic parts of the discussion rather than promotional content.
 """
 
     current_app.logger.debug(f"Prompt constructed: {len(prompt)} characters")
@@ -8483,7 +8487,26 @@ def delete_venue():
 def manage_styles():
     writing_styles = WritingStyle.query.all()
     style_modifiers = StyleModifier.query.all()
-    return render_template('manage_styles.html', writing_styles=writing_styles, style_modifiers=style_modifiers)
+    seeders = OfficialSeeder.query.all()
+    return render_template('manage_styles.html', writing_styles=writing_styles, style_modifiers=style_modifiers, seeders=seeders)
+
+@app.route('/update_seeder_style', methods=['POST'])
+def update_seeder_style():
+    seeder_id = request.form.get('seeder_id')
+    style_id = request.form.get('style_id')
+    seeder = OfficialSeeder.query.get_or_404(seeder_id)
+    seeder.writing_style_id = style_id
+    db.session.commit()
+    return jsonify(success=True)
+
+@app.route('/update_seeder_modifiers', methods=['POST'])
+def update_seeder_modifiers():
+    seeder_id = request.form.get('seeder_id')
+    modifier_ids = request.form.getlist('modifier_ids[]')
+    seeder = OfficialSeeder.query.get_or_404(seeder_id)
+    seeder.style_modifiers = StyleModifier.query.filter(StyleModifier.id.in_(modifier_ids)).all()
+    db.session.commit()
+    return jsonify(success=True)
 
 @app.route('/add_writing_style', methods=['POST'])
 def add_writing_style():

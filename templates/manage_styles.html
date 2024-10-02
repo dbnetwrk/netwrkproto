@@ -36,6 +36,47 @@
     </form>
 </div>
 
+<h3 class="mt-5">Manage Seeder Styles and Modifiers</h3>
+    {% for seeder in seeders %}
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">{{ seeder.full_name }}</h5>
+            <td><img src="{{ seeder.profile_picture }}" alt="Profile Picture" style="width: 50px; height: 50px;"></td>
+            <span class="badge {% if seeder.types_lowercase %}bg-success{% else %}bg-danger{% endif %}">
+                    {% if seeder.types_lowercase %}types lowercase{% else %}Types Normal Case{% endif %}
+                </span>
+            <div class="form-group">
+                <label>Writing Style:</label>
+                <select class="form-control" onchange="updateSeederStyle({{ seeder.id }}, this.value)">
+                    <option value="">Select a style</option>
+                    {% for style in writing_styles %}
+                    <option value="{{ style.id }}" {% if seeder.writing_style_id == style.id %}selected{% endif %}>
+                        {{ style.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group mt-3">
+                <label>Style Modifiers:</label>
+                <div class="checkbox-group">
+                    {% for modifier in style_modifiers %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="{{ modifier.id }}" 
+                               id="modifier-{{ seeder.id }}-{{ modifier.id }}"
+                               {% if modifier in seeder.style_modifiers %}checked{% endif %}
+                               onchange="updateSeederModifiers({{ seeder.id }})">
+                        <label class="form-check-label" for="modifier-{{ seeder.id }}-{{ modifier.id }}">
+                            {{ modifier.name }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
 <script>
 function deleteStyle(styleId) {
     if (confirm('Are you sure you want to delete this writing style?')) {
@@ -58,4 +99,36 @@ function deleteModifier(modifierId) {
             });
     }
 }
+
+function updateSeederStyle(seederId, styleId) {
+    fetch('/update_seeder_style', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `seeder_id=${seederId}&style_id=${styleId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) alert('Failed to update seeder style');
+    });
+}
+
+function updateSeederModifiers(seederId) {
+    const checkboxes = document.querySelectorAll(`input[id^="modifier-${seederId}-"]:checked`);
+    const selectedModifiers = Array.from(checkboxes).map(checkbox => checkbox.value);
+    fetch('/update_seeder_modifiers', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `seeder_id=${seederId}&modifier_ids[]=${selectedModifiers.join('&modifier_ids[]=')}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) alert('Failed to update seeder modifiers');
+    });
+}
+</script>
+
 {% endblock %}
