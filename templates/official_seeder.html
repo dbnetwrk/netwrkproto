@@ -48,7 +48,29 @@
             <input type="checkbox" class="form-check-input" id="types_lowercase" name="types_lowercase">
             <label class="form-check-label" for="types_lowercase">Types in lowercase</label>
         </div>
+        <div class="mb-3">
+            <label for="writing_style" class="form-label">Writing Style</label>
+            <select class="form-select" id="writing_style" name="writing_style" required>
+                <option value="">Select a writing style</option>
+                {% for style in writing_styles %}
+                <option value="{{ style.id }}">{{ style.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="style_modifiers" class="form-label">Style Modifiers</label>
+            <select class="form-select" id="style_modifiers" name="style_modifiers" multiple>
+                {% for modifier in style_modifiers %}
+                <option value="{{ modifier.id }}">{{ modifier.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary">Add Entry</button>
+
+         
+
+
     </form>
     <h2>Official Seeder List</h2>
     <table class="table">
@@ -60,6 +82,8 @@
             <th>State</th>
             <th>Industry</th>
             <th>Neighborhood</th>
+            <th>Writing Style</th>
+            <th>Style Modifiers</th>
             <th>Types Lowercase</th>
             <th>Number of Vaults</th>
             <th>Actions</th>
@@ -74,6 +98,12 @@
             <td>{{ seeder.state.value if seeder.state else 'N/A' }}</td>
             <td>{{ seeder.industry.value if seeder.industry else 'N/A' }}</td>
             <td>{{ seeder.neighborhood.value if seeder.neighborhood else 'N/A' }}</td>
+            <td>{{ seeder.writing_style.name if seeder.writing_style else 'N/A' }}</td>
+            <td>
+                {% for modifier in seeder.style_modifiers %}
+                    <span class="badge bg-secondary">{{ modifier.name }}</span>
+                {% endfor %}
+            </td>
             <td>
                 <span class="badge {% if seeder.types_lowercase %}bg-success{% else %}bg-danger{% endif %}">
                     {% if seeder.types_lowercase %}Yes{% else %}No{% endif %}

@@ -1,5 +1,7 @@
 from playwright.sync_api import sync_playwright
 import time
+from datetime import datetime, timedelta
+import re
 
 def scrape_groupon(url):
     with sync_playwright() as playwright:
@@ -140,61 +142,187 @@ def scrape_individual_eventbrite_page(url, playwright):
 
 
 
-def scrape_eventbrite2(url):
+def scrape_miami_general(url):
+    all_links = set()
+    
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=False)
+        page = browser.new_page()
+        
+        while url:
+            page.goto(url, wait_until='domcontentloaded')
+            
+            # Extract links from the current page
+            new_links = page.evaluate("""
+                () => {
+                    const links = [];
+                    document.querySelectorAll('article.ys-card[data-type="event"] a').forEach(link => {
+                        links.push(link.href);
+                    });
+                    return links;
+                }
+            """)
+            all_links.update(new_links)
+            
+            # Check for the next page
+            next_button = page.query_selector('li.ys-pagination__item:not(.pagination-disabled) a[aria-label="Next"]')
+            if next_button:
+                url = next_button.get_attribute('href')
+                if url and not url.startswith('http'):
+                    # If it's a relative URL, make it absolute
+                    url = f"https://www.miamiandbeaches.com{url}"
+            else:
+                url = None  # No more pages to scrape
+        
+        browser.close()
+    
+        content_data = []
+        for link in all_links:
+            content_data.append(scrape_individual_miami_beaches_page(link, playwright))
+        return content_data
+
+
+def scrape_individual_miami_beaches_page(url, playwright):
+    browser = playwright.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto(url, wait_until='domcontentloaded')
+    
+    # Extract title
+    title_element = page.query_selector('h1.h1.text-uppercase')
+    title = title_element.text_content().strip() if title_element else "Title Not Found"
+    
+    # Extract date
+    date_element = page.query_selector('h3.date-range')
+    date_text = date_element.text_content().strip() if date_element else None
+    event_date = parse_date(date_text)
+    
+    # Extract time
+    time_element = page.query_selector('h5.time-frame')
+    time = time_element.text_content().strip() if time_element else None
+    
+    # Extract description
+    paragraphs = page.query_selector_all('p')
+    description = ' '.join(p.text_content().strip() for p in paragraphs if p.text_content().strip())
+    
+    browser.close()
+    
+    return {
+        'url': url,
+        'title': title,
+        'description': description,
+        'event_date': event_date,
+        'event_time': time
+    }
+
+def parse_date(date_text):
+    if not date_text:
+        return None
+    
+    # Try to parse a single date
+    try:
+        return datetime.strptime(date_text, "%b %d, %Y").date()
+    except ValueError:
+        pass
+    
+    # Check for date range
+    if ' - ' in date_text:
+        start_date = date_text.split(' - ')[0]
+        try:
+            return datetime.strptime(start_date, "%b %d, %Y").date()
+        except ValueError:
+            pass
+    
+    # Check for "Through" format
+    if date_text.startswith("Through"):
+        # Return the date for the coming weekend
+        return get_coming_weekend()
+    
+    # If all else fails, return the coming weekend
+    return get_coming_weekend()
+
+def get_coming_weekend():
+    today = datetime.now().date()
+    days_ahead = 5 - today.weekday()  # Saturday is 5
+    if days_ahead <= 0:  # Target day already happened this week
+        days_ahead += 7
+    return today + timedelta(days=days_ahead)
+
+
+
+
+def scrape_timeout(url):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=False)  # Visible browser
         page = browser.new_page()
         page.goto(url, wait_until='domcontentloaded')
-        page.wait_for_timeout(10000)  # Initial wait for content
+        
+        # Wait for initial content to load
+        page.wait_for_timeout(5000)
 
-        # Scroll down the page in chunks
-        viewport_height = page.viewport_size['height']
-        scroll_step = viewport_height * 0.8  # Scroll 80% of the viewport height each time
-        last_height = 0
-        while True:
-            last_height = page.evaluate("document.body.scrollHeight")
-
-            # Scroll down by one step
-            page.evaluate(f"window.scrollBy(0, {scroll_step})")
-            page.wait_for_timeout(3000)  # Wait for content to load
-
-            # Check if we've reached the bottom
-            new_height = page.evaluate("document.body.scrollHeight")
-            if new_height == last_height:
-                # If no new content loaded, try scrolling to the very bottom
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(3000)
-                final_height = page.evaluate("document.body.scrollHeight")
-                if final_height == new_height:
-                    # If still no change, we've reached the bottom
+        # Function to click "Show more" button and load more content
+        def load_more_content(max_attempts=50):
+            for _ in range(max_attempts):
+                try:
+                    # Try to find and click the "Show more" button
+                    show_more_button = page.query_selector('a[data-testID="view-more-cta_testID"]')
+                    if show_more_button:
+                        show_more_button.click()
+                        print("Clicked 'Show more' button")
+                        # Wait for new content to load
+                        page.wait_for_timeout(15000)
+                    else:
+                        print("'Show more' button not found. All content loaded.")
+                        break
+                except Exception as e:
+                    print(f"Error clicking 'Show more' button: {e}")
                     break
 
-            
-
-        # Extract links
-        links = page.evaluate("""
+        # Load more content
+        load_more_content()
+        
+        # Extract event information
+        events = page.evaluate("""
             () => {
-                const links = [];
-                document.querySelectorAll('a.event-card-link').forEach(link => {
-                    links.push(link.href);
+                const events = [];
+                document.querySelectorAll('div.articleContent').forEach(article => {
+                    const titleElement = article.querySelector('h3');
+                    const title = titleElement ? titleElement.textContent.trim() : 'No Title';
+                    
+                    
+                    const summaryElement = article.querySelector('._summary_1dc5j_23');
+                    const summary = summaryElement ? summaryElement.textContent.trim() : 'No Summary';
+                    
+                    events.push({
+                        title: title,
+                        summary: summary
+                    });
                 });
-                return links;
+                return events;
             }
         """)
+        
         browser.close()
-        return list(set(links))
+        return events
+
 
 
 if __name__ == '__main__':
+
+
+    url = "https://www.timeout.com/miami/things-to-do/things-to-do-in-miami-this-weekend"
+    scraped_events = scrape_timeout(url)
+    for event in scraped_events:
+        print(event)
+
     #url = "https://www.groupon.com/local/miami/things-to-do?distance=%5B0..10%5D"  # Replace with the specific Groupon page URL if needed
     #links = scrape_groupon(url)
 
-    url = "https://www.eventbrite.com/b/fl--miami/business/startups-and-small-business/"  # Replace with the specific Groupon page URL if needed
-    links = scrape_eventbrite(url)
+    #url = "https://www.miamiandbeaches.com/events?dates._datesFilter=week"  # Replace with the specific Groupon page URL if needed
+    #links = scrape_miami_general(url)
 
-    print("Extracted links:")
-    for link in links:
-        print(link)
+    #print("Extracted links:")
+    #for link in links:
+        #print(link)
 
-    print(" We got this many: ", len(links))
-    print("\nScraping completed. Check groupon.html for the page content.")
+    #print(" We got this many: ", len(links))
+    #print("\nScraping completed. Check groupon.html for the page content.")

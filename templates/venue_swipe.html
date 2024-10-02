@@ -1,0 +1,62 @@
+
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                {% if venue %}
+                    <div class="card-header">
+                        <h3>{{ venue.title }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Description:</strong> {{ venue.description }}</p>
+                        <p><strong>Price:</strong> {{ venue.price }}</p>
+                        <p><strong>Category:</strong> {{ venue.category_name }} ({{ venue.main_category }})</p>
+                        <p><strong>Location:</strong> {{ venue.neighborhood }}, {{ venue.city }}</p>
+                        <p><strong>Address:</strong> {{ venue.street }}, {{ venue.postal_code }}</p>
+                        <p><strong>Website:</strong> <a href="{{ venue.website }}" target="_blank">{{ venue.website }}</a></p>
+                        <p><strong>Google Search:</strong> <a href="{{ venue.google_search_url }}" target="_blank">View on Google</a></p>
+                        <p><strong>Total Score:</strong> {{ venue.total_score }}</p>
+                        <p><strong>Reviews Count:</strong> {{ venue.reviews_count }}</p>
+                        <p><strong>Status:</strong> 
+                            {% if venue.permanently_closed %}
+                                <span class="text-danger">Permanently Closed</span>
+                            {% elif venue.temporarily_closed %}
+                                <span class="text-warning">Temporarily Closed</span>
+                            {% else %}
+                                <span class="text-success">Open</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="card-footer">
+                        <form method="post" class="d-flex justify-content-between">
+                            <input type="hidden" name="venue_id" value="{{ venue.id }}">
+                            <button type="submit" name="action" value="delete" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this venue?')">Delete</button>
+                            <button type="submit" name="action" value="next" class="btn btn-primary">Next</button>
+                            
+                        </form>
+                    </div>
+                {% else %}
+                    <div class="card-body">
+                        <p>No more venues to display.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'ArrowRight') {
+        document.querySelector('button[value="next"]').click();
+    } else if (event.key === 'Delete') {
+        if (confirm('Are you sure you want to delete this venue?')) {
+            document.querySelector('button[value="delete"]').click();
+        }
+    }
+});
+</script>
+
+{% endblock %}

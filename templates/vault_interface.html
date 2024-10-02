@@ -21,7 +21,7 @@
         <thead>
             <tr>
                 <th>Community</th>
-                <th>Scheduled</th>
+                
                 <th>Posted</th>
             </tr>
         </thead>
@@ -29,7 +29,7 @@
             {% for community in communities %}
             <tr>
                 <td>{{ community.name }}</td>
-                <td>{{ current_week_counts.get(community.id, {}).get('scheduled', 0) }}</td>
+                
                 <td>{{ current_week_counts.get(community.id, {}).get('posted', 0) }}</td>
             </tr>
             {% endfor %}
@@ -44,7 +44,7 @@
         <thead>
             <tr>
                 <th>Community</th>
-                <th>Scheduled</th>
+                
                 <th>Posted</th>
             </tr>
         </thead>
@@ -52,7 +52,7 @@
             {% for community in communities %}
             <tr>
                 <td>{{ community.name }}</td>
-                <td>{{ next_week_counts.get(community.id, {}).get('scheduled', 0) }}</td>
+                
                 <td>{{ next_week_counts.get(community.id, {}).get('posted', 0) }}</td>
             </tr>
             {% endfor %}
@@ -76,7 +76,7 @@
                     <thead>
                         <tr>
                             <th>Community</th>
-                            <th>Scheduled</th>
+                            
                             <th>Posted</th>
                         </tr>
                     </thead>
@@ -84,7 +84,7 @@
                         {% for community in communities %}
                         <tr>
                             <td>{{ community.name }}</td>
-                            <td>{{ communities_counts.get(community.id, {}).get('scheduled', 0) }}</td>
+                            
                             <td>{{ communities_counts.get(community.id, {}).get('posted', 0) }}</td>
                         </tr>
                         {% endfor %}

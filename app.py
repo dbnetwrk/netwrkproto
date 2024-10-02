@@ -455,10 +455,24 @@ community_subreddit_association = db.Table('community_subreddit',
     db.Column('subreddit_id', db.Integer, db.ForeignKey('subreddits.id'), primary_key=True)
 )
 
+
+venue_content_category = db.Table('venue_content_category',
+    db.Column('venue_id', db.Integer, db.ForeignKey('venue.id'), primary_key=True),
+    db.Column('content_category_id', db.Integer, db.ForeignKey('content_category.id'), primary_key=True)
+)
+
+# New association table for OfficialSeeder and StyleModifier
+seeder_style_modifiers = db.Table('seeder_style_modifiers',
+    db.Column('seeder_id', db.Integer, db.ForeignKey('official_seeder.id'), primary_key=True),
+    db.Column('style_modifier_id', db.Integer, db.ForeignKey('style_modifier.id'), primary_key=True)
+)
+
+
 class ContentCategory(db.Model):
     __tablename__ = 'content_category'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
+    venues = db.relationship('Venue', secondary=venue_content_category, back_populates='categories')
 
     def __repr__(self):
         return f'<ContentCategory {self.name}>'
@@ -770,10 +784,12 @@ class OfficialSeeder(db.Model):
     industry = db.Column(db.Enum(Industry), nullable=True)
     neighborhood = db.Column(db.Enum(Neighborhood), nullable=True) 
     facts = db.relationship('Fact', backref='official_seeder', lazy=True)
-    character_traits = db.Column(
-        ARRAY(SQLEnum(CharacterTraitEnum, name='character_trait_enum')),  # Specify the enum type name
-        nullable=True
-    )
+    writing_style_id = db.Column(db.Integer, db.ForeignKey('writing_style.id'))
+    writing_style = db.relationship('WritingStyle')
+    
+    # Changed to many-to-many relationship
+    style_modifiers = db.relationship('StyleModifier', secondary=seeder_style_modifiers, 
+                                      lazy='joined', backref=db.backref('seeders', lazy='joined'))
     
 
 class Fact(db.Model):
@@ -782,14 +798,22 @@ class Fact(db.Model):
     seeder_id = db.Column(db.Integer, db.ForeignKey('official_seeder.id'))
 
 
+
 class WritingStyle(db.Model):
-    __tablename__ = 'writing_styles'  # Explicitly specify the table name here
-
     id = db.Column(db.Integer, primary_key=True)
-    author = db.Column(db.String(100))
-    content = db.Column(db.Text)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    description = db.Column(db.String(255))
 
+    def __repr__(self):
+        return f'<WritingStyle {self.name}>'
 
+class StyleModifier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    description = db.Column(db.String(255))
+
+    def __repr__(self):
+        return f'<StyleModifier {self.name}>'
 
 class EventbriteSpider(scrapy.Spider):
     name = 'eventbrite'
@@ -937,7 +961,8 @@ class Venue(db.Model):
     temporarily_closed = db.Column(db.Boolean)
     reviews_count = db.Column(db.Integer)
     google_search_url = db.Column(db.String(1000))
-    reviews = db.relationship('Review', backref='venue', lazy=True)
+    reviews = db.relationship('Review', backref='venue', lazy=True, cascade='all, delete-orphan')
+    categories = db.relationship('ContentCategory', secondary=venue_content_category, back_populates='venues')
 
 
 
@@ -972,7 +997,7 @@ class SelectedURLs(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), unique=True, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
-    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer', 'Groupon', 'Instagram', 'Eventbrite', name='scraper_type'), nullable=False, default='Regular')
+    scraper_type = db.Column(db.Enum('Regular', 'Puppeteer', 'Groupon', 'Instagram', 'Eventbrite', 'Timeout', name='scraper_type'), nullable=False, default='Regular')
     link_selector = db.Column(db.String(200), nullable=True)
     page_function = db.Column(db.Text, nullable=True)
     max_results = db.Column(db.Integer, default=20)
@@ -987,7 +1012,7 @@ class ScraperResult(db.Model):
     title = db.Column(db.String(500))
     text = db.Column(db.Text)
     scrape_date = db.Column(db.DateTime, default=datetime.utcnow)
-    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', name='scraper_source'), nullable=False, default='Regular')
+    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', 'Timeout', name='scraper_source'), nullable=False, default='Regular')
     price = db.Column(db.Numeric(10, 2))
     event_date = db.Column(db.DateTime)
     categories = db.relationship('ContentCategory', secondary=scraper_result_categories,
@@ -4412,13 +4437,55 @@ def generate_comments_for_all_items(content_type='post', chains_per_item=1, item
 
 
 def select_random_commenters(min_commenters, max_commenters, item, content_type):
+    current_app.logger.debug(f"Selecting random commenters for {content_type}. Min: {min_commenters}, Max: {max_commenters}")
+    
     num_commenters = random.randint(min_commenters, max_commenters)
+    current_app.logger.debug(f"Number of commenters to select: {num_commenters}")
+    
     if content_type == 'vault':
+        current_app.logger.debug("Processing for vault content type")
         original_seeder = OfficialSeeder.query.get(item.seeder_id)
-        commenters = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id).order_by(func.random()).limit(num_commenters).all()
-        return [original_seeder] + commenters
+        current_app.logger.debug(f"Original seeder ID: {original_seeder.id}")
+        
+        commenters = []
+        for _ in range(num_commenters):
+            use_profile_picture = random.random() < 0.8
+            current_app.logger.debug(f"Selecting commenter with profile picture: {use_profile_picture}")
+            
+            query = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id)
+            if use_profile_picture:
+                query = query.filter(OfficialSeeder.profile_picture.isnot(None))
+            else:
+                query = query.filter(or_(OfficialSeeder.profile_picture.is_(None), OfficialSeeder.profile_picture.isnot(None)))
+            
+            random_commenter = query.order_by(func.random()).first()
+            if random_commenter:
+                commenters.append(random_commenter)
+                current_app.logger.debug(f"Selected commenter ID: {random_commenter.id}, Has profile picture: {random_commenter.profile_picture is not None}")
+        
+        result = [original_seeder] + commenters
+        current_app.logger.debug(f"Final result for vault: {len(result)} commenters (including original seeder)")
+        return result
     else:  # post
-        return OfficialSeeder.query.order_by(func.random()).limit(num_commenters).all()
+        current_app.logger.debug("Processing for post content type")
+        commenters = []
+        for _ in range(num_commenters):
+            use_profile_picture = random.random() < 0.8
+            current_app.logger.debug(f"Selecting commenter with profile picture: {use_profile_picture}")
+            
+            query = OfficialSeeder.query
+            if use_profile_picture:
+                query = query.filter(OfficialSeeder.profile_picture.isnot(None))
+            else:
+                query = query.filter(or_(OfficialSeeder.profile_picture.is_(None), OfficialSeeder.profile_picture.isnot(None)))
+            
+            random_commenter = query.order_by(func.random()).first()
+            if random_commenter:
+                commenters.append(random_commenter)
+                current_app.logger.debug(f"Selected commenter ID: {random_commenter.id}, Has profile picture: {random_commenter.profile_picture is not None}")
+        
+        current_app.logger.debug(f"Selected {len(commenters)} commenters for post")
+        return commenters
 
 
 def select_ai_comment_prompt(category):
@@ -4439,10 +4506,101 @@ def get_name_with_indicator(name, types_lowercase):
     return name
 
 
+def format_commenter_info(commenter, is_original_poster=False):
+    info = []
+    info.append(f"Name: {get_name_with_indicator(commenter.full_name, commenter.types_lowercase)} ({commenter.alias})")
+    if is_original_poster:
+        info.append("Role: Original Poster")
+    if commenter.state:
+        info.append(f"From: {commenter.state.value}")
+    if commenter.industry:
+        info.append(f"Industry: {commenter.industry.value}")
+    if commenter.neighborhood:
+        info.append(f"Lives in: {commenter.neighborhood.value}")
+    
+    # Debug logging
+    logging.debug(f"Commenter: {commenter.full_name}")
+    logging.debug(f"Writing style: {commenter.writing_style.name if commenter.writing_style else 'None'}")
+    logging.debug(f"Style modifiers: {[mod.name for mod in commenter.style_modifiers]}")
+
+    # Handle writing style and modifiers
+    writing_style_info = []
+    if commenter.writing_style:
+        writing_style_info.append(commenter.writing_style.name.lower())
+    
+    # Ensure we're accessing style_modifiers correctly
+    if hasattr(commenter, 'style_modifiers'):
+        modifier_names = [modifier.name.lower() for modifier in commenter.style_modifiers]
+        writing_style_info.extend(modifier_names)
+    
+    if writing_style_info:
+        info.append(f"Writing Style: {', '.join(writing_style_info)}")
+    
+    return " | ".join(info)
+
+
+def construct_additional_info(random_venue, scraper_results):
+    additional_info = {
+        "local_venue": {},
+        "recent_articles": [],
+        "social_media": []
+    }
+    
+    # Add random venue info
+    if random_venue:
+        additional_info["local_venue"] = {
+            "name": random_venue.title,
+            "description": random_venue.description or "",
+            "neighborhood": random_venue.neighborhood or "",
+            "menu": [],
+            "reviews": []
+        }
+        
+        # Handle menu items
+        if isinstance(random_venue.menu, (list, dict)):
+            menu_items = random_venue.menu if isinstance(random_venue.menu, list) else list(random_venue.menu.items())
+            additional_info["local_venue"]["menu"] = [
+                {"item": item, "price": price} if isinstance(item, tuple) else {"item": item}
+                for item in menu_items[:10]
+            ]
+        
+        # Handle reviews
+        if random_venue.reviews:
+            additional_info["local_venue"]["reviews"] = [
+                {"text": review.text[:100] + "..." if len(review.text) > 100 else review.text}
+                for review in random_venue.reviews[:3]
+            ]
+    
+    # Add scraper results info
+    for source, result in scraper_results.items():
+        if result:
+            info = {
+                "source": source,
+                "title": result.title,
+                "text": result.text
+            }
+            
+            if result.price is not None:
+                info["price"] = f"{result.price:.2f}"
+            
+            if result.event_date is not None:
+                info["date"] = result.event_date.strftime('%Y-%m-%d')
+            
+            if source == 'Regular':
+                additional_info["recent_articles"].append(info)
+            else:
+                additional_info["social_media"].append(info)
+    
+    # Convert to JSON string
+    additional_info_str = json.dumps(additional_info, ensure_ascii=False, indent=2)
+    
+    return additional_info_str
+
+
 def construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type):
     # Get the five-second moment if it exists
     five_second_moment = item.five_second_moment if hasattr(item, 'five_second_moment') else None
-
+    
     # Get one of each type of scraper result
     scraper_results = {}
     for source in ['Groupon', 'Instagram', 'Eventbrite', 'Regular']:
@@ -4451,74 +4609,68 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
             ScraperResult.source == source
         ).order_by(func.random()).first()
         scraper_results[source] = result
-
-    current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
-
-    # Prepare additional info from scraper results
-    additional_info = []
-    for source, result in scraper_results.items():
-        if result:
-            info = f"{source}: {result.title}"
-            
-            if result.price is not None:
-                info += f" - Price: ${result.price:.2f}"
-            
-            if result.event_date is not None:
-                info += f" - Date: {result.event_date.strftime('%B %d, %Y')}"
-            
-            info += f" - {result.text}"
-            
-            additional_info.append(info)
-
-    additional_info_str = "\n".join(additional_info)
-    current_app.logger.debug(f"Additional info prepared: {len(additional_info)} items")
-
-    original_seeder = OfficialSeeder.query.get(item.seeder_id).full_name
-    current_app.logger.debug(f"Original seeder: {original_seeder}")
-    commenter_info = []
-    for i, commenter in enumerate(commenters):
-        traits = ", ".join([trait.value for trait in commenter.character_traits]) if commenter.character_traits else "no specific traits"
-        full_name_with_indicator = get_name_with_indicator(commenter.full_name, commenter.types_lowercase)
-        
-        if commenter.full_name == original_seeder:
-            commenter_info.append(f"{full_name_with_indicator} ({commenter.alias}) (Original Poster): {traits}")
-        else:
-            commenter_info.append(f"{full_name_with_indicator} ({commenter.alias}): {traits}")
     
-    commenter_info_str = "\n-".join(commenter_info)
+    current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
+    
+    # Get a random venue
+    random_venue = Venue.query.filter(
+        Venue.categories.any(id=category.id)
+    ).options(joinedload(Venue.reviews)).order_by(func.random()).first()
+    
+    current_app.logger.debug(f"Random venue: {random_venue.id if random_venue else None}")
+    
+    # Construct the additional info string using our new function
+    additional_info_str = construct_additional_info(random_venue, scraper_results)
+    
+    # Parse the JSON string back into a dictionary for logging
+    additional_info_dict = json.loads(additional_info_str)
+    current_app.logger.debug(f"Additional info prepared: {len(additional_info_dict)} top-level items")
 
+    original_seeder = OfficialSeeder.query.get(item.seeder_id)
+    current_app.logger.debug(f"Original seeder: {original_seeder.full_name}")
+
+    commenter_info = []
+    for commenter in commenters:
+        is_original_poster = commenter.full_name == original_seeder.full_name
+        commenter_info.append(format_commenter_info(commenter, is_original_poster))
+
+    commenter_info_str = "\n- ".join(commenter_info)
     current_app.logger.debug(f"Commenters prepared: {len(commenters)} commenters")
 
     ai_prompt = select_ai_comment_prompt(category)
     first_comment_prompt = ai_prompt.prompt if ai_prompt else "Respond to the original post"
     current_app.logger.debug(f"First comment prompt: {first_comment_prompt[:50]}...")
     
+    #{"The problem/main idea of the post is: " + five_second_moment if five_second_moment else ""}
+    #and {num_levels} nested levels of replies
+    #8. Use 8th grade verbiage 
+
     prompt = f"""Generate a realistic comment chain for a Miami discussion board about {category.name}. The original post is:
 
 {item.title}
 Content: {item.content}
 
-{"The problem/main idea of the post is: " + five_second_moment if five_second_moment else ""}
 
-Create a conversation with {num_comments} comments total and {num_levels} nested levels of replies, involving these characters:
+
+Create a conversation with {num_comments} comments total, involving these characters:
 {commenter_info_str}
 
 Guidelines:
 
-1. Start with one top-level comment responding to {original_seeder}s post. For the first comment, use the following guideline: {first_comment_prompt}
+1. Start with one top-level comment responding to {original_seeder.full_name}s post. For the first comment, use the following guideline: {first_comment_prompt}
 2. All subsequent comments should be replies to this first comment
-3. {original_seeder} (OP) should participate in the conversation, but not dominate it. Her comments should seek clarification or respond to advice.
-4. Each character's comments should reflect their traits. 
-5. Use '-' to denote comment levels (e.g., '-', '--', '---').
-6. Keep comments concise and in casual, 8th-grade level language with occasional imperfections.
-7. Ensure a natural conversation flow, with each comment building on previous ones and some disagreement or conflicting opinions.
-8. Make each comment one concise sentence
-9. Subtly incorporate this additional information where relevant:
+3. {original_seeder.full_name} (OP) should participate in the conversation, but not dominate it. Her comments should seek clarification or respond to advice.
+4. Each character's comments should be written in their writing styles
+5. Incorporate disagreement and controversy into the comment chain
+6. Each comment should be at most one, concise sentence
+7. Use '-' to denote comment levels (e.g., '-', '--', '---').
+8. Ensure a natural conversation flow, with each comment building on previous ones
+9. Subtly incorporate this information from the additional_info_string where relevant:
 {additional_info_str}
-10. When mentioning events, activities, or deals, include specific details such as the exact name, date, price, and source (Groupon, Eventbrite, Instagram, etc.)
+10. When mentioning events, activities, deals, etc. from the additional_info_string, include specific details such as the exact name, date, price, and source
 
 Format:
--[First comment] By: [Author]
+-[First comment] By: [Author] 
 --[Reply] By: [Different Author]
 ---[Reply to reply] By: [Another Author]
 (Continue this pattern for all {num_comments} comments)
@@ -4527,6 +4679,7 @@ Aim for a conversation that feels authentic, engaging, and natural, while addres
 """
 
     current_app.logger.debug(f"Prompt constructed: {len(prompt)} characters")
+    current_app.logger.debug(f"FULL PROMPT: {prompt}")
 
     return prompt
 
@@ -4534,11 +4687,29 @@ Aim for a conversation that feels authentic, engaging, and natural, while addres
 
 def generate_comment_chain(prompt):
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "system", "content": prompt}]
+
+
+        response = anthropic_client.messages.create(
+            model="claude-3-opus-20240229",
+            #model="claude-3-5-sonnet-20240620",
+            max_tokens=3000,  # Adjust as needed
+            temperature=0.75,
+            #system=super_prompt <think>,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
         )
-        return response.choices[0].message.content.strip()
+        
+        return response.content[0].text.strip()
+
+        #response = client.chat.completions.create(
+         #   model="gpt-4o",
+          #  messages=[{"role": "system", "content": prompt}]
+        #)
+        #return response.choices[0].message.content.strip()
     except Exception as e:
         current_app.logger.error(f"Error in GPT-4 API call: {str(e)}")
         raise
@@ -5150,27 +5321,62 @@ def parse_seeder_info(seeder_info):
 
 def generate_story_with_anthropic(five_sec_moment, category, seeder_info, scheduled_date):
     # Get one random result for the category
-    random_article = ScraperResult.query.filter(
-        ScraperResult.categories.any(id=category.id)
-    ).order_by(func.random()).first()
+    choose_article = random.choice([True, False])
     
-    current_app.logger.debug(f"Random article: {random_article.id if random_article else None}")
+    random_article = None
+    random_venue = None
+    additional_info = ""
+    url = None
 
-    # Prepare additional info from the single result
-    if random_article:
-        additional_info = f"{random_article.source}: {random_article.title}"
+    if choose_article:
+        # Get one random result for the category
+        random_article = ScraperResult.query.filter(
+            ScraperResult.categories.any(id=category.id)
+        ).order_by(func.random()).first()
         
-        if random_article.price is not None:
-            additional_info += f" - Price: ${random_article.price:.2f}"
+        current_app.logger.debug(f"Random article: {random_article.id if random_article else None}")
         
-        if random_article.event_date is not None:
-            additional_info += f" - Date: {random_article.event_date.strftime('%B %d, %Y')}"
+        if random_article:
+            additional_info = f"{random_article.source}: {random_article.title}"
+            
+            if random_article.price is not None:
+                additional_info += f" - Price: ${random_article.price:.2f}"
+            
+            if random_article.event_date is not None:
+                additional_info += f" - Date: {random_article.event_date.strftime('%B %d, %Y')}"
+            
+            additional_info += f" - {random_article.text}"
+            url = random_article.url
+    
+    if not random_article:
+        # Get one random venue for the category
+        random_venue = Venue.query.filter(
+            Venue.categories.any(id=category.id)
+        ).options(joinedload(Venue.reviews)).order_by(func.random()).first()
         
-        additional_info += f" - {random_article.text}"
-        url = random_article.url
-    else:
-        additional_info = f"No recent information available for category {category.name}."
-        url = None
+        current_app.logger.debug(f"Random venue: {random_venue.id if random_venue else None}")
+        
+        if random_venue:
+            additional_info = f"Place: {random_venue.title}"
+            
+            if random_venue.description:
+                additional_info += f" - Description: {random_venue.description}"
+
+            if random_venue.neighborhood:
+                additional_info += f" - Neighborhood: {random_venue.neighborhood}"
+            
+            if random_venue.menu:
+                menu_items = ', '.join([f"{item}: ${price}" for item, price in random_venue.menu.items()[:10]])  # Limit to first 5 menu items
+                additional_info += f" - Menu highlights: {menu_items}"
+            
+            if random_venue.reviews:
+                review_excerpts = '; '.join([review.text[:100] + '...' for review in random_venue.reviews[:3]])  # Limit to first 3 reviews, 100 chars each
+                additional_info += f" - Recent reviews: {review_excerpts}"
+            
+            url = random_venue.google_search_url
+    
+    if not random_article and not random_venue:
+        additional_info = f"No recent information or venues available for category {category.name}."
 
     seeder_details = parse_seeder_info(seeder_info)
     current_app.logger.debug(f"HERE IS SEEDER_DETAILS IN GENERATE STORY: {seeder_details}")
@@ -5198,7 +5404,7 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
 
     {additional_info}
 
-    5. The story is set on {formatted_date}.
+    5. The story is set on {formatted_date}. If the additional information includes future event dates, ensure the narrative reflects the appropriate timeline (e.g., anticipation of upcoming events, reflection on past events). Always maintain chronological consistency between the story date and any mentioned event dates.
     6. Write in first-person, like a Reddit post. End with a question to engage readers.
     7. The narrator is a recent Miami transplant:
        - From: {seeder_details['state']}
@@ -5210,8 +5416,10 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
     10. The story should be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.
     11. Start the story close to its ending.
     12. If any specific dates are mentioned in the backdrop information, include them naturally in the story if relevant.
+    13. End the story with a question that asks for specific local recommendations related to the unique Miami location or experience described. Focus on insider knowledge about places or events that could enhance the narrator's experience.
+    14. Create a controversial title for the story by combining an extreme statement or question related to the five-second moment with a stereotypical aspect of Miami culture. The title should be provocative but not offensive, and should be phrased as a question.
 
-    Wrap the final story in <story> tags. <think>
+    Wrap the final story in <story> tags.  <think> 
     """
     current_app.logger.info(f"HERE IS THE USER PROMPT WOOO: {user_prompt}")
 
@@ -6298,9 +6506,14 @@ from itertools import groupby
 from datetime import datetime
 from collections import OrderedDict
 
+
 @app.route('/vault_interface')
 def vault_interface():
     community_id = request.args.get('community_id')
+    
+    # Get the start of the current week (Monday)
+    today = datetime.utcnow().date()
+    start_of_week = today - timedelta(days=today.weekday())
     
     query = Vault.query.options(
         joinedload(Vault.official_seeder),
@@ -6309,6 +6522,13 @@ def vault_interface():
     
     if community_id:
         query = query.filter_by(community_id=community_id)
+    
+    # Filter vaults to include those from the start of the current week onwards
+    query = query.filter(
+        (Vault.scheduled_at >= start_of_week) | 
+        (Vault.is_posted & (Vault.scheduled_at >= start_of_week)) |
+        ((Vault.scheduled_at == None) & (Vault.created_at >= start_of_week))
+    )
     
     vaults = query.order_by(Vault.scheduled_at.asc(), Vault.created_at.desc()).all()
     
@@ -6319,7 +6539,7 @@ def vault_interface():
     scheduled_vaults = [v for v in vaults if v.scheduled_at and not v.is_posted]
     unscheduled_vaults = [v for v in vaults if not v.scheduled_at and not v.is_posted]
     posted_vaults = [v for v in vaults if v.is_posted]
-
+    
     grouped_scheduled_vaults = {
         date: list(items) for date, items in groupby(
             sorted(scheduled_vaults, key=lambda x: x.scheduled_at.date()),
@@ -6327,7 +6547,7 @@ def vault_interface():
         )
     }
     sorted_grouped_scheduled_vaults = OrderedDict(sorted(grouped_scheduled_vaults.items(), key=lambda x: x[0]))
-
+    
     grouped_posted_vaults = {
         date: list(items) for date, items in groupby(
             sorted(posted_vaults, key=lambda x: x.scheduled_at.date() if x.scheduled_at else x.created_at.date()),
@@ -6335,8 +6555,7 @@ def vault_interface():
         )
     }
     sorted_grouped_posted_vaults = OrderedDict(sorted(grouped_posted_vaults.items(), key=lambda x: x[0], reverse=True))
-
-
+    
     # Fetch scheduling statistics
     stats = get_vault_counts_by_week_and_community()
     
@@ -6363,19 +6582,15 @@ def vault_interface():
             'posted': item.posted_count
         }
     
-    
-
-
-
     return render_template('vault_interface.html', 
-                       grouped_scheduled_vaults=sorted_grouped_scheduled_vaults,
-                       grouped_posted_vaults=sorted_grouped_posted_vaults,
-                       unscheduled_vaults=unscheduled_vaults, 
-                       communities=communities,
-                       community_dict=community_dict,
-                       daily_breakdown=daily_breakdown,
-                       current_week_counts=current_week_counts,
-                       next_week_counts=next_week_counts)
+                           grouped_scheduled_vaults=sorted_grouped_scheduled_vaults,
+                           grouped_posted_vaults=sorted_grouped_posted_vaults,
+                           unscheduled_vaults=unscheduled_vaults, 
+                           communities=communities,
+                           community_dict=community_dict,
+                           daily_breakdown=daily_breakdown,
+                           current_week_counts=current_week_counts,
+                           next_week_counts=next_week_counts)
 
 @app.route('/delete_vault/<int:vault_id>', methods=['POST'])
 def delete_vault(vault_id):
@@ -6566,6 +6781,8 @@ def add_official_seeder():
         state = request.form.get('state')
         industry = request.form.get('industry')
         neighborhood = request.form.get('neighborhood')
+        writing_style_id = request.form.get('writing_style')
+        style_modifier_ids = request.form.getlist('style_modifiers')
         
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
@@ -6573,12 +6790,11 @@ def add_official_seeder():
             file_path = os.path.join(specific_folder, filename)
             os.makedirs(specific_folder, exist_ok=True)
             file.save(file_path)
-            # Normalize the path for URL usage
             normalized_path = os.path.join('images/profile_pics', filename).replace('\\', '/')
             profile_picture_url = url_for('static', filename=normalized_path)
         else:
-            profile_picture_url = None  # Handle case where no file is uploaded or invalid file type
-        
+            profile_picture_url = None
+
         seeder = OfficialSeeder(
             full_name=full_name, 
             profile_picture=profile_picture_url, 
@@ -6586,17 +6802,39 @@ def add_official_seeder():
             types_lowercase=types_lowercase,
             state=State[state] if state else None,
             industry=Industry[industry] if industry else None,
-            neighborhood=Neighborhood[neighborhood] if neighborhood else None
+            neighborhood=Neighborhood[neighborhood] if neighborhood else None,
+            writing_style_id=writing_style_id
         )
+
+        # Add style modifiers
+        for modifier_id in style_modifier_ids:
+            modifier = StyleModifier.query.get(modifier_id)
+            if modifier:
+                seeder.style_modifiers.append(modifier)
+
         db.session.add(seeder)
         db.session.commit()
+        return redirect(url_for('add_official_seeder'))
     
-    # Query seeders with their vault count
-    seeders_with_vault_count = db.session.query(
+    # Query seeders with their vault count, writing style, and modifiers
+    seeders_with_data = db.session.query(
         OfficialSeeder,
         func.count(Vault.id).label('vault_count')
-    ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
-    return render_template('official_seeder.html', seeders=seeders_with_vault_count, State=State, Industry=Industry, Neighborhood=Neighborhood)
+    ).outerjoin(Vault).options(
+        joinedload(OfficialSeeder.writing_style),
+        joinedload(OfficialSeeder.style_modifiers)
+    ).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
+
+    writing_styles = WritingStyle.query.all()
+    style_modifiers = StyleModifier.query.all()
+
+    return render_template('official_seeder.html', 
+                           seeders=seeders_with_data, 
+                           State=State, 
+                           Industry=Industry, 
+                           Neighborhood=Neighborhood,
+                           writing_styles=writing_styles,
+                           style_modifiers=style_modifiers)
 
 
 @app.route('/edit_official_seeder/<int:seeder_id>', methods=['GET', 'POST'])
@@ -6697,27 +6935,6 @@ def schedule_vault(vault_id):
         return jsonify(success=False, error=str(e))
 
 
-@app.route('/add_writing_style', methods=['GET', 'POST'])
-def add_writing_style():
-    if request.method == 'POST':
-        author = request.form['author']
-        content = request.form['content']
-        new_style = WritingStyle(author=author, content=content)
-        db.session.add(new_style)
-        db.session.commit()
-        flash('Writing Style Added Successfully!')
-        return redirect(url_for('add_writing_style'))
-
-    styles = WritingStyle.query.all()
-    return render_template('add_writing_style.html', styles=styles)
-
-@app.route('/delete_writing_style/<int:id>', methods=['POST'])
-def delete_writing_style(id):
-    style_to_delete = WritingStyle.query.get_or_404(id)
-    db.session.delete(style_to_delete)
-    db.session.commit()
-    flash('Writing Style Deleted Successfully!')
-    return redirect(url_for('add_writing_style'))
 
 
 
@@ -7067,6 +7284,61 @@ def scrape_individual_page(url, playwright):
     return {'url': url, 'title': title, 'description': description}
 
 
+def scrape_timeout(url):
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=False)  # Visible browser
+        page = browser.new_page()
+        page.goto(url, wait_until='domcontentloaded')
+        
+        # Wait for initial content to load
+        page.wait_for_timeout(5000)
+
+        # Function to click "Show more" button and load more content
+        def load_more_content(max_attempts=50):
+            for _ in range(max_attempts):
+                try:
+                    # Try to find and click the "Show more" button
+                    show_more_button = page.query_selector('a[data-testID="view-more-cta_testID"]')
+                    if show_more_button:
+                        show_more_button.click()
+                        print("Clicked 'Show more' button")
+                        # Wait for new content to load
+                        page.wait_for_timeout(15000)
+                    else:
+                        print("'Show more' button not found. All content loaded.")
+                        break
+                except Exception as e:
+                    print(f"Error clicking 'Show more' button: {e}")
+                    break
+
+        # Load more content
+        load_more_content()
+        
+        # Extract event information
+        events = page.evaluate("""
+            () => {
+                const events = [];
+                document.querySelectorAll('div.articleContent').forEach(article => {
+                    const titleElement = article.querySelector('h3');
+                    const title = titleElement ? titleElement.textContent.trim() : 'No Title';
+                    
+                    
+                    const summaryElement = article.querySelector('._summary_1dc5j_23');
+                    const summary = summaryElement ? summaryElement.textContent.trim() : 'No Summary';
+                    
+                    events.push({
+                        title: title,
+                        summary: summary
+                    });
+                });
+                return events;
+            }
+        """)
+        
+        browser.close()
+        return events
+
+
 import logging
 from flask import current_app
 
@@ -7096,7 +7368,7 @@ def run_scraper():
 
             print(f"URL {url.url} Categories: {url.categories}")
 
-            if url.url == "https://www.JobTrigger.com" and url.category == CategoryEnum.CAREER in url.categories:
+            if url.url == "https://www.JobTrigger.com":
                 # Use LinkedIn jobs scraper
                 run_input = {
                     "contractType": "F",
@@ -7259,32 +7531,86 @@ def run_scraper():
                     existing_result = ScraperResult.query.filter_by(url=item['url']).first()
                     
                     if not existing_result:
+                        # Check if the event_date is within the valid range
+                        is_valid_date = True
+                        if item.get('event_date'):
+                            today = datetime.now().date()
+                            
+                            # Convert event_date to datetime.date object if it's a string
+                            if isinstance(item['event_date'], str):
+                                try:
+                                    event_date = datetime.strptime(item['event_date'], '%Y-%m-%d').date()
+                                except ValueError:
+                                    # If the date string is in a different format, skip this item
+                                    current_app.logger.warning(f"Invalid date format for Eventbrite event: {item['url']}")
+                                    continue
+                            elif isinstance(item['event_date'], datetime):
+                                event_date = item['event_date'].date()
+                            else:
+                                event_date = item['event_date']  # Assume it's already a date object
+                            
+                            week_before = today - timedelta(days=7)
+                            week_after = today + timedelta(days=7)
+                            is_valid_date = week_before <= event_date <= week_after
+                        
+                        if is_valid_date:
+                            scraper_result = ScraperResult(
+                                url=item['url'],
+                                title=item['title'],
+                                text=item['description'],
+                                categories=url.categories,
+                                source='Eventbrite',
+                                event_date=event_date if 'event_date' in locals() else None
+                            )
+                            db.session.add(scraper_result)
+                            try:
+                                db.session.commit()
+                                new_results += 1
+                                current_app.logger.debug(f"Added new Eventbrite result: {item['url']}")
+                            except IntegrityError:
+                                db.session.rollback()
+                                skipped_results += 1
+                                current_app.logger.warning(f"IntegrityError for Eventbrite URL: {item['url']}")
+                        else:
+                            skipped_results += 1
+                            current_app.logger.debug(f"Skipped Eventbrite result due to invalid date: {item['url']}")
+                    else:
+                        skipped_results += 1
+                        current_app.logger.debug(f"Skipped existing Eventbrite result: {item['url']}")
+
+            elif url.scraper_type == 'Timeout':
+                # Use Timeout scraper
+                content_data = scrape_timeout(url.url)
+                
+                for item in content_data:
+                    existing_result = ScraperResult.query.filter_by(url=url.url, title=item['title']).first()
+                    
+                    if not existing_result:
                         scraper_result = ScraperResult(
-                            url=item['url'],
+                            url=url.url,  # Using the main URL as we don't have individual URLs for each event
                             title=item['title'],
-                            text=item['description'],
+                            text=item['summary'],
                             categories=url.categories,
-                            source='Eventbrite',
-                            event_date=item['event_date']
+                            source='Timeout'
                         )
                         db.session.add(scraper_result)
                         try:
                             db.session.commit()
                             new_results += 1
-                            current_app.logger.debug(f"Added new Eventbrite result: {item['url']}")
+                            current_app.logger.debug(f"Added new Timeout result: {item['title']}")
                         except IntegrityError:
                             db.session.rollback()
                             skipped_results += 1
-                            current_app.logger.warning(f"IntegrityError for Eventbrite URL: {item['url']}")
+                            current_app.logger.warning(f"IntegrityError for Timeout event: {item['title']}")
                     else:
                         skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing Eventbrite result: {item['url']}")
+                        current_app.logger.debug(f"Skipped existing Timeout result: {item['title']}")
 
             else:
                 # Use website content crawler for other URLs
                 run_input = {
                     "startUrls": [{"url": url.url}],
-                    "maxCrawlDepth": 0,
+                    "maxCrawlDepth": 1,
                     "maxResults": url.max_results
                 }
                 
@@ -7489,7 +7815,15 @@ def random_venue2():
 @app.route('/manage-urls', methods=['GET', 'POST'])
 def manage_urls():
     if request.method == 'POST':
-        if 'add_url' in request.form or 'edit_url' in request.form:
+        if 'activate_all' in request.form:
+            SelectedURLs.query.update({SelectedURLs.is_active: True})
+            db.session.commit()
+            flash("All URLs have been activated.", "success")
+        elif 'deactivate_all' in request.form:
+            SelectedURLs.query.update({SelectedURLs.is_active: False})
+            db.session.commit()
+            flash("All URLs have been deactivated.", "success")
+        elif 'add_url' in request.form or 'edit_url' in request.form:
             url = request.form.get('url')
             category_ids = request.form.getlist('categories')
             scraper_type = request.form.get('scraper_type')
@@ -7544,8 +7878,30 @@ def manage_urls():
             else:
                 flash("URL not found.", "error")
     
-    urls = SelectedURLs.query.order_by(SelectedURLs.id).all()
-    categories = ContentCategory.query.all()
+    subquery = db.session.query(
+        SelectedURLs.id,
+        func.min(ContentCategory.name).label('first_category_name')
+    ).join(
+        SelectedURLs.categories
+    ).group_by(SelectedURLs.id).subquery()
+
+    # Main query with ordering
+    urls = db.session.query(SelectedURLs).outerjoin(
+        subquery, SelectedURLs.id == subquery.c.id
+    ).order_by(
+        case(
+            (SelectedURLs.scraper_type == 'Regular', 1),
+            (SelectedURLs.scraper_type == 'Puppeteer', 2),
+            (SelectedURLs.scraper_type == 'Groupon', 3),
+            (SelectedURLs.scraper_type == 'Instagram', 4),
+            (SelectedURLs.scraper_type == 'Eventbrite', 5),
+            else_=6
+        ),
+        subquery.c.first_category_name,
+        SelectedURLs.id
+    ).all()
+
+    categories = ContentCategory.query.order_by(ContentCategory.name).all()
     return render_template('manage_urls.html', urls=urls, categories=categories)
 
 
@@ -8019,6 +8375,162 @@ def delete_moment(id):
     flash('Moment of realization deleted successfully', 'success')
     return redirect(url_for('moments_of_realization'))
 
+
+
+
+#venue cleaner/management
+
+# Updated Flask route
+@app.route('/venue_swipe', methods=['GET', 'POST'])
+def venue_swipe():
+    if request.method == 'POST':
+        venue_id = request.form.get('venue_id')
+        action = request.form.get('action')
+        
+        if action == 'delete':
+            venue = Venue.query.get(venue_id)
+            if venue:
+                # The cascade will automatically delete associated reviews
+                db.session.delete(venue)
+                db.session.commit()
+                flash('Venue and its reviews deleted successfully', 'success')
+        
+        return redirect(url_for('venue_swipe'))
+    
+    venue = Venue.query.order_by(func.random()).first()
+    return render_template('venue_swipe.html', venue=venue)
+
+
+@app.route('/admin/venue_categories')
+def venue_categories():
+    categories = defaultdict(list)
+    venues = Venue.query.options(joinedload(Venue.categories)).order_by(Venue.main_category, Venue.title).all()
+    for venue in venues:
+        categories[venue.main_category].append({
+            'venue': venue,
+            'content_categories': [cat.name for cat in venue.categories]
+        })
+    return render_template('venue_category_management.html', categories=dict(categories))
+
+@app.route('/admin/venue/<int:venue_id>')
+def venue_detail(venue_id):
+    venue = Venue.query.get_or_404(venue_id)
+    return render_template('venue_detail.html', venue=venue)
+
+@app.route('/admin/venue/<int:venue_id>/edit', methods=['GET', 'POST'])
+def edit_venue(venue_id):
+    venue = Venue.query.get_or_404(venue_id)
+    if request.method == 'POST':
+        try:
+            venue.title = request.form['title']
+            venue.main_category = request.form['main_category']
+            venue.street = request.form['street']
+            venue.city = request.form['city']
+            venue.postal_code = request.form['postal_code']
+            venue.total_score = float(request.form['total_score']) if request.form['total_score'] else None
+            venue.description = request.form['description']
+            
+            db.session.commit()
+            flash('Venue updated successfully', 'success')
+            return redirect(url_for('venue_categories'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating venue: {str(e)}', 'error')
+    
+    return render_template('venue_detail.html', venue=venue)
+
+@app.route('/admin/delete_categories', methods=['POST'])
+def delete_categories():
+    categories_to_delete = request.form.getlist('categories[]')
+    if not categories_to_delete:
+        flash("No categories selected for deletion", 'warning')
+        return redirect(url_for('venue_categories'))
+
+    try:
+        deleted_count = 0
+        for category in categories_to_delete:
+            venues_to_delete = Venue.query.filter_by(main_category=category).all()
+            for venue in venues_to_delete:
+                db.session.delete(venue)
+                deleted_count += 1
+        db.session.commit()
+        flash(f"Deleted {len(categories_to_delete)} categories with {deleted_count} venues", 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error deleting categories: {str(e)}", 'error')
+    return redirect(url_for('venue_categories'))
+
+@app.route('/admin/delete_venue', methods=['POST'])
+def delete_venue():
+    venue_id = request.form['venue_id']
+    try:
+        venue = Venue.query.get(venue_id)
+        if venue:
+            db.session.delete(venue)
+            db.session.commit()
+            flash(f"Deleted venue: {venue.title}", 'success')
+        else:
+            flash("Venue not found", 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error deleting venue: {str(e)}", 'error')
+    return redirect(url_for('venue_categories'))
+
+
+#Styles
+
+@app.route('/manage_styles', methods=['GET'])
+def manage_styles():
+    writing_styles = WritingStyle.query.all()
+    style_modifiers = StyleModifier.query.all()
+    return render_template('manage_styles.html', writing_styles=writing_styles, style_modifiers=style_modifiers)
+
+@app.route('/add_writing_style', methods=['POST'])
+def add_writing_style():
+    style_name = request.form.get('style_name')
+    if style_name:
+        new_style = WritingStyle(name=style_name)
+        db.session.add(new_style)
+        db.session.commit()
+    return redirect(url_for('manage_styles'))
+
+@app.route('/add_style_modifier', methods=['POST'])
+def add_style_modifier():
+    modifier_name = request.form.get('modifier_name')
+    if modifier_name:
+        new_modifier = StyleModifier(name=modifier_name)
+        db.session.add(new_modifier)
+        db.session.commit()
+    return redirect(url_for('manage_styles'))
+
+@app.route('/writing_style/<int:style_id>', methods=['DELETE'])
+def delete_writing_style(style_id):
+    style = WritingStyle.query.get_or_404(style_id)
+    db.session.delete(style)
+    db.session.commit()
+    return jsonify(success=True)
+
+@app.route('/style_modifier/<int:modifier_id>', methods=['DELETE'])
+def delete_style_modifier(modifier_id):
+    modifier = StyleModifier.query.get_or_404(modifier_id)
+    db.session.delete(modifier)
+    db.session.commit()
+    return jsonify(success=True)
+
+
+
+
+@app.route('/detailed_debug_seeders')
+def detailed_debug_seeders():
+    seeders = OfficialSeeder.query.all()
+    debug_info = []
+    for seeder in seeders:
+        modifier_info = [f"{mod.id}: {mod.name}" for mod in seeder.style_modifiers]
+        debug_info.append(f"Seeder: {seeder.full_name}")
+        debug_info.append(f"Modifier Count: {len(seeder.style_modifiers)}")
+        debug_info.append(f"Modifiers: {', '.join(modifier_info)}")
+        debug_info.append("---")
+    return "<br>".join(debug_info)
 
 if __name__ == '__main__':
     
