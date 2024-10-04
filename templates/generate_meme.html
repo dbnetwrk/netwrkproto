@@ -1,0 +1,170 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container">
+    <h1>Meme Generator</h1>
+    <div class="mb-3">
+        <label for="category" class="form-label">Select Content Category:</label>
+        <select class="form-select" id="category">
+            {% for category in categories %}
+            <option value="{{ category.id }}">{{ category.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button id="generateMeme" class="btn btn-primary">Generate Meme</button>
+    <div id="memeResult" class="mt-4" style="display: none;">
+        <img id="memeImage" src="" alt="Generated Meme" class="img-fluid">
+        <h3 id="itemTitle" class="mt-2"></h3>
+        <p id="memeText"></p>
+    </div>
+
+
+
+    <h2> Vault Post </h2>
+
+
+     <form method="POST" action="{{ url_for('vault_post') }}" class="vault-form" >
+        <input type="hidden" id="item_id" name="item_id">
+        <input type="hidden" id="item_type" name="item_type">
+                <div class="mb-3">
+                    <label for="scheduled_at" class="form-label">Schedule Post (optional)</label>
+                    <input type="datetime-local" class="form-control" id="scheduled_at" name="scheduled_at">
+                </div>
+
+
+                <div class="mb-3">
+                    <label for="seeder_id" class="form-label">Select Official Seeder:</label>
+                    <select class="form-select" name="seeder_id" id="seeder_id">
+                        {% for seeder, vault_count in seeders_with_counts %}
+                        <option value="{{ seeder.id }}">{{ seeder.full_name }} ({{ seeder.alias }}) ({{ vault_count }} vaults) ({{ seeder.state.value }}) ({{ seeder.industry.value }}) ({{ seeder.neighborhood.value }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="button" class="btn btn-secondary" onclick="toggleNewSeederForm()">Create New Seeder</button>
+
+                <!-- New Seeder Form (initially hidden) -->
+                <div id="newSeederForm" style="display: none;">
+                    <h6>Create New Seeder</h6>
+                    <div class="mb-3">
+                        <label for="new_seeder_name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="new_seeder_name" name="new_seeder_name">
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_seeder_alias" class="form-label">Alias</label>
+                        <input type="text" class="form-control" id="new_seeder_alias" name="new_seeder_alias">
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_seeder_profile_picture" class="form-label">Profile Picture</label>
+                        <input type="file" class="form-control" id="new_seeder_profile_picture" name="new_seeder_profile_picture">
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_seeder_state" class="form-label">State</label>
+                        <select class="form-select" id="new_seeder_state" name="new_seeder_state">
+                            <option value="">Select a state</option>
+                            {% for state in State %}
+                            <option value="{{ state.name }}">{{ state.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_seeder_industry" class="form-label">Industry</label>
+                        <select class="form-select" id="new_seeder_industry" name="new_seeder_industry">
+                            <option value="">Select an industry</option>
+                            {% for industry in Industry %}
+                            <option value="{{ industry.name }}">{{ industry.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_seeder_neighborhood" class="form-label">Neighborhood</label>
+                        <select class="form-select" id="new_seeder_neighborhood" name="new_seeder_neighborhood">
+                            <option value="">Select a neighborhood</option>
+                            {% for neighborhood in Neighborhood %}
+                            <option value="{{ neighborhood.name }}">{{ neighborhood.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase" name="new_seeder_types_lowercase">
+                        <label class="form-check-label" for="new_seeder_types_lowercase">Types in lowercase</label>
+                    </div>
+                    <div class="mb-3">
+        <label for="new_seeder_writing_style" class="form-label">Writing Style</label>
+        <select class="form-select" id="new_seeder_writing_style" name="new_seeder_writing_style">
+            <option value="">Select a writing style</option>
+            {% for style in writing_styles %}
+            <option value="{{ style.id }}">{{ style.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Style Modifiers</label>
+        <div class="checkbox-group">
+            {% for modifier in style_modifiers %}
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="{{ modifier.id }}" 
+                       id="new_seeder_modifier_{{ modifier.id }}" name="new_seeder_modifiers">
+                <label class="form-check-label" for="new_seeder_modifier_{{ modifier.id }}">
+                    {{ modifier.name }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+                </div>
+
+                
+
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control" name="title" id="title">
+                </div>
+                <div class="mb-3">
+                    <label for="content" class="form-label">Content</label>
+                    <textarea class="form-control" name="content" id="content"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="community_id" class="form-label">Select Community</label>
+                    <select class="form-select" name="community_id" id="community_id">
+                        {% for community in communities %}
+                        <option value="{{ community.id }}">{{ community.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-secondary">Vault Post</button>
+            </form>
+
+
+</div>
+
+<script>
+document.getElementById('generateMeme').addEventListener('click', function() {
+    const categoryId = document.getElementById('category').value;
+    fetch('/generate_meme', { 
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'category_id=' + categoryId
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('memeImage').src = data.meme_path;
+        document.getElementById('itemTitle').textContent = data.item_title;
+        document.getElementById('memeText').textContent = data.meme_text;
+        document.getElementById('memeResult').style.display = 'block';
+        
+        // Set the item_id and item_type for the vault post form
+        document.getElementById('item_id').value = data.item_id;
+        document.getElementById('item_type').value = data.item_type;
+    });
+});
+
+function toggleNewSeederForm() {
+    var form = document.getElementById('newSeederForm');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

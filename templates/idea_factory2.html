@@ -93,6 +93,30 @@
                         <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase" name="new_seeder_types_lowercase">
                         <label class="form-check-label" for="new_seeder_types_lowercase">Types in lowercase</label>
                     </div>
+                    <div class="mb-3">
+        <label for="new_seeder_writing_style" class="form-label">Writing Style</label>
+        <select class="form-select" id="new_seeder_writing_style" name="new_seeder_writing_style">
+            <option value="">Select a writing style</option>
+            {% for style in writing_styles %}
+            <option value="{{ style.id }}">{{ style.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Style Modifiers</label>
+        <div class="checkbox-group">
+            {% for modifier in style_modifiers %}
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="{{ modifier.id }}" 
+                       id="new_seeder_modifier_{{ modifier.id }}" name="new_seeder_modifiers">
+                <label class="form-check-label" for="new_seeder_modifier_{{ modifier.id }}">
+                    {{ modifier.name }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
                 </div>
 
                 <button type="button" class="btn btn-primary" onclick="generateStory()">Generate Story</button>

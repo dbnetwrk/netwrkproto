@@ -22,6 +22,7 @@ import random
 from flask import request
 import boto3
 import pytz
+from sqlalchemy.orm import class_mapper
 from sqlalchemy import case
 
 from sqlalchemy import case, nullsfirst
@@ -61,6 +62,8 @@ import faiss
 import pickle
 import os
 import json
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
 
 
 
@@ -355,6 +358,7 @@ app = Flask(__name__)
 socketio = SocketIO(app)
 crochet.setup()
 
+MEME_FOLDER = os.path.join('static', 'memes', 'meme_templates')
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
@@ -1019,6 +1023,17 @@ class ScraperResult(db.Model):
                                  backref=db.backref('scraper_results', lazy='dynamic'))
 
 
+class Meme(db.Model):
+    __tablename__ = 'memes'
+    id = db.Column(db.Integer, primary_key=True)
+    image_filename = db.Column(db.String(255), nullable=False)
+    context = db.Column(db.Text, nullable=False)
+    text_positions = db.Column(ARRAY(db.JSON), nullable=False)
+
+    def __repr__(self):
+        return f'<Meme {self.image_filename}>'
+
+
 industry_images = {
     1: '/images/education.png',
     2: '/images/construction.png',
@@ -1076,7 +1091,70 @@ def upload_file_to_s3(file, bucket_name, filename, content_type=None):
 
 
 
+def construct_item_text(item):
+    """
+    Construct a text representation of a ScraperResult or Venue item.
+    
+    :param item: An instance of either ScraperResult or Venue
+    :return: A string containing relevant information about the item
+    """
+    text_parts = []
 
+    # Get all attributes of the item
+    attributes = class_mapper(item.__class__).column_attrs
+
+    # Common attributes to include (if they exist)
+    common_attrs = ['title', 'description', 'text', 'price', 'url', 'address', 'neighborhood']
+
+    # Special handling for certain attributes
+    if hasattr(item, 'title'):
+        text_parts.append(f"Title: {item.title}")
+
+    for attr in common_attrs:
+        if hasattr(item, attr) and getattr(item, attr):
+            value = getattr(item, attr)
+            if attr not in ['title']:  # Skip title as it's already handled
+                text_parts.append(f"{attr.capitalize()}: {value}")
+
+    # Handle categories
+    if hasattr(item, 'categories'):
+        categories = [cat.name for cat in item.categories]
+        if categories:
+            text_parts.append(f"Categories: {', '.join(categories)}")
+
+    # Special handling for ScraperResult
+    if hasattr(item, 'source'):
+        text_parts.append(f"Source: {item.source}")
+    if hasattr(item, 'event_date'):
+        text_parts.append(f"Event Date: {item.event_date}")
+
+    # Special handling for Venue
+    if hasattr(item, 'reviews_count'):
+        text_parts.append(f"Reviews: {item.reviews_count}")
+    if hasattr(item, 'total_score'):
+        text_parts.append(f"Rating: {item.total_score}")
+
+    # Handle menu for Venue
+    if hasattr(item, 'menu') and item.menu:
+        text_parts.append("Menu Highlights:")
+        if isinstance(item.menu, list):
+            for menu_item in item.menu[:5]:  # Limit to 5 items
+                if isinstance(menu_item, dict):
+                    text_parts.append(f"- {menu_item.get('name', 'Unnamed Item')}: {menu_item.get('description', 'No description')}")
+                elif isinstance(menu_item, str):
+                    text_parts.append(f"- {menu_item}")
+        elif isinstance(item.menu, dict):
+            for key, value in list(item.menu.items())[:5]:
+                text_parts.append(f"- {key}: {value}")
+
+    # Add any other attributes not covered above
+    for attr in attributes:
+        if attr.key not in common_attrs and not attr.key.endswith('_id'):
+            value = getattr(item, attr.key)
+            if value is not None and attr.key not in ['menu']:  # Exclude menu as it's handled separately
+                text_parts.append(f"{attr.key.replace('_', ' ').capitalize()}: {value}")
+
+    return "\n".join(text_parts)
 
 
 @app.context_processor
@@ -4539,37 +4617,39 @@ def format_commenter_info(commenter, is_original_poster=False):
     return " | ".join(info)
 
 
-def construct_additional_info(random_venue, scraper_results):
+def construct_additional_info(venues, scraper_results):
     additional_info = {
-        "local_venue": {},
+        "local_venues": [],
         "recent_articles": [],
         "social_media": []
     }
     
-    # Add random venue info
-    if random_venue:
-        additional_info["local_venue"] = {
-            "name": random_venue.title,
-            "description": random_venue.description or "",
-            "neighborhood": random_venue.neighborhood or "",
+    # Add venue info
+    for venue in venues:
+        venue_info = {
+            "name": venue.title,
+            "description": venue.description or "",
+            "neighborhood": venue.neighborhood or "",
             "menu": [],
             "reviews": []
         }
         
         # Handle menu items
-        if isinstance(random_venue.menu, (list, dict)):
-            menu_items = random_venue.menu if isinstance(random_venue.menu, list) else list(random_venue.menu.items())
-            additional_info["local_venue"]["menu"] = [
+        if isinstance(venue.menu, (list, dict)):
+            menu_items = venue.menu if isinstance(venue.menu, list) else list(venue.menu.items())
+            venue_info["menu"] = [
                 {"item": item, "price": price} if isinstance(item, tuple) else {"item": item}
                 for item in menu_items[:10]
             ]
         
         # Handle reviews
-        if random_venue.reviews:
-            additional_info["local_venue"]["reviews"] = [
+        if venue.reviews:
+            venue_info["reviews"] = [
                 {"text": review.text[:100] + "..." if len(review.text) > 100 else review.text}
-                for review in random_venue.reviews[:3]
+                for review in venue.reviews[:3]
             ]
+        
+        additional_info["local_venues"].append(venue_info)
     
     # Add scraper results info
     for source, result in scraper_results.items():
@@ -4601,26 +4681,43 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     # Get the five-second moment if it exists
     five_second_moment = item.five_second_moment if hasattr(item, 'five_second_moment') else None
     
-    # Get one of each type of scraper result
+    # Initialize scraper_results dictionary
     scraper_results = {}
+    
+    # Check if the Vault has an associated ScraperResult
+    if item.scraper_result:
+        scraper_results[item.scraper_result.source] = item.scraper_result
+    
+    # Fill in the remaining sources with random results
     for source in ['Groupon', 'Instagram', 'Eventbrite', 'Regular']:
-        result = ScraperResult.query.filter(
-            ScraperResult.categories.any(ContentCategory.id == category.id),
-            ScraperResult.source == source
-        ).order_by(func.random()).first()
-        scraper_results[source] = result
+        if source not in scraper_results:
+            result = ScraperResult.query.filter(
+                ScraperResult.categories.any(ContentCategory.id == category.id),
+                ScraperResult.source == source
+            ).order_by(func.random()).first()
+            scraper_results[source] = result
     
     current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
     
-    # Get a random venue
+    # Initialize venues list
+    venues = []
+    
+    # Check if the Vault has an associated Venue
+    if item.venue:
+        venues.append(item.venue)
+    
+    # Get a random venue if we don't have one from the Vault
+   
     random_venue = Venue.query.filter(
         Venue.categories.any(id=category.id)
-    ).options(joinedload(Venue.reviews)).order_by(func.random()).first()
+        ).options(joinedload(Venue.reviews)).order_by(func.random()).first()
+    if random_venue:
+        venues.append(random_venue)
     
-    current_app.logger.debug(f"Random venue: {random_venue.id if random_venue else None}")
+    current_app.logger.debug(f"Venues: {', '.join([str(v.id) for v in venues])}")
     
-    # Construct the additional info string using our new function
-    additional_info_str = construct_additional_info(random_venue, scraper_results)
+    # Construct the additional info string using our updated function
+    additional_info_str = construct_additional_info(venues, scraper_results)
     
     # Parse the JSON string back into a dictionary for logging
     additional_info_dict = json.loads(additional_info_str)
@@ -5463,7 +5560,7 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
 
 
 def discussion_question_generator(text):
-    emotions = ["controversial", "anxiety"]
+    emotions = ["controversial"]
     chosen_emotion = random.choice(emotions)
     
     emotion_prompt = (
@@ -5486,7 +5583,7 @@ def discussion_question_generator(text):
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20240620",
-            max_tokens=500,
+            max_tokens=3000,
             temperature=0.8,
             system=super_prompt,
             messages=[
@@ -5496,6 +5593,9 @@ def discussion_question_generator(text):
                 }
             ]
         )
+
+        current_app.logger.debug(f"HERE IS THE FULL PROMPT: {prompt}")
+
         full_response = response.content[0].text.strip()
         
         current_app.logger.debug(f"Full response: {full_response}")
@@ -5517,6 +5617,10 @@ def discussion_question_generator(text):
 
 @app.route('/discussion_factory/', methods=['GET', 'POST'])
 def discussion_factory():
+    writing_styles = WritingStyle.query.all()
+
+    # Fetch style modifiers
+    style_modifiers = StyleModifier.query.all()
     communities = Community.query.options(joinedload(Community.subreddits)).all()
     community_dict = {c.id: c.name for c in communities}
     seeders_with_counts = db.session.query(
@@ -5524,64 +5628,122 @@ def discussion_factory():
         func.count(Vault.id).label('vault_count')
     ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
     
+    content_categories = ContentCategory.query.all()
+    
     if request.method == 'POST':
         clear_image_directory()
         number_of_posts = int(request.form.get('number_of_posts', 100))
-        article_category = request.form.get('article_category')
+        content_category_id = int(request.form.get('content_category'))
         session_data = {
             'number_of_posts': number_of_posts
         }
         session.update(session_data)
         results = []
-
-        # Fetch ScraperResult objects matching the category
-        scraper_results = ScraperResult.query.filter_by(category=article_category).all()
-
-        if scraper_results:
-            # If there are fewer results than requested, we'll need to repeat some
-            results_needed = max(number_of_posts, len(scraper_results))
+        
+        # Fetch ScraperResult and Venue objects matching the category
+        scraper_results = ScraperResult.query.filter(
+            ScraperResult.categories.any(ContentCategory.id == content_category_id)
+        ).all()
+        
+        venues = Venue.query.filter(
+            Venue.categories.any(ContentCategory.id == content_category_id)
+        ).all()
+        
+        combined_results = scraper_results + venues
+        
+        if combined_results:
+            results_needed = max(number_of_posts, len(combined_results))
             
             for i in range(results_needed):
-                # Use modulo to cycle through available results if needed
-                scraper_result = scraper_results[i % len(scraper_results)]
+                # Randomly choose between ScraperResult and Venue
+                item = random.choice(combined_results)
                 
-                article = {
-                    'url': scraper_result.url,
-                    'title': scraper_result.title,
-                    'text': scraper_result.text,
-                    'category': scraper_result.category
-                }
+                if isinstance(item, ScraperResult):
+                    article = {
+                        'type': 'scraper_result',
+                        'id': item.id,
+                        'url': item.url,
+                        'title': item.title,
+                        'text': item.text,
+                        'categories': [category.name for category in item.categories],
+                        'source': item.source,
+                        'price': str(item.price) if item.price else None,
+                        'event_date': item.event_date.strftime('%Y-%m-%d %H:%M:%S') if item.event_date else None
+                    }
+                elif isinstance(item, Venue):
+                    article = {
+                        'type': 'venue',
+                        'id': item.id,
+                        'title': item.title,
+                        'description': item.description,
+                        'price': item.price,
+                        'categories': [category.name for category in item.categories],
+                        'neighborhood': item.neighborhood,
+                        'address': f"{item.street}, {item.city}, {item.postal_code}",
+                        'website': item.website,
+                        'menu': item.menu,
+                        'permanently_closed': item.permanently_closed,
+                        'temporarily_closed': item.temporarily_closed,
+                        'total_score': item.total_score,
+                        'reviews_count': item.reviews_count,
+                        'google_search_url': item.google_search_url
+                    }
+                
                 results.append(article)
         
         # Shuffle the results to mix up any repeated entries
         random.shuffle(results)
-
         # Trim results to the requested number if we ended up with more
         results = results[:number_of_posts]
-
+        
         # Generate the discussion content
         for article in results:
-            full_text = f"Title: {article.get('title', '')}\n\n{article['text']}"
+            if article['type'] == 'scraper_result':
+                full_text = f"Title: {article.get('title', '')}\n\n{article['text']}"
+            else:  # venue
+                full_text = f"Venue: {article['title']}\n\nDescription: {article['description']}\n\n"
+                if article['menu']:
+                    full_text += "Menu Highlights:\n"
+                    try:
+                        if isinstance(article['menu'], list):
+                            for item in article['menu'][:5]:
+                                if isinstance(item, dict):
+                                    full_text += f"- {item.get('name', 'Unnamed Item')}: {item.get('description', 'No description')}\n"
+                                elif isinstance(item, str):
+                                    full_text += f"- {item}\n"
+                        elif isinstance(article['menu'], dict):
+                            for key, value in list(article['menu'].items())[:5]:
+                                full_text += f"- {key}: {value}\n"
+                        elif isinstance(article['menu'], str):
+                            full_text += f"- {article['menu']}\n"
+                    except Exception as e:
+                        current_app.logger.error(f"Error processing menu for venue {article['title']}: {str(e)}")
+                        full_text += "Menu information unavailable\n"
+
+                full_text += f"\nAddress: {article['address']}\nNeighborhood: {article['neighborhood']}\n"
+                full_text += f"Price Range: {article['price']}\nRating: {article['total_score']} ({article['reviews_count']} reviews)\n"
+            
             modified_content = discussion_question_generator(full_text)
             article['ai_content'] = modified_content
-
-        text_results = [article for article in results]
-
-        if text_results:
-            flash(f"Scraped and processed {len(text_results)} text posts")
-
+        
+        if results:
+            flash(f"Processed {len(results)} items (mix of articles and venues)")
+        
         return render_template(
             'discussion_factory.html',
-            results=text_results,
+            results=results,
             communities=communities,
             session=session,
             seeders_with_counts=seeders_with_counts,
             State=State,
             Industry=Industry,
             Neighborhood=Neighborhood,
-            community_dict=community_dict,  # Pass community_dict to template
+            community_dict=community_dict,
+            content_categories=content_categories,
+            writing_styles=writing_styles,
+            style_modifiers=style_modifiers
         )
-
+    
     return render_template(
         'discussion_factory.html',
         communities=communities,
@@ -5590,7 +5752,10 @@ def discussion_factory():
         State=State,
         Industry=Industry,
         Neighborhood=Neighborhood,
-        community_dict=community_dict  # Pass community_dict to template
+        community_dict=community_dict,
+        content_categories=content_categories,
+        writing_styles=writing_styles,
+        style_modifiers=style_modifiers
     )
 
 
@@ -5651,6 +5816,12 @@ def idea_factory_2():
         func.count(Vault.id).label('vault_count')
     ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
 
+    # Fetch writing styles
+    writing_styles = WritingStyle.query.all()
+
+    # Fetch style modifiers
+    style_modifiers = StyleModifier.query.all()
+
     return render_template(
         'idea_factory2.html',
         communities=communities,
@@ -5659,7 +5830,9 @@ def idea_factory_2():
         State=State,
         Industry=Industry,
         Neighborhood=Neighborhood,
-        community_dict=community_dict
+        community_dict=community_dict,
+        writing_styles=writing_styles,
+        style_modifiers=style_modifiers
     )
 
 
@@ -6439,6 +6612,8 @@ def vault_post():
         seeder_id = request.form['seeder_id']
         reddit_post_id = str(random.randint(1, 1000000))
         scheduled_at = request.form.get('scheduled_at')
+        item_type = request.form.get('item_type')
+        item_id = request.form.get('item_id')
 
         logging.debug('vault_post called')
         logging.debug(f'request.form: {request.form}')
@@ -6457,7 +6632,8 @@ def vault_post():
                 types_lowercase=request.form.get('new_seeder_types_lowercase') == 'on',
                 neighborhood=Neighborhood[request.form.get('new_seeder_neighborhood')] if request.form.get('new_seeder_neighborhood') else None,
                 state=State[request.form.get('new_seeder_state')] if request.form.get('new_seeder_state') else None,
-                industry=Industry[request.form.get('new_seeder_industry')] if request.form.get('new_seeder_industry') else None
+                industry=Industry[request.form.get('new_seeder_industry')] if request.form.get('new_seeder_industry') else None,
+                writing_style_id=request.form.get('new_seeder_writing_style')
             )
 
             
@@ -6469,8 +6645,13 @@ def vault_post():
                     file_path = os.path.join('static/images/profile_pics', filename)
                     file.save(file_path)
                     new_seeder.profile_picture = url_for('static', filename=f'images/profile_pics/{filename}')
+            if 'new_seeder_modifiers' in request.form:
+                modifier_ids = request.form.getlist('new_seeder_modifiers')
+                modifiers = StyleModifier.query.filter(StyleModifier.id.in_(modifier_ids)).all()
+                new_seeder.style_modifiers = modifiers
+
             db.session.add(new_seeder)
-            db.session.flush()  # This assigns an ID to new_seeder
+            db.session.flush()   # This assigns an ID to new_seeder
             # Add facts
             if 'new_seeder_facts' in request.form:
                 facts = request.form['new_seeder_facts'].split('\n')
@@ -6495,6 +6676,13 @@ def vault_post():
             reddit_post_id=reddit_post_id,
             scheduled_at=scheduled_at 
         )
+
+        # Set the appropriate ID based on the item type
+        if item_type == 'scraper_result':
+            new_vault.scraper_result_id = item_id
+        elif item_type == 'venue':
+            new_vault.venue_id = item_id
+
         db.session.add(new_vault)
         db.session.commit()
         return jsonify({"success": True, "message": "Post vaulted successfully"})
@@ -8554,6 +8742,250 @@ def detailed_debug_seeders():
         debug_info.append(f"Modifiers: {', '.join(modifier_info)}")
         debug_info.append("---")
     return "<br>".join(debug_info)
+
+
+
+#meme generator
+
+def fetch_random_item(category_id=None):
+    # Query for ScraperResults and Venues
+    scraper_query = ScraperResult.query
+    venue_query = Venue.query
+
+    if category_id:
+        scraper_query = scraper_query.filter(ScraperResult.categories.any(ContentCategory.id == category_id))
+        venue_query = venue_query.filter(Venue.categories.any(ContentCategory.id == category_id))
+
+    # Combine the results
+    combined_results = list(scraper_query.all()) + list(venue_query.all())
+
+    if not combined_results:
+        return None
+
+    # Randomly choose one item
+    chosen_item = random.choice(combined_results)
+
+    return chosen_item
+
+
+
+def generate_meme_text(meme_context, article_summary):
+    prompt = f"""
+    Generate meme text for a ({meme_context}) meme, capturing a relatable Miami experience in a humorous and slightly controversial way.
+    The meme should be entertaining by quickly conveying a shared experience or cultural reference that resonates with Miami locals and transplants alike.
+    Key elements:
+        1. Meme format: ({meme_context})
+        2. Subject article: ({article_summary})
+        3. Target audience: Recent Miami transplants, ages 22-26
+        4. Cultural reference: Include a subtle nod to Miami culture or a current event
+        5. Controversial angle: Present a mildly provocative viewpoint or question about the subject
+        6. Format: Adapt to the specified meme format, but keep text concise (max 10 words total)
+        7. Language: Use 8th grade level vocabulary and casual, conversational tone
+        8. Insider element: Include a reference to a local spot, event, or Miami-specific experience from the subject article
+
+        The meme text should be structured as: 
+       <meme>Text fitting the specified meme format, incorporating the Miami-related subject</meme>
+        
+        Remember:
+        * Tailor the tone and structure to fit the specified meme format
+        * Ensure the content is relatable to young Miami transplants
+        * Keep it funny and slightly edgy to spark engagement
+        * Use the Miami-related topic as the core subject of the meme
+
+
+        <think>
+    """
+    
+    current_app.logger.debug(f"Here is the summary of the article used: {article_summary}")
+
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20240620",
+            max_tokens=8000,  # Adjust as needed
+            temperature=0.75,
+            system=super_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+        full_response = response.content[0].text.strip()
+        
+        # Extract text between <meme> tags
+        meme_pattern = r'<meme>(.*?)</meme>'
+        match = re.search(meme_pattern, full_response, re.DOTALL)
+        
+        if match:
+            generated_meme = match.group(1).strip()
+        else:
+            generated_meme = "No meme found in the generated content."
+        
+        return generated_meme
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        return "Error generating meme text."
+
+
+def generate_meme(meme, text):
+    img = Image.open(os.path.join('static', 'memes', 'meme_templates', meme.image_filename))
+    
+    if img.mode == 'RGBA':
+        img = img.convert('RGB')
+    
+    draw = ImageDraw.Draw(img)
+    
+    font_size = meme.text_positions[0]['font_size']
+    font = ImageFont.truetype("static/fonts/impact.ttf", font_size)
+    
+    # Calculate maximum width for text
+    margin = 0 # Horizontal margin in pixels
+    max_text_width = img.width - (margin)
+    
+    # Adjust wrapping to respect max_text_width
+    wrapped_text = textwrap.wrap(text, width=int(max_text_width / (font_size * 0.6)))  # Approximate character width
+    
+    # Introduce line spacing
+    line_spacing = 0.3 * font_size  # Adjust this value to increase/decrease spacing
+    
+    # Calculate total text height with line spacing
+    line_heights = [font.getbbox(line)[3] - font.getbbox(line)[1] + line_spacing for line in wrapped_text]
+    total_text_height = sum(line_heights) - line_spacing  # Subtract last line's spacing
+    
+    # Start y_text from the bottom of the image, leaving some padding
+    vertical_padding = 20
+    y_text = img.height - total_text_height - vertical_padding
+    
+    for line in wrapped_text:
+        left, top, right, bottom = font.getbbox(line)
+        line_width = right - left
+        line_height = bottom - top
+        
+        x_text = (img.width - line_width) / 2  # Center the text horizontally
+        
+        # Ensure x_text is within margins
+        x_text = max(margin, min(x_text, img.width - line_width - margin))
+        
+        # Draw text outline
+        for adj in range(-1, 2):
+            for adj2 in range(-1, 2):
+                draw.text((x_text+adj, y_text+adj2), line, font=font, fill="black")
+        
+        # Draw text
+        draw.text((x_text, y_text), line, font=font, fill="white")
+        y_text += line_height + line_spacing
+    
+    # Save the image
+    output_path = os.path.join('static', 'memes', 'generated_memes', f"meme_{meme.id}_{int(time.time())}.jpg")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    img.save(output_path, 'JPEG', quality=95)
+    return output_path
+
+@app.route('/generate_meme', methods=['GET', 'POST'])
+def generate_meme_route():
+    if request.method == 'POST':
+        category_id = request.form.get('category_id')
+        meme = Meme.query.order_by(func.random()).first()
+        item = fetch_random_item(category_id)
+        
+        if item is None:
+            return jsonify({'error': 'No suitable item found'}), 400
+
+        full_text = construct_item_text(item)
+        item_type = item.__class__.__name__.lower()  # 'scraperresult' or 'venue'
+        current_app.logger.debug(f"Here is the full text for our venue and what not for meme scraper: {full_text}")
+
+        meme_text = generate_meme_text(meme.context, full_text)
+        meme_path = generate_meme(meme, meme_text)
+        
+        return jsonify({
+            'meme_path': meme_path,
+            'item_title': item.title if hasattr(item, 'title') else "Untitled",
+            'meme_text': meme_text,
+            'item_id': item.id,
+            'item_type': item_type,
+            'full_text': full_text  # Optionally include the full text for debugging or display
+        })
+
+    # The rest of the function remains the same
+    communities = Community.query.all()
+    community_dict = {c.id: c.name for c in communities}
+    categories = ContentCategory.query.all()
+    
+    seeders_with_counts = db.session.query(
+        OfficialSeeder,
+        func.count(Vault.id).label('vault_count')
+    ).outerjoin(Vault).group_by(OfficialSeeder.id).order_by(func.count(Vault.id).asc()).all()
+    writing_styles = WritingStyle.query.all()
+    style_modifiers = StyleModifier.query.all()
+    return render_template(
+        'generate_meme.html',
+        communities=communities,
+        categories=categories,
+        seeders_with_counts=seeders_with_counts,
+        State=State,
+        Industry=Industry,
+        Neighborhood=Neighborhood,
+        community_dict=community_dict,
+        writing_styles=writing_styles,
+        style_modifiers=style_modifiers
+    )
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/manage_memes', methods=['GET', 'POST'])
+def manage_memes():
+    # Ensure the meme folder exists
+    os.makedirs(MEME_FOLDER, exist_ok=True)
+
+    if request.method == 'POST':
+        if 'delete' in request.form:
+            meme_id = request.form['delete']
+            meme = Meme.query.get(meme_id)
+            if meme:
+                # Delete the file
+                file_path = os.path.join(MEME_FOLDER, meme.image_filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                db.session.delete(meme)
+                db.session.commit()
+                flash('Meme deleted successfully', 'success')
+            return redirect(url_for('manage_memes'))
+        
+        elif 'add' in request.form:
+            if 'file' not in request.files:
+                flash('No file part', 'error')
+                return redirect(request.url)
+            file = request.files['file']
+            if file.filename == '':
+                flash('No selected file', 'error')
+                return redirect(request.url)
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(MEME_FOLDER, filename)
+                file.save(file_path)
+                
+                new_meme = Meme(
+                    image_filename=filename,
+                    context=request.form['context'],
+                    text_positions=[{
+                        'x': int(request.form['x']),
+                        'y': int(request.form['y']),
+                        'font_size': int(request.form['font_size']),
+                        'max_chars': int(request.form['max_chars'])
+                    }]
+                )
+                db.session.add(new_meme)
+                db.session.commit()
+                flash('Meme added successfully', 'success')
+                return redirect(url_for('manage_memes'))
+
+    memes = Meme.query.all()
+    return render_template('manage_memes.html', memes=memes, meme_folder=MEME_FOLDER)
+
 
 if __name__ == '__main__':
     

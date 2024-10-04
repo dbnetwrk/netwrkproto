@@ -11,19 +11,18 @@
 
         <div class="mb-3">
             <label for="number_of_posts" class="form-label">Number of Discussions to Generate</label>
-            <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ session.get('number_of_posts', 100) }}">
+            <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ session.get('number_of_posts', 10) }}">
         </div>
 
 
         <div class="mb-3">
-    <label for="article_category" class="form-label">Select Article Category:</label>
-    <select class="form-select" id="article_category" name="article_category">
-        <option value="FOOD">Food</option>
-        <option value="SCENES">Scenes</option>
-        <option value="CAREER">Career</option>
-        
-    </select>
-</div>
+            <label for="content_category" class="form-label">Select Content Category:</label>
+            <select class="form-select" id="content_category" name="content_category">
+                {% for category in content_categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
         
 
@@ -35,26 +34,53 @@
         <div class="col-12 mb-3" id="postCard{{ loop.index }}">
             <div class="card">
                 <div class="card-body">
-                    <p class="card-subtitle text-muted">{{ result.url }}</p>
-                    {% if result.title %}
-                    <h4 class="card-title">{{ result.title }}</h4>
+                    {% if result.type == 'scraper_result' %}
+                        <p class="card-subtitle text-muted">{{ result.url }}</p>
+                        <h4 class="card-title">{{ result.title }}</h4>
+                        <p class="card-text">{{ result.text[:100] | truncate_lines | safe }}</p>
+                        <p>Source: {{ result.source }}</p>
+                        {% if result.price %}
+                            <p>Price: {{ result.price }}</p>
+                        {% endif %}
+                        {% if result.event_date %}
+                            <p>Event Date: {{ result.event_date }}</p>
+                        {% endif %}
+                    {% else %}
+                        <h4 class="card-title">{{ result.title }}</h4>
+                        {% if result.description %}
+                            <p class="card-text">{{ result.description[:100] | truncate_lines | safe }}</p>
+                        {% else %}
+                            <p class="card-text">No description available</p>
+                        {% endif %}
+                        <p>Address: {{ result.address }}</p>
+                        <p>Neighborhood: {{ result.neighborhood }}</p>
+                        <p>Price Range: {{ result.price }}</p>
+                        <p>Rating: {{ result.total_score }} ({{ result.reviews_count }} reviews)</p>
+                        {% if result.menu %}
+                            <p>Menu Highlights:</p>
+                            <ul>
+                                {% for item in result.menu[:5] %}
+                                    <li>{{ item }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                        {% if result.website %}
+                            <p><a href="{{ result.website }}" target="_blank">Website</a></p>
+                        {% endif %}
+                        {% if result.google_search_url %}
+                            <p><a href="{{ result.google_search_url }}" target="_blank">Google Search</a></p>
+                        {% endif %}
                     {% endif %}
-                    {% if result.text %}
-                    <p class="card-text">{{ result.text[:100] | truncate_lines | safe }}</p>
-                    <p class="card-text ai-content">{{ result.ai_content}}</p>
-                    {% endif %}
+                    <p class="card-text ai-content">{{ result.ai_content }}</p>
 
 
-                    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#collapseForm{{ loop.index }}" aria-expanded="false" aria-controls="collapseForm{{ loop.index }}">
-                    <i class="fas fa-chevron-down"></i> Toggle Form
-                </button>
-
-                 <div class="collapse" id="collapseForm{{ loop.index }}">
+                    
 
                     <!-- Vault Form Embedded Directly into the Card -->
                     <form method="POST" action="{{ url_for('vault_post') }}" class="vault-form" data-index="{{ loop.index }}">
                     
-
+                            <input type="hidden" name="item_type" value="{{ result.type }}">
+                    <input type="hidden" name="item_id" value="{{ result.id }}">
                         <div class="mb-3">
                             <label for="scheduled_at{{ loop.index }}" class="form-label">Schedule Post (optional)</label>
                             <input type="datetime-local" class="form-control" id="scheduled_at{{ loop.index }}" name="scheduled_at">
@@ -122,33 +148,64 @@
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="new_seeder_types_lowercase{{ loop.index }}" name="new_seeder_types_lowercase">
                                 <label class="form-check-label" for="new_seeder_types_lowercase{{ loop.index }}">Types in lowercase</label>
+
                             </div>
+                            <div class="mb-3">
+        <label for="new_seeder_writing_style" class="form-label">Writing Style</label>
+        <select class="form-select" id="new_seeder_writing_style" name="new_seeder_writing_style">
+            <option value="">Select a writing style</option>
+            {% for style in writing_styles %}
+            <option value="{{ style.id }}">{{ style.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Style Modifiers</label>
+        <div class="checkbox-group">
+            {% for modifier in style_modifiers %}
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="{{ modifier.id }}" 
+                       id="new_seeder_modifier_{{ modifier.id }}" name="new_seeder_modifiers">
+                <label class="form-check-label" for="new_seeder_modifier_{{ modifier.id }}">
+                    {{ modifier.name }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
                         </div>
+
+
+                        
                         
                         
 
-                        <div class="mb-3">
-                            <label for="title{{ loop.index }}" class="form-label">Title</label>
-                            <input type="text" class="form-control" name="title" id="title{{ loop.index }}">
-                        </div>
-                        <div class="mb-3">
-                            <label for="content{{ loop.index }}" class="form-label">Content</label>
-                            <textarea class="form-control" name="content" id="content{{ loop.index }}"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="community_id{{ loop.index }}" class="form-label">Select Community</label>
-                            <select class="form-select" name="community_id" id="community_id{{ loop.index }}">
-                                {% for community in communities %}
-                                <option value="{{ community.id }}">{{ community.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                         
+                </div>
 
-                        
+                
 
-                        <button type="submit" class="btn btn-secondary">Vault Post</button>
-                    </form>
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control" name="title" id="title">
+                </div>
+                <div class="mb-3">
+                    <label for="content" class="form-label">Content</label>
+                    <textarea class="form-control" name="content" id="content"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="community_id" class="form-label">Select Community</label>
+                    <select class="form-select" name="community_id" id="community_id">
+                        {% for community in communities %}
+                        <option value="{{ community.id }}">{{ community.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-secondary">Vault Post</button>
+            </form>
+
                 </div>
                 </div>
             </div>
