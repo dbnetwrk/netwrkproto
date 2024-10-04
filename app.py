@@ -5556,9 +5556,9 @@ def discussion_question_generator(text, category):
         f"Tailor your question to be relevant to the {category} category.\n\n"
         f"Use 8th grade verbiage\n\n"
         f"Wrap your response in <question> brackets\n\n"
-        f"The community does not know about the article you are referencing\n\n"
         f"The community is recent transplants to Miami that are between 22-26 years old\n\n"
         f"The discussion question should be at most 12 words\n\n"
+        f"The question must be impossible to ask about any other city without changing key words\n\n"
         f"{emotion_prompt} <think>"
     )
     try:
