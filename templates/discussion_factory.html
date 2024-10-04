@@ -54,19 +54,11 @@
                         {% endif %}
                         <p>Address: {{ result.address }}</p>
                         <p>Neighborhood: {{ result.neighborhood }}</p>
+                        <p>Reviews: {{ result.review_text }}</p>
+                        <p>Menu summ: {{ result.menu_text }}</p>
                         <p>Price Range: {{ result.price }}</p>
                         <p>Rating: {{ result.total_score }} ({{ result.reviews_count }} reviews)</p>
-                        {% if result.menu %}
-                            <p>Menu Highlights:</p>
-                            <ul>
-                                {% for item in result.menu[:5] %}
-                                    <li>{{ item }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                        {% if result.website %}
-                            <p><a href="{{ result.website }}" target="_blank">Website</a></p>
-                        {% endif %}
+                        
                         {% if result.google_search_url %}
                             <p><a href="{{ result.google_search_url }}" target="_blank">Google Search</a></p>
                         {% endif %}

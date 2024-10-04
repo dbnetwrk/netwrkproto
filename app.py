@@ -957,6 +957,8 @@ class Venue(db.Model):
     neighborhood = db.Column(db.String(200))
     street = db.Column(db.String(500))
     city = db.Column(db.String(200))
+    menu_text = db.Column(db.Text)
+    review_text = db.Column(db.Text)
     postal_code = db.Column(db.String(50))
     website = db.Column(db.String(1000))
     menu = db.Column(JSONB)
@@ -1093,67 +1095,60 @@ def upload_file_to_s3(file, bucket_name, filename, content_type=None):
 
 def construct_item_text(item):
     """
-    Construct a text representation of a ScraperResult or Venue item.
+    Construct a text representation of a ScraperResult or Venue item,
+    using menu_text and review_text when available.
     
     :param item: An instance of either ScraperResult or Venue
     :return: A string containing relevant information about the item
     """
     text_parts = []
-
-    # Get all attributes of the item
-    attributes = class_mapper(item.__class__).column_attrs
-
     # Common attributes to include (if they exist)
-    common_attrs = ['title', 'description', 'text', 'price', 'url', 'address', 'neighborhood']
-
-    # Special handling for certain attributes
+    common_attrs = ['title', 'description', 'price', 'url', 'address', 'neighborhood']
+    
+    # Handle title first
     if hasattr(item, 'title'):
         text_parts.append(f"Title: {item.title}")
-
+    
+    # Handle common attributes
     for attr in common_attrs:
         if hasattr(item, attr) and getattr(item, attr):
             value = getattr(item, attr)
-            if attr not in ['title']:  # Skip title as it's already handled
+            if attr != 'title':  # Skip title as it's already handled
                 text_parts.append(f"{attr.capitalize()}: {value}")
-
+    
     # Handle categories
     if hasattr(item, 'categories'):
         categories = [cat.name for cat in item.categories]
         if categories:
             text_parts.append(f"Categories: {', '.join(categories)}")
-
+    
     # Special handling for ScraperResult
     if hasattr(item, 'source'):
         text_parts.append(f"Source: {item.source}")
     if hasattr(item, 'event_date'):
         text_parts.append(f"Event Date: {item.event_date}")
-
+    
     # Special handling for Venue
     if hasattr(item, 'reviews_count'):
         text_parts.append(f"Reviews: {item.reviews_count}")
     if hasattr(item, 'total_score'):
         text_parts.append(f"Rating: {item.total_score}")
-
-    # Handle menu for Venue
-    if hasattr(item, 'menu') and item.menu:
-        text_parts.append("Menu Highlights:")
-        if isinstance(item.menu, list):
-            for menu_item in item.menu[:5]:  # Limit to 5 items
-                if isinstance(menu_item, dict):
-                    text_parts.append(f"- {menu_item.get('name', 'Unnamed Item')}: {menu_item.get('description', 'No description')}")
-                elif isinstance(menu_item, str):
-                    text_parts.append(f"- {menu_item}")
-        elif isinstance(item.menu, dict):
-            for key, value in list(item.menu.items())[:5]:
-                text_parts.append(f"- {key}: {value}")
-
-    # Add any other attributes not covered above
-    for attr in attributes:
-        if attr.key not in common_attrs and not attr.key.endswith('_id'):
-            value = getattr(item, attr.key)
-            if value is not None and attr.key not in ['menu']:  # Exclude menu as it's handled separately
-                text_parts.append(f"{attr.key.replace('_', ' ').capitalize()}: {value}")
-
+    
+    # Use menu_text if available, otherwise fall back to original menu handling
+    if hasattr(item, 'menu_text') and item.menu_text:
+        text_parts.append("Menu Summary:")
+        text_parts.append(item.menu_text)
+    
+    # Use review_text if available
+    if hasattr(item, 'review_text') and item.review_text:
+        text_parts.append("Review Summary:")
+        text_parts.append(item.review_text)
+    
+    # Add the main text content for ScraperResult
+    if hasattr(item, 'text') and item.text:
+        text_parts.append("Content:")
+        text_parts.append(item.text)
+    
     return "\n".join(text_parts)
 
 
@@ -4630,24 +4625,10 @@ def construct_additional_info(venues, scraper_results):
             "name": venue.title,
             "description": venue.description or "",
             "neighborhood": venue.neighborhood or "",
-            "menu": [],
-            "reviews": []
+            "menu": venue.menu_text or "",
+            "reviews": venue.review_text or ""
         }
         
-        # Handle menu items
-        if isinstance(venue.menu, (list, dict)):
-            menu_items = venue.menu if isinstance(venue.menu, list) else list(venue.menu.items())
-            venue_info["menu"] = [
-                {"item": item, "price": price} if isinstance(item, tuple) else {"item": item}
-                for item in menu_items[:10]
-            ]
-        
-        # Handle reviews
-        if venue.reviews:
-            venue_info["reviews"] = [
-                {"text": review.text[:100] + "..." if len(review.text) > 100 else review.text}
-                for review in venue.reviews[:3]
-            ]
         
         additional_info["local_venues"].append(venue_info)
     
@@ -5467,12 +5448,10 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
                 additional_info += f" - Neighborhood: {random_venue.neighborhood}"
             
             if random_venue.menu:
-                menu_items = ', '.join([f"{item}: ${price}" for item, price in random_venue.menu.items()[:10]])  # Limit to first 5 menu items
-                additional_info += f" - Menu highlights: {menu_items}"
+                additional_info += f" - Menu: {random_venue.menu_text}"
             
             if random_venue.reviews:
-                review_excerpts = '; '.join([review.text[:100] + '...' for review in random_venue.reviews[:3]])  # Limit to first 3 reviews, 100 chars each
-                additional_info += f" - Recent reviews: {review_excerpts}"
+                additional_info += f" - Summary of Reviews: {random_venue.review_text}"
             
             url = random_venue.google_search_url
     
@@ -5559,7 +5538,7 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
 ## DISCUSSION FACTORY ##
 
 
-def discussion_question_generator(text):
+def discussion_question_generator(text, category):
     emotions = ["controversial"]
     chosen_emotion = random.choice(emotions)
     
@@ -5573,6 +5552,8 @@ def discussion_question_generator(text):
         f"You are a discussion question generator. Your goal is to generate a discussion question that results in people commenting. Here are the specifications:\n\n"
         f"Give a concise, one sentence discussion question that is based on this piece of text: \n\n"
         f"{text}\n\n"
+        f"The content category is: {category}\n\n"
+        f"Tailor your question to be relevant to the {category} category.\n\n"
         f"Use 8th grade verbiage\n\n"
         f"Wrap your response in <question> brackets\n\n"
         f"The community does not know about the article you are referencing\n\n"
@@ -5634,6 +5615,7 @@ def discussion_factory():
         clear_image_directory()
         number_of_posts = int(request.form.get('number_of_posts', 100))
         content_category_id = int(request.form.get('content_category'))
+        content_category = ContentCategory.query.get(content_category_id)
         session_data = {
             'number_of_posts': number_of_posts
         }
@@ -5682,6 +5664,8 @@ def discussion_factory():
                         'address': f"{item.street}, {item.city}, {item.postal_code}",
                         'website': item.website,
                         'menu': item.menu,
+                        'menu_text': item.menu_text,
+                        'review_text': item.review_text,
                         'permanently_closed': item.permanently_closed,
                         'temporarily_closed': item.temporarily_closed,
                         'total_score': item.total_score,
@@ -5699,33 +5683,29 @@ def discussion_factory():
         # Generate the discussion content
         for article in results:
             if article['type'] == 'scraper_result':
-                full_text = f"Title: {article.get('title', '')}\n\n{article['text']}"
+                full_text = f"Title: {article.get('title', '')}\n\n{article.get('text', '')}"
             else:  # venue
-                full_text = f"Venue: {article['title']}\n\nDescription: {article['description']}\n\n"
-                if article['menu']:
-                    full_text += "Menu Highlights:\n"
-                    try:
-                        if isinstance(article['menu'], list):
-                            for item in article['menu'][:5]:
-                                if isinstance(item, dict):
-                                    full_text += f"- {item.get('name', 'Unnamed Item')}: {item.get('description', 'No description')}\n"
-                                elif isinstance(item, str):
-                                    full_text += f"- {item}\n"
-                        elif isinstance(article['menu'], dict):
-                            for key, value in list(article['menu'].items())[:5]:
-                                full_text += f"- {key}: {value}\n"
-                        elif isinstance(article['menu'], str):
-                            full_text += f"- {article['menu']}\n"
-                    except Exception as e:
-                        current_app.logger.error(f"Error processing menu for venue {article['title']}: {str(e)}")
-                        full_text += "Menu information unavailable\n"
-
-                full_text += f"\nAddress: {article['address']}\nNeighborhood: {article['neighborhood']}\n"
-                full_text += f"Price Range: {article['price']}\nRating: {article['total_score']} ({article['reviews_count']} reviews)\n"
+                full_text = f"Venue: {article['title']}\n\n"
+                
+                if article.get('description'):
+                    full_text += f"Description: {article['description']}\n\n"
+                
+                if article.get('menu_text'):
+                    full_text += f"Menu Summary:\n{article['menu_text']}\n\n"
+                
+                if article.get('review_text'):
+                    full_text += f"Reviews Summary:\n{article['review_text']}\n\n"
+                
+                # Add other important venue details
+                full_text += f"Address: {article.get('address', 'N/A')}\n"
+                full_text += f"Neighborhood: {article.get('neighborhood', 'N/A')}\n"
+                full_text += f"Price Range: {article.get('price', 'N/A')}\n"
+                full_text += f"Rating: {article.get('total_score', 'N/A')} "
+                full_text += f"({article.get('reviews_count', 'N/A')} reviews)\n"
             
-            modified_content = discussion_question_generator(full_text)
+            modified_content = discussion_question_generator(full_text, content_category.name)
             article['ai_content'] = modified_content
-        
+
         if results:
             flash(f"Processed {len(results)} items (mix of articles and venues)")
         
@@ -7534,6 +7514,26 @@ def scrape_timeout(url):
 import logging
 from flask import current_app
 
+
+
+
+def summarize_text(text):
+    custom_prompt = "Your job is a summarizer. Summarize the piece of text given to you"
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": custom_prompt},
+                {"role": "user", "content": text}
+            ]
+        )
+        summarized_text = response.choices[0].message.content
+        return summarized_text
+    except Exception as e:
+        current_app.logger.error(f"Error in summarization: {str(e)}")
+        return text  # Return original text if summarization fails
+
 @app.route('/run-scraper', methods=['GET', 'POST'])
 def run_scraper():
     categories = ContentCategory.query.all()
@@ -7544,7 +7544,6 @@ def run_scraper():
     if request.method == 'POST' and 'run_scraper' in request.form:
         client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
         
-        # Get URLs for the selected category (or all categories) from SelectedURLs
         if 'ALL' in selected_categories:
             urls = SelectedURLs.query.filter_by(is_active=True).all()
         else:
@@ -7557,20 +7556,16 @@ def run_scraper():
         skipped_results = 0
         
         for url in urls:
-
-            print(f"URL {url.url} Categories: {url.categories}")
+            current_app.logger.debug(f"Processing URL {url.url} Categories: {url.categories}")
 
             if url.url == "https://www.JobTrigger.com":
-                # Use LinkedIn jobs scraper
                 run_input = {
                     "contractType": "F",
                     "experienceLevel": "3",
                     "location": "Miami",
                     "proxy": {
                         "useApifyProxy": True,
-                        "apifyProxyGroups": [
-                            "RESIDENTIAL"
-                        ]
+                        "apifyProxyGroups": ["RESIDENTIAL"]
                     },
                     "publishedAt": "r604800",
                     "rows": url.max_results,
@@ -7580,12 +7575,10 @@ def run_scraper():
                 
                 run = client.actor("bebity/linkedin-jobs-scraper").call(run_input=run_input)
                 
-                
                 unique_companies = {}
                 
                 for item in client.dataset(run["defaultDatasetId"]).iterate_items():
                     company_name = item.get('companyName', '')
-                    
                     if company_name not in unique_companies:
                         unique_companies[company_name] = item
                 
@@ -7593,17 +7586,20 @@ def run_scraper():
                     existing_result = ScraperResult.query.filter_by(url=item.get('jobUrl', '')).first()
                     
                     if not existing_result:
+                        original_text = f"Company: {company_name}\n" \
+                                        f"Location: {item.get('location', '')}\n" \
+                                        f"Posted: {item.get('postedTime', '')}\n" \
+                                        f"Contract Type: {item.get('contractType', '')}\n" \
+                                        f"Experience Level: {item.get('experienceLevel', '')}\n" \
+                                        f"Description: {item.get('description', '')}"
+                        summarized_text = summarize_text(original_text)
+                        
                         scraper_result = ScraperResult(
                             url=item.get('jobUrl', ''),
                             title=item.get('title', ''),
-                            text=f"Company: {company_name}\n"
-                                 f"Location: {item.get('location', '')}\n"
-                                 f"Posted: {item.get('postedTime', '')}\n"
-                                 f"Contract Type: {item.get('contractType', '')}\n"
-                                 f"Experience Level: {item.get('experienceLevel', '')}\n"
-                                 f"Description: {item.get('description', '')}",
+                            text=summarized_text,
                             categories=url.categories,
-                            source = 'Regular'
+                            source='Regular'
                         )
                         db.session.add(scraper_result)
                         try:
@@ -7619,7 +7615,6 @@ def run_scraper():
                         current_app.logger.debug(f"Skipped existing LinkedIn job result for company: {company_name}")
 
             elif url.scraper_type == 'Puppeteer':
-                # Use Puppeteer scraper
                 run_input = {
                     "startUrls": [{"url": url.url}],
                     "maxCrawlingDepth": 2,
@@ -7635,10 +7630,13 @@ def run_scraper():
                     existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                     
                     if not existing_result:
+                        original_text = item.get('content', '')
+                        summarized_text = summarize_text(original_text)
+                        
                         scraper_result = ScraperResult(
                             url=item.get('url', ''),
                             title=item.get('title', ''),
-                            text=item.get('content', ''),  # Assuming 'content' field contains the main text
+                            text=summarized_text,
                             categories=url.categories
                         )
                         db.session.add(scraper_result)
@@ -7655,10 +7653,8 @@ def run_scraper():
                         current_app.logger.debug(f"Skipped existing Puppeteer result: {item.get('url', '')}")
 
             elif url.scraper_type == 'Instagram':
-                # Use Instagram scraper
-                client = ApifyClient(os.environ.get('APIFY_API_TOKEN'))
                 run_input = {
-                    "username": [url.url],  # Assuming the URL is the Instagram username
+                    "username": [url.url],
                     "resultsLimit": url.max_results,
                     "onlyPostsNewerThan": (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
                 }
@@ -7668,10 +7664,13 @@ def run_scraper():
                     existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                     
                     if not existing_result:
+                        original_text = f"Caption: {item.get('caption', '')}"
+                        summarized_text = summarize_text(original_text)
+                        
                         scraper_result = ScraperResult(
                             url=item.get('url', ''),
                             title=f"Instagram post by {item.get('ownerUsername', '')}",
-                            text=f"Caption: {item.get('caption', '')}\n",
+                            text=summarized_text,
                             categories=url.categories,
                             source='Instagram'
                         )
@@ -7686,21 +7685,22 @@ def run_scraper():
                         skipped_results += 1
 
             elif url.scraper_type == 'Groupon':
-                # New Groupon scraping logic
                 content_data = scrape_groupon(url.url)
                 
                 for item in content_data:
                     existing_result = ScraperResult.query.filter_by(url=item['url']).first()
                     
                     if not existing_result:
+                        original_text = item['description']
+                        summarized_text = summarize_text(original_text)
+                        
                         scraper_result = ScraperResult(
                             url=item['url'],
                             title=item['title'],
-                            text=item['description'],
+                            text=summarized_text,
                             categories=url.categories,
                             source='Groupon',
                             price=item['price']
-
                         )
                         db.session.add(scraper_result)
                         try:
@@ -7716,40 +7716,39 @@ def run_scraper():
                         current_app.logger.debug(f"Skipped existing Groupon result: {item['url']}")
 
             elif url.scraper_type == 'Eventbrite':
-                # New Eventbrite scraping logic
                 content_data = scrape_eventbrite(url.url)
                 
                 for item in content_data:
                     existing_result = ScraperResult.query.filter_by(url=item['url']).first()
                     
                     if not existing_result:
-                        # Check if the event_date is within the valid range
                         is_valid_date = True
                         if item.get('event_date'):
                             today = datetime.now().date()
                             
-                            # Convert event_date to datetime.date object if it's a string
                             if isinstance(item['event_date'], str):
                                 try:
                                     event_date = datetime.strptime(item['event_date'], '%Y-%m-%d').date()
                                 except ValueError:
-                                    # If the date string is in a different format, skip this item
                                     current_app.logger.warning(f"Invalid date format for Eventbrite event: {item['url']}")
                                     continue
                             elif isinstance(item['event_date'], datetime):
                                 event_date = item['event_date'].date()
                             else:
-                                event_date = item['event_date']  # Assume it's already a date object
+                                event_date = item['event_date']
                             
                             week_before = today - timedelta(days=7)
                             week_after = today + timedelta(days=7)
                             is_valid_date = week_before <= event_date <= week_after
                         
                         if is_valid_date:
+                            original_text = item['description']
+                            summarized_text = summarize_text(original_text)
+                            
                             scraper_result = ScraperResult(
                                 url=item['url'],
                                 title=item['title'],
-                                text=item['description'],
+                                text=summarized_text,
                                 categories=url.categories,
                                 source='Eventbrite',
                                 event_date=event_date if 'event_date' in locals() else None
@@ -7771,17 +7770,19 @@ def run_scraper():
                         current_app.logger.debug(f"Skipped existing Eventbrite result: {item['url']}")
 
             elif url.scraper_type == 'Timeout':
-                # Use Timeout scraper
                 content_data = scrape_timeout(url.url)
                 
                 for item in content_data:
                     existing_result = ScraperResult.query.filter_by(url=url.url, title=item['title']).first()
                     
                     if not existing_result:
+                        original_text = item['summary']
+                        summarized_text = summarize_text(original_text)
+                        
                         scraper_result = ScraperResult(
-                            url=url.url,  # Using the main URL as we don't have individual URLs for each event
+                            url=url.url,
                             title=item['title'],
-                            text=item['summary'],
+                            text=summarized_text,
                             categories=url.categories,
                             source='Timeout'
                         )
@@ -7799,28 +7800,28 @@ def run_scraper():
                         current_app.logger.debug(f"Skipped existing Timeout result: {item['title']}")
 
             else:
-                # Use website content crawler for other URLs
                 run_input = {
                     "startUrls": [{"url": url.url}],
                     "maxCrawlDepth": 1,
                     "maxResults": url.max_results
                 }
                 
-                
                 run = client.actor("apify/website-content-crawler").call(run_input=run_input)
-                
                 
                 for item in client.dataset(run["defaultDatasetId"]).iterate_items():
                     current_app.logger.debug(f"Processing item: {item.get('url', '')}")
                     existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                     
                     if not existing_result:
+                        original_text = item.get('text', '')
+                        summarized_text = summarize_text(original_text)
+                        
                         scraper_result = ScraperResult(
                             url=item.get('url', ''),
                             title=item.get('title', ''),
-                            text=item.get('text', ''),
+                            text=summarized_text,
                             categories=url.categories,
-                            source= 'Regular'
+                            source='Regular'
                         )
                         db.session.add(scraper_result)
                         try:
@@ -7834,7 +7835,6 @@ def run_scraper():
                     else:
                         skipped_results += 1
                         current_app.logger.debug(f"Skipped existing result: {item.get('url', '')}")
-        
         current_app.logger.info(f"Scraper completed. New results: {new_results}, Skipped: {skipped_results}")
         flash(f"Scraper completed for {', '.join(selected_categories)}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")
     
@@ -8769,7 +8769,7 @@ def fetch_random_item(category_id=None):
 
 
 
-def generate_meme_text(meme_context, article_summary):
+def generate_meme_text(meme_context, article_summary, category):
     prompt = f"""
     Generate meme text for a ({meme_context}) meme, capturing a relatable Miami experience in a humorous and slightly controversial way.
     The meme should be entertaining by quickly conveying a shared experience or cultural reference that resonates with Miami locals and transplants alike.
@@ -8777,11 +8777,13 @@ def generate_meme_text(meme_context, article_summary):
         1. Meme format: ({meme_context})
         2. Subject article: ({article_summary})
         3. Target audience: Recent Miami transplants, ages 22-26
-        4. Cultural reference: Include a subtle nod to Miami culture or a current event
-        5. Controversial angle: Present a mildly provocative viewpoint or question about the subject
-        6. Format: Adapt to the specified meme format, but keep text concise (max 10 words total)
-        7. Language: Use 8th grade level vocabulary and casual, conversational tone
-        8. Insider element: Include a reference to a local spot, event, or Miami-specific experience from the subject article
+        4. The meme text content category is {category}
+        5. Tailor the meme text to be relevant to the {category} category
+        6. Cultural reference: Include a subtle nod to Miami culture or a current event
+        7. Controversial angle: Present a mildly provocative viewpoint or question about the subject
+        8. Format: Adapt to the specified meme format, but keep text concise (max 10 words total)
+        9. Language: Use 8th grade level vocabulary and casual, conversational tone
+        10. Insider element: Include a reference to a local spot, event, or Miami-specific experience from the subject article
 
         The meme text should be structured as: 
        <meme>Text fitting the specified meme format, incorporating the Miami-related subject</meme>
@@ -8812,6 +8814,7 @@ def generate_meme_text(meme_context, article_summary):
             ]
         )
         full_response = response.content[0].text.strip()
+        current_app.logger.debug(f"Here is full meme prompt: {prompt}")
         
         # Extract text between <meme> tags
         meme_pattern = r'<meme>(.*?)</meme>'
@@ -8886,6 +8889,7 @@ def generate_meme(meme, text):
 def generate_meme_route():
     if request.method == 'POST':
         category_id = request.form.get('category_id')
+        content_category = ContentCategory.query.get(category_id)
         meme = Meme.query.order_by(func.random()).first()
         item = fetch_random_item(category_id)
         
@@ -8896,7 +8900,7 @@ def generate_meme_route():
         item_type = item.__class__.__name__.lower()  # 'scraperresult' or 'venue'
         current_app.logger.debug(f"Here is the full text for our venue and what not for meme scraper: {full_text}")
 
-        meme_text = generate_meme_text(meme.context, full_text)
+        meme_text = generate_meme_text(meme.context, full_text, content_category.name)
         meme_path = generate_meme(meme, meme_text)
         
         return jsonify({
@@ -8985,6 +8989,36 @@ def manage_memes():
 
     memes = Meme.query.all()
     return render_template('manage_memes.html', memes=memes, meme_folder=MEME_FOLDER)
+
+
+@app.route('/admin/update-venue-summaries', methods=['GET'])
+def update_venue_summaries_route():
+    try:
+        # Use joinedload to efficiently load reviews along with venues
+        venues = Venue.query.options(joinedload(Venue.reviews)).all()
+        
+        for venue in venues:
+            # Summarize menu
+            if venue.menu:
+                menu_text = json.dumps(venue.menu, indent=2)  # Convert JSONB to formatted string
+                venue.menu_text = summarize_text(menu_text)
+            
+            # Summarize reviews
+            if venue.reviews:
+                all_reviews = " ".join([review.text for review in venue.reviews if review.text])
+                venue.review_text = summarize_text(all_reviews)
+            
+            current_app.logger.info(f"Updated summaries for venue: {venue.id}")
+            db.session.commit()
+        
+        
+        current_app.logger.info("Finished updating all venue summaries")
+        
+        return jsonify({"message": "Venue summaries updated successfully"}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error updating venue summaries: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": "An error occurred while updating venue summaries"}), 500
 
 
 if __name__ == '__main__':
