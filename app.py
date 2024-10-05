@@ -1030,10 +1030,10 @@ class Meme(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     image_filename = db.Column(db.String(255), nullable=False)
     context = db.Column(db.Text, nullable=False)
-    text_positions = db.Column(ARRAY(db.JSON), nullable=False)
-
-    def __repr__(self):
-        return f'<Meme {self.image_filename}>'
+    text_count = db.Column(db.Integer, nullable=False)
+    font_types = db.Column(ARRAY(db.String(50)), nullable=False)
+    text_positions = db.Column(ARRAY(JSON), nullable=False)
+    text_styles = db.Column(ARRAY(JSON), nullable=False)
 
 
 industry_images = {
@@ -8763,18 +8763,37 @@ def fetch_random_item(category_id=None):
         return None
 
     # Randomly choose one item
-    chosen_item = random.choice(combined_results)
+    #chosen_item = random.choice(combined_results)
+    chosen_item = random.choice(list(scraper_query.all()))
 
     return chosen_item
 
 
 
-def generate_meme_text(meme_context, article_summary, category):
+def generate_meme_text(meme_context, article_summary, category, pieces_of_text):
+    # Query for a random MomentOfRealization for the given category
+    try:
+        content_category = ContentCategory.query.filter_by(name=category).first()
+        if content_category:
+            random_moment = MomentOfRealization.query.filter_by(category_id=content_category.id).order_by(func.random()).first()
+            
+            if random_moment:
+                common_theme = random_moment.text
+            else:
+                common_theme = "Life in Miami"
+                current_app.logger.warning(f"No MomentOfRealization found for category: {category}")
+        else:
+            common_theme = "Life in Miami"
+            current_app.logger.warning(f"Category not found: {category}")
+    except Exception as e:
+        common_theme = "Life in Miami"
+        current_app.logger.error(f"Error fetching MomentOfRealization: {str(e)}")
+
     prompt = f"""
     Generate meme text for a ({meme_context}) meme, capturing a relatable Miami experience in a humorous and slightly controversial way.
-    The meme should be entertaining by quickly conveying a shared experience or cultural reference that resonates with Miami locals and transplants alike.
+    The meme should be entertaining by quickly conveying a shared experience or cultural reference that resonates with Miami transplants.
     Key elements:
-        1. Meme format: ({meme_context})
+        1. Meme format: ({pieces_of_text} separate pieces of text)
         2. Subject article: ({article_summary})
         3. Target audience: Recent Miami transplants, ages 22-26
         4. The meme text content category is {category}
@@ -8784,7 +8803,8 @@ def generate_meme_text(meme_context, article_summary, category):
         8. Format: Adapt to the specified meme format, but keep text concise (max 10 words total)
         9. Language: Use 8th grade level vocabulary and casual, conversational tone
         10. Insider element: Include a reference to a local spot, event, or Miami-specific experience from the subject article
-
+        11. Make the meme about this common theme: {common_theme}
+        
         The meme text should be structured as: 
        <meme>Text fitting the specified meme format, incorporating the Miami-related subject</meme>
         
@@ -8793,8 +8813,6 @@ def generate_meme_text(meme_context, article_summary, category):
         * Ensure the content is relatable to young Miami transplants
         * Keep it funny and slightly edgy to spark engagement
         * Use the Miami-related topic as the core subject of the meme
-
-
         <think>
     """
     
@@ -8832,6 +8850,7 @@ def generate_meme_text(meme_context, article_summary, category):
 
 
 def generate_meme(meme, text):
+    current_app.logger.debug(f"Generating meme with id: {meme.id}")
     img = Image.open(os.path.join('static', 'memes', 'meme_templates', meme.image_filename))
     
     if img.mode == 'RGBA':
@@ -8839,50 +8858,67 @@ def generate_meme(meme, text):
     
     draw = ImageDraw.Draw(img)
     
-    font_size = meme.text_positions[0]['font_size']
-    font = ImageFont.truetype("static/fonts/impact.ttf", font_size)
-    
-    # Calculate maximum width for text
-    margin = 0 # Horizontal margin in pixels
-    max_text_width = img.width - (margin)
-    
-    # Adjust wrapping to respect max_text_width
-    wrapped_text = textwrap.wrap(text, width=int(max_text_width / (font_size * 0.6)))  # Approximate character width
-    
-    # Introduce line spacing
-    line_spacing = 0.3 * font_size  # Adjust this value to increase/decrease spacing
-    
-    # Calculate total text height with line spacing
-    line_heights = [font.getbbox(line)[3] - font.getbbox(line)[1] + line_spacing for line in wrapped_text]
-    total_text_height = sum(line_heights) - line_spacing  # Subtract last line's spacing
-    
-    # Start y_text from the bottom of the image, leaving some padding
-    vertical_padding = 20
-    y_text = img.height - total_text_height - vertical_padding
-    
-    for line in wrapped_text:
-        left, top, right, bottom = font.getbbox(line)
-        line_width = right - left
-        line_height = bottom - top
+    # Parse the input text
+    text_elements = re.findall(r'<text(\d+)>(.*?)</text\1>', text)
+    current_app.logger.debug(f"Parsed text elements: {text_elements}")
+
+    for i, (_, element_text) in enumerate(text_elements):
+        if i >= meme.text_count:
+            current_app.logger.warning(f"More text elements provided than meme supports. Ignoring extra elements.")
+            break
+
+        position = meme.text_positions[i]
+        font_type = meme.font_types[i]
+        font_size = position['font_size']
+        max_chars = position['max_chars']
+        x, y = position['x'], position['y']
+
+        text_style = meme.text_styles[i]
+        text_color = text_style.get('color', 'white')
+        outline_color = text_style.get('outline_color')
+        has_outline = text_style.get('has_outline', False)
+
+        try:
+            font = ImageFont.truetype(f"static/fonts/{font_type}.ttf", font_size)
+        except IOError:
+            current_app.logger.error(f"Font file not found: {font_type}.ttf. Using default font.")
+            font = ImageFont.truetype("static/fonts/impact.ttf", font_size)
+
+        # Wrap text respecting max_chars
+        wrapped_text = textwrap.wrap(element_text, width=max_chars)
         
-        x_text = (img.width - line_width) / 2  # Center the text horizontally
-        
-        # Ensure x_text is within margins
-        x_text = max(margin, min(x_text, img.width - line_width - margin))
-        
-        # Draw text outline
-        for adj in range(-1, 2):
-            for adj2 in range(-1, 2):
-                draw.text((x_text+adj, y_text+adj2), line, font=font, fill="black")
-        
-        # Draw text
-        draw.text((x_text, y_text), line, font=font, fill="white")
-        y_text += line_height + line_spacing
-    
+        # Calculate total text height
+        line_spacing = 0.3 * font_size
+        line_heights = [font.getbbox(line)[3] - font.getbbox(line)[1] + line_spacing for line in wrapped_text]
+        total_text_height = sum(line_heights) - line_spacing
+
+        # Adjust y position if text goes out of bounds
+        if y + total_text_height > img.height:
+            y = max(0, img.height - total_text_height)
+
+        for line in wrapped_text:
+            bbox = font.getbbox(line)
+            line_width = bbox[2] - bbox[0]
+            line_height = bbox[3] - bbox[1]
+
+            # Ensure x is within image bounds
+            x_text = max(0, min(x, img.width - line_width))
+            
+            # Draw text outline
+            if has_outline and outline_color:
+                for adj in range(-1, 2):
+                    for adj2 in range(-1, 2):
+                        draw.text((x_text+adj, y+adj2), line, font=font, fill=outline_color)
+            
+            # Draw text
+            draw.text((x_text, y), line, font=font, fill=text_color)
+            y += line_height + line_spacing
+
     # Save the image
     output_path = os.path.join('static', 'memes', 'generated_memes', f"meme_{meme.id}_{int(time.time())}.jpg")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     img.save(output_path, 'JPEG', quality=95)
+    current_app.logger.debug(f"Meme saved at: {output_path}")
     return output_path
 
 @app.route('/generate_meme', methods=['GET', 'POST'])
@@ -8894,13 +8930,16 @@ def generate_meme_route():
         item = fetch_random_item(category_id)
         
         if item is None:
+            current_app.logger.error("No suitable item found for meme generation")
             return jsonify({'error': 'No suitable item found'}), 400
 
         full_text = construct_item_text(item)
-        item_type = item.__class__.__name__.lower()  # 'scraperresult' or 'venue'
-        current_app.logger.debug(f"Here is the full text for our venue and what not for meme scraper: {full_text}")
+        item_type = item.__class__.__name__.lower()
+        current_app.logger.debug(f"Full text for meme: {full_text}")
 
-        meme_text = generate_meme_text(meme.context, full_text, content_category.name)
+        meme_text = generate_meme_text(meme.context, full_text, content_category.name, meme.text_count)
+        current_app.logger.debug(f"Generated meme text: {meme_text}")
+        
         meme_path = generate_meme(meme, meme_text)
         
         return jsonify({
@@ -8909,10 +8948,10 @@ def generate_meme_route():
             'meme_text': meme_text,
             'item_id': item.id,
             'item_type': item_type,
-            'full_text': full_text  # Optionally include the full text for debugging or display
+            'full_text': full_text
         })
 
-    # The rest of the function remains the same
+    # The GET method remains the same
     communities = Community.query.all()
     community_dict = {c.id: c.name for c in communities}
     categories = ContentCategory.query.all()
@@ -8942,20 +8981,19 @@ def allowed_file(filename):
 
 @app.route('/manage_memes', methods=['GET', 'POST'])
 def manage_memes():
-    # Ensure the meme folder exists
+    current_app.logger.debug("Entering manage_memes route")
     os.makedirs(MEME_FOLDER, exist_ok=True)
-
     if request.method == 'POST':
         if 'delete' in request.form:
             meme_id = request.form['delete']
             meme = Meme.query.get(meme_id)
             if meme:
-                # Delete the file
                 file_path = os.path.join(MEME_FOLDER, meme.image_filename)
                 if os.path.exists(file_path):
                     os.remove(file_path)
                 db.session.delete(meme)
                 db.session.commit()
+                current_app.logger.debug(f"Deleted meme with id: {meme_id}")
                 flash('Meme deleted successfully', 'success')
             return redirect(url_for('manage_memes'))
         
@@ -8972,22 +9010,38 @@ def manage_memes():
                 file_path = os.path.join(MEME_FOLDER, filename)
                 file.save(file_path)
                 
+                text_count = int(request.form['text_count'])
+                font_types = request.form.getlist('font_type')
+                text_positions = []
+                text_styles = []
+                
+                for i in range(text_count):
+                    text_positions.append({
+                        'x': int(request.form[f'x_{i}']),
+                        'y': int(request.form[f'y_{i}']),
+                        'font_size': int(request.form[f'font_size_{i}']),
+                        'max_chars': int(request.form[f'max_chars_{i}'])
+                    })
+                    text_styles.append({
+                        'color': request.form[f'text_color_{i}'],
+                        'has_outline': request.form[f'has_outline_{i}'] == 'true',
+                        'outline_color': request.form[f'outline_color_{i}'] if request.form[f'has_outline_{i}'] == 'true' else None
+                    })
+                
                 new_meme = Meme(
                     image_filename=filename,
                     context=request.form['context'],
-                    text_positions=[{
-                        'x': int(request.form['x']),
-                        'y': int(request.form['y']),
-                        'font_size': int(request.form['font_size']),
-                        'max_chars': int(request.form['max_chars'])
-                    }]
+                    text_count=text_count,
+                    font_types=font_types,
+                    text_positions=text_positions,
+                    text_styles=text_styles
                 )
                 db.session.add(new_meme)
                 db.session.commit()
                 flash('Meme added successfully', 'success')
                 return redirect(url_for('manage_memes'))
-
     memes = Meme.query.all()
+    current_app.logger.debug(f"Fetched {len(memes)} memes")
     return render_template('manage_memes.html', memes=memes, meme_folder=MEME_FOLDER)
 
 
