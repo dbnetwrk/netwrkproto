@@ -1028,6 +1028,7 @@ class ScraperResult(db.Model):
 class Meme(db.Model):
     __tablename__ = 'memes'
     id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(500))
     image_filename = db.Column(db.String(255), nullable=False)
     context = db.Column(db.Text, nullable=False)
     text_count = db.Column(db.Integer, nullable=False)
@@ -4491,9 +4492,15 @@ def generate_comments_for_all_items(content_type='post', chains_per_item=1, item
 
         for _ in range(chains_per_item):
             num_levels = random.randint(2, 5)
-            num_comments = random.randint(2, 8)
-            
-            commenters = select_random_commenters(2, 4, item, content_type)
+            num_comments = random.randint(2, 4)
+
+            # Ensure the number of commenters is at most the number of comments
+            max_commenters = min(num_comments-1, 4)  # We keep the upper limit of 4 from the original code
+            num_commenters = random.randint(1, max_commenters)
+
+            commenters = select_random_commenters(num_commenters, num_commenters, item, content_type)
+
+            current_app.logger.debug(f"Generated {num_comments} comments with {num_commenters} commenters across {num_levels} levels")
             
             chain_prompt = construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type)
             
@@ -4522,7 +4529,7 @@ def select_random_commenters(min_commenters, max_commenters, item, content_type)
         
         commenters = []
         for _ in range(num_commenters):
-            use_profile_picture = random.random() < 0.7
+            use_profile_picture = random.random() < 0.6
             current_app.logger.debug(f"Selecting commenter with profile picture: {use_profile_picture}")
             
             query = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id)
@@ -4543,7 +4550,7 @@ def select_random_commenters(min_commenters, max_commenters, item, content_type)
         current_app.logger.debug("Processing for post content type")
         commenters = []
         for _ in range(num_commenters):
-            use_profile_picture = random.random() < 0.7
+            use_profile_picture = random.random() < 0.6
             current_app.logger.debug(f"Selecting commenter with profile picture: {use_profile_picture}")
             
             query = OfficialSeeder.query
@@ -4562,8 +4569,11 @@ def select_random_commenters(min_commenters, max_commenters, item, content_type)
 
 
 def select_ai_comment_prompt(category):
+
+
+    #filter out category by adding this: AICommentPrompt.category_id == category.id
+
     return AICommentPrompt.query.filter(
-        AICommentPrompt.category_id == category.id,
         AICommentPrompt.prompt_type == 'top_level',
         AICommentPrompt.is_active == True
     ).order_by(func.random()).first()
@@ -4584,12 +4594,12 @@ def format_commenter_info(commenter, is_original_poster=False):
     info.append(f"Name: {get_name_with_indicator(commenter.full_name, commenter.types_lowercase)} ({commenter.alias})")
     if is_original_poster:
         info.append("Role: Original Poster")
-    if commenter.state:
-        info.append(f"From: {commenter.state.value}")
+    #if commenter.state:
+        #info.append(f"From: {commenter.state.value}")
     if commenter.industry:
         info.append(f"Industry: {commenter.industry.value}")
-    if commenter.neighborhood:
-        info.append(f"Lives in: {commenter.neighborhood.value}")
+    #if commenter.neighborhood:
+        #info.append(f"Lives in: {commenter.neighborhood.value}")
     
     # Debug logging
     logging.debug(f"Commenter: {commenter.full_name}")
@@ -4614,9 +4624,7 @@ def format_commenter_info(commenter, is_original_poster=False):
 
 def construct_additional_info(venues, scraper_results):
     additional_info = {
-        "local_venues": [],
-        "recent_articles": [],
-        "social_media": []
+        "seed_info": []
     }
     
     # Add venue info
@@ -4630,7 +4638,7 @@ def construct_additional_info(venues, scraper_results):
         }
         
         
-        additional_info["local_venues"].append(venue_info)
+        #additional_info["local_venues"].append(venue_info)
     
     # Add scraper results info
     for source, result in scraper_results.items():
@@ -4650,7 +4658,7 @@ def construct_additional_info(venues, scraper_results):
             if source == 'Regular':
                 additional_info["recent_articles"].append(info)
             else:
-                additional_info["social_media"].append(info)
+                additional_info["seed_info"].append(info)
     
     # Convert to JSON string
     additional_info_str = json.dumps(additional_info, ensure_ascii=False, indent=2)
@@ -4662,23 +4670,15 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     # Get the five-second moment if it exists
     five_second_moment = item.five_second_moment if hasattr(item, 'five_second_moment') else None
     
-    # Initialize scraper_results dictionary
-    scraper_results = {}
+    # Fetch 3 random ScraperResult objects with the specified content category
+    random_scraper_results = ScraperResult.query.filter(
+        ScraperResult.categories.any(ContentCategory.id == category.id)
+    ).order_by(func.random()).limit(2).all()
     
-    # Check if the Vault has an associated ScraperResult
-    if item.scraper_result:
-        scraper_results[item.scraper_result.source] = item.scraper_result
-    
-    # Fill in the remaining sources with random results
-    for source in ['Groupon', 'Instagram', 'Eventbrite', 'Regular']:
-        if source not in scraper_results:
-            result = ScraperResult.query.filter(
-                ScraperResult.categories.any(ContentCategory.id == category.id),
-                ScraperResult.source == source
-            ).order_by(func.random()).first()
-            scraper_results[source] = result
-    
-    current_app.logger.debug(f"Scraper results: {', '.join([f'{k}: {v.id if v else None}' for k, v in scraper_results.items()])}")
+    # Create a dictionary of scraper_results using the ScraperResult's ID as the key
+    scraper_results = {result.id: result for result in random_scraper_results}
+
+    current_app.logger.debug(f"Fetched {len(scraper_results)} random ScraperResult objects for category {category.name}")
     
     # Initialize venues list
     venues = []
@@ -4722,43 +4722,35 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     #{"The problem/main idea of the post is: " + five_second_moment if five_second_moment else ""}
     #and {num_levels} nested levels of replies
     #8. Use 8th grade verbiage 
-    #For the first comment, use the following guideline: {first_comment_prompt}
+    #7. Characters tend to agree more with others whose names suggest the same gender, and disagree more with those whose names suggest a different gender.
+    #1. First comment: {first_comment_prompt}, and must be made by anyone other than {original_seeder.full_name} (OP)
 
-    prompt = f"""Generate a realistic comment chain for a Miami discussion board about {category.name}. The original post is:
+    prompt = f"""Generate a single, realistic comment chain for a Miami-based instagram post.
 
-{item.title}
-Content: {item.content}
+    Original post:
+    Title: {item.title}
+    Content: {item.content}
 
+    Create a conversation with {num_comments} comments in a single chain. Use these characters:
+    {commenter_info_str}
 
+    Guidelines:
+    1. The first comment must be made by anyone other than {original_seeder.full_name} (OP)
+    2. The first comment must {first_comment_prompt} in response to the original post
+    3. Subsequent comments: Direct replies to the previous comment.
+    4. Reflect each character's unique writing style.
+    5. Incorporate natural disagreement where appropriate.
+    6. Keep comments under 30 words
+    7. Reference this local seed information where relevant: [{additional_info_str}]
 
-Create a conversation with {num_comments} comments total, involving these characters:
-{commenter_info_str}
+    Format:
+    -[Comment] By: [Author]
+    --[Reply] By: [Different Author]
+    ---[Reply] By: [Another Author]
+    (Continue this pattern for all {num_comments} comments)
 
-Guidelines:
-
-1. Start with one top-level comment responding to {original_seeder.full_name}s post. 
-2. All subsequent comments should be replies to this first comment
-3. {original_seeder.full_name} (OP) should participate in the conversation, but not dominate it. His/Her comments should seek clarification or respond to advice.
-4. Each character's comments should be written in their writing styles
-5. Incorporate disagreement and controversy into the comment chain
-6. Each comment should be at most one, concise sentence
-7. Use '-' to denote comment levels (e.g., '-', '--', '---').
-8. Ensure a natural conversation flow, with each comment building on previous ones
-9. Naturally weave in elements from the following additional information where it fits the conversation flow:
-[{additional_info_str}]
-10. When mentioning events, activities, or places from the additional information:
--Vary how much detail you provide
--Make references feel casual and incidental
--Ensure the information is findable but not overly specific
-
-11. Use this format for output:
--[First comment] By: [Author] 
---[Reply] By: [Different Author]
----[Reply to reply] By: [Another Author]
-(Continue this pattern for all {num_comments} comments)
-
-Aim for a conversation that feels authentic and natural. Address the original post's concerns while occasionally alluding to the additional information as if it's something the commenter genuinely knows or has experienced. The goal is to make these references feel like organic parts of the discussion rather than promotional content.
-"""
+    Ensure a realistic conversation that casually touches on local Miami experiences and the discussion topic.
+    """
 
     current_app.logger.debug(f"Prompt constructed: {len(prompt)} characters")
     current_app.logger.debug(f"FULL PROMPT: {prompt}")
@@ -4775,7 +4767,7 @@ def generate_comment_chain(prompt):
             model="claude-3-opus-20240229",
             #model="claude-3-5-sonnet-20240620",
             max_tokens=3000,  # Adjust as needed
-            temperature=0.75,
+            temperature=0.8,
             #system=super_prompt <think>,
             messages=[
                 {
@@ -4816,256 +4808,6 @@ def save_comment_chain_to_database(chain, item, content_type):
 
 
 
-
-
-
-
-
-
-
-
-def generate_comments_for_all_items_2(content_type='post', comments_per_item=1, item_id=None):
-    with app.app_context():
-        # Get the Career community
-        career_community = Community.query.filter_by(name='Career').first()
-        
-        if content_type == 'post':
-            ItemModel = Post
-            if item_id:
-                items = ItemModel.query.filter_by(id=item_id).all()
-            else:
-                items = ItemModel.query.all()
-        elif content_type == 'vault':
-            ItemModel = Vault
-            if item_id:
-                items = ItemModel.query.filter(Vault.is_posted == False, Vault.id == item_id).all()
-            else:
-                items = ItemModel.query.filter(Vault.is_posted == False).all()
-        else:
-            logging.error("Invalid content type.")
-            return "Invalid content type."
-        
-        if not items:
-            logging.warning(f"No unscheduled {content_type}s available.")
-            return f"No unscheduled {content_type}s available."
-        
-        results = []
-        
-        for item in items:
-
-            # Check if the item is in the Career community
-            community = Community.query.get(item.community_id)
-            category = community.category if community else None
-
-            item_context = f"You're browsing a local to Miami discussion board that has the topic {category}. You see someone has just posted this: {item.title}\nContent: {item.content}\n\n"
-
-            # Check for associations and log the presence of venue or scraper_result
-            if hasattr(item, 'venue') and item.venue:
-                current_app.logger.debug(f"Item {item.id} has an associated venue.")
-            elif hasattr(item, 'scraper_result') and item.scraper_result:
-                current_app.logger.debug(f"Item {item.id} has an associated scraper_result.")
-            else:
-                current_app.logger.debug(f"Item {item.id} has no associated venue or scraper_result.")
-
-            item_text = get_item_text(item)
-
-            
-            
-            if category:
-                top_level_prompts = AICommentPrompt.query.filter(
-                    AICommentPrompt.prompt_type == 'top_level',
-                    AICommentPrompt.is_active == True,
-                    AICommentPrompt.data_type != 'venue'
-                ).all()
-                reply_prompts = AICommentPrompt.query.filter(
-                    AICommentPrompt.prompt_type == 'reply',
-                    AICommentPrompt.is_active == True,
-                    AICommentPrompt.data_type != 'venue'
-                ).all()
-            else:
-                logging.warning(f"No category found for item {item.id}")
-                continue
-            
-            if not top_level_prompts or not reply_prompts:
-                logging.warning("No prompts available.")
-                results.append(f"No prompts available for {content_type} {item.id}")
-                continue
-
-
-           #Get our recs
-
-            all_recommendations = find_diverse_recommendations(item.content, category, num_recommendations=20)
-
-            random.shuffle(all_recommendations) 
-
-            used_recommendations = set() 
-
-            selected_prompts = [top_level_prompts[i % len(top_level_prompts)] for i in range(comments_per_item)]
-            
-            for prompt in selected_prompts:
-                use_recommendation = prompt.data_type != 'none'
-                chain_recommendation = None
-
-                if use_recommendation and all_recommendations:
-                    available_recommendations = [rec for rec in all_recommendations if rec.id not in used_recommendations]
-                    if not available_recommendations:
-                        used_recommendations.clear()
-                        available_recommendations = all_recommendations
-                    chain_recommendation = random.choice(available_recommendations)
-
-                current_app.logger.debug(f"Current chain rec: {chain_recommendation}")
-
-                if content_type == 'post':
-                    commenter = User.query.filter(User.seeder == True, User.id != item.user_id).order_by(func.random()).first()
-                else:  # vault
-                    commenter = OfficialSeeder.query.filter(OfficialSeeder.id != item.seeder_id).order_by(func.random()).first()
-                
-                if not commenter:
-                    logging.warning(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
-                    results.append(f"No available {'users' if content_type == 'post' else 'official seeders'} for commenting.")
-                    continue
-
-                
-
-                poster_character_traits = []
-                if content_type == 'vault':
-                    poster = OfficialSeeder.query.filter_by(id=item.seeder_id).order_by(func.random()).first()
-                    poster_character_traits = poster.character_traits or []
-
-                # Prepare character traits string
-                poster_traits_string = ", ".join(trait.value for trait in poster_character_traits) if poster_character_traits else "no specific traits"
-
-                character_traits = []
-                if content_type == 'vault' and hasattr(commenter, 'character_traits'):
-                    character_traits = commenter.character_traits or []
-
-                # Prepare character traits string
-                traits_string = ", ".join(trait.value for trait in character_traits) if character_traits else "no specific traits"
-
-                # First comment
-                if use_recommendation:
-                    resolved_prompt = resolve_prompt_template(prompt, chain_recommendation)
-                else:
-                    resolved_prompt = resolve_prompt_template(prompt)
-
-                combined_prompt = f"{item_context} As a commenter with the following traits: {traits_string}, {resolved_prompt}"
-
-                logging.info(f"Here is the poster traits {poster_traits_string} and here is the commenter traits {traits_string}")
-
-                try:
-                    # First comment
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "system", "content": combined_prompt}]
-                    )
-                    generated_comment = response.choices[0].message.content.strip()
-                    
-                    if content_type == 'vault' and commenter.types_lowercase:
-                        generated_comment = generated_comment.lower()
-                    
-                    new_comment = Comment(
-                        content=generated_comment,
-                        user_id=commenter.id if content_type == 'post' else None,
-                        official_seeder_id=commenter.id if content_type == 'vault' else None,
-                        post_id=item.id if content_type == 'post' else None,
-                        vault_id=item.id if content_type == 'vault' else None,
-                        posted_time=datetime.utcnow(),
-                        is_burner=False
-                    )
-                    db.session.add(new_comment)
-                    db.session.flush()  # This assigns an ID to new_comment
-                    
-                    # Second comment (reply from original creator)
-                    if use_recommendation:
-                        filtered_reply_prompts = [p for p in reply_prompts if p.data_type != 'none']
-                    else:
-                        filtered_reply_prompts = [p for p in reply_prompts if p.data_type == 'none']
-
-                    # Second comment (reply from original creator)
-                    reply_prompt = random.choice(filtered_reply_prompts)
-                    if use_recommendation:
-                        resolved_reply_prompt = resolve_prompt_template(reply_prompt, chain_recommendation)
-                    else:
-                        resolved_reply_prompt = resolve_prompt_template(reply_prompt)
-                    
-                    reply_context = f"On a Miami discussion board of the topic {category} where you made a post, someone just said this: {generated_comment}, which is a reply to your original post {item.title}\nContent: {item.content}\n\n"
-                    combined_reply_prompt = f"{reply_context} As a person with the following traits: {poster_traits_string} {resolved_reply_prompt}"
-                    
-                    reply_response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "system", "content": combined_reply_prompt}]
-                    )
-                    generated_reply = reply_response.choices[0].message.content.strip()
-                    
-                    if content_type == 'vault':
-                        original_seeder = OfficialSeeder.query.get(item.seeder_id)
-                        if original_seeder and original_seeder.types_lowercase:
-                            generated_reply = generated_reply.lower()
-                    
-                    new_reply = Comment(
-                        content=generated_reply,
-                        user_id=item.user_id if content_type == 'post' else None,
-                        official_seeder_id=item.seeder_id if content_type == 'vault' else None,
-                        post_id=item.id if content_type == 'post' else None,
-                        vault_id=item.id if content_type == 'vault' else None,
-                        posted_time=datetime.utcnow(),
-                        is_burner=False,
-                        parent_id=new_comment.id
-                    )
-                    db.session.add(new_reply)
-                    db.session.flush()  # This assigns an ID to new_reply
-                    
-                    # Third comment (reply from original commenter)
-                    third_reply_prompt = random.choice(filtered_reply_prompts)
-                    if use_recommendation:
-                        resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt, chain_recommendation)
-                    else:
-                        resolved_third_reply_prompt = resolve_prompt_template(third_reply_prompt)
-                    
-                    third_reply_context = f"""You are on a Miami based discussion board of the topic {category}, participating in a comment chain. Here's the chain so far:
-                    Original post: {item.title}\nContent: {item.content}
-                    Your first comment: {generated_comment}
-                    Their reply to your comment: {generated_reply}
-                    \n\n"""
-                    combined_third_reply_prompt = f"{third_reply_context} As a commenter with the following traits: {traits_string}, {resolved_third_reply_prompt}"
-                    
-                    third_reply_response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "system", "content": combined_third_reply_prompt}]
-                    )
-                    generated_third_reply = third_reply_response.choices[0].message.content.strip()
-                    
-                    if content_type == 'vault' and commenter.types_lowercase:
-                        generated_third_reply = generated_third_reply.lower()
-                    
-                    new_third_reply = Comment(
-                        content=generated_third_reply,
-                        user_id=commenter.id if content_type == 'post' else None,
-                        official_seeder_id=commenter.id if content_type == 'vault' else None,
-                        post_id=item.id if content_type == 'post' else None,
-                        vault_id=item.id if content_type == 'vault' else None,
-                        posted_time=datetime.utcnow(),
-                        is_burner=False,
-                        parent_id=new_reply.id
-                    )
-                    db.session.add(new_third_reply)
-
-                    if use_recommendation and chain_recommendation:
-                        used_recommendations.add(chain_recommendation.id)
-                    
-                    try:
-                        db.session.commit()
-                        logging.info(f"Comment chain added successfully for {content_type} {item.id}")
-                        results.append(f"Generated and posted comment chain successfully for {content_type} {item.id}")
-                    except SQLAlchemyError as db_error:
-                        db.session.rollback()
-                        logging.error(f"Database error when adding comment chain: {str(db_error)}")
-                        results.append(f"Failed to add comment chain to database for {content_type} {item.id}: {str(db_error)}")
-                except Exception as e:
-                    logging.error(f"Error generating comment chain: {str(e)}")
-                    results.append(f"Failed to generate comment chain for {content_type} {item.id}: {str(e)}")
-        
-        return results
 
 
 
@@ -5401,65 +5143,50 @@ def parse_seeder_info(seeder_info):
     }
 
 
-def generate_story_with_anthropic(five_sec_moment, category, seeder_info, scheduled_date):
-    # Get one random result for the category
-    choose_article = random.choice([True, False])
-    
-    random_article = None
-    random_venue = None
+def generate_story_with_anthropic(five_sec_moment, category, seeder_info, scheduled_date, content_source):
     additional_info = ""
     url = None
 
-    if choose_article:
-        # Get one random result for the category
+    current_app.logger.debug(f"Generating story with content source: {content_source}")
+
+    if content_source in ['scraper_results', 'both']:
         random_article = ScraperResult.query.filter(
             ScraperResult.categories.any(id=category.id)
         ).order_by(func.random()).first()
         
-        current_app.logger.debug(f"Random article: {random_article.id if random_article else None}")
-        
         if random_article:
             additional_info = f"{random_article.source}: {random_article.title}"
-            
             if random_article.price is not None:
                 additional_info += f" - Price: ${random_article.price:.2f}"
-            
             if random_article.event_date is not None:
                 additional_info += f" - Date: {random_article.event_date.strftime('%B %d, %Y')}"
-            
             additional_info += f" - {random_article.text}"
             url = random_article.url
     
-    if not random_article:
-        # Get one random venue for the category
+    if (content_source == 'venues' or (content_source == 'both' and not additional_info)):
         random_venue = Venue.query.filter(
             Venue.categories.any(id=category.id)
         ).options(joinedload(Venue.reviews)).order_by(func.random()).first()
         
-        current_app.logger.debug(f"Random venue: {random_venue.id if random_venue else None}")
-        
         if random_venue:
             additional_info = f"Place: {random_venue.title}"
-            
             if random_venue.description:
                 additional_info += f" - Description: {random_venue.description}"
-
             if random_venue.neighborhood:
                 additional_info += f" - Neighborhood: {random_venue.neighborhood}"
-            
             if random_venue.menu:
                 additional_info += f" - Menu: {random_venue.menu_text}"
-            
             if random_venue.reviews:
                 additional_info += f" - Summary of Reviews: {random_venue.review_text}"
-            
             url = random_venue.google_search_url
-    
-    if not random_article and not random_venue:
+
+    if not additional_info:
         additional_info = f"No recent information or venues available for category {category.name}."
 
+    current_app.logger.debug(f"Additional info generated: {additional_info[:100]}...")  # Log first 100 chars
+
     seeder_details = parse_seeder_info(seeder_info)
-    current_app.logger.debug(f"HERE IS SEEDER_DETAILS IN GENERATE STORY: {seeder_details}")
+    current_app.logger.debug(f"Seeder details: {seeder_details}")
 
     # Format the scheduled date
     if scheduled_date:
@@ -5471,37 +5198,42 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
     else:
         formatted_date = "an unspecified date"
 
-    num_paragraphs = random.randint(1, 3)
+    content_type = random.choice(['paragraphs'])
+
+    if content_type == 'paragraphs':
+        num_paragraphs = random.randint(1, 2)
+        content_instruction = f"The story should be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}."
+    else:
+        num_sentences = random.randint(2, 4)
+        content_instruction = f"The story should be {num_sentences} sentence{'s' if num_sentences > 1 else ''}."
 
     user_prompt = f"""
-    Create a story that captures a five-second moment in someone's life, bringing it to the greatest clarity possible. Every element of the story should serve to illuminate this moment.
+        Create a first-person story about a five-second moment: {five_sec_moment}. Format as a Reddit post in a {category.name} community set in Miami on {formatted_date}.
 
-    Key elements:
-    1. Five-second moment: {five_sec_moment}
-    2. This moment should be realized towards the end of the story.
-    3. The story should begin with a situation or feeling opposite to the five-second moment.
-    4. Use the following information as potential backdrop or context for the story. Incorporate elements that naturally fit with the five-second moment:
+        Story structure:
+        1. Start with an opposite situation/feeling to the five-second moment.
+        2. Begin close to the ending.
+        3. Realize the five-second moment near the end.
 
-    {additional_info}
+        Narrator:
+        - Recent Miami transplant, 22-26 years old
+        - From: {seeder_details['state']}
+        - Works in: {seeder_details['industry']}
+        - Lives in: {seeder_details['neighborhood']}
 
-    5. The story is set on {formatted_date}. If the additional information includes future event dates, ensure the narrative reflects the appropriate timeline (e.g., anticipation of upcoming events, reflection on past events). Always maintain chronological consistency between the story date and any mentioned event dates.
-    6. Write in first-person, like a Reddit post. End with a question to engage readers.
-    7. The narrator is a recent Miami transplant:
-       - From: {seeder_details['state']}
-       - Works in: {seeder_details['industry']}
-       - Living in: {seeder_details['neighborhood']} neighborhood
-       - Age: 22-26
-    8. Use 8th grade level language. Subtly incorporate the narrator's background.
-    9. Maintain a casual, conversational tone.
-    10. The story should be {num_paragraphs} paragraph{'s' if num_paragraphs > 1 else ''}.
-    11. Start the story close to its ending.
-    12. If any specific dates are mentioned in the backdrop information, include them naturally in the story if relevant.
-    13. End the story with a question that asks for specific local recommendations related to the unique Miami location or experience described. Focus on insider knowledge about places or events that could enhance the narrator's experience.
-    14. Create a controversial title for the story by combining an extreme statement or question related to the five-second moment with a stereotypical aspect of Miami culture. The title should be provocative but not offensive, and should be phrased as a question.
+        Guidelines:
+        1. Use 8th grade level language and a casual tone.
+        2. Incorporate backdrop elements that fit naturally: {additional_info}
+        3. Ensure chronological consistency with any mentioned event dates.
+        4. {content_instruction}
+        5. End with a question asking for local Miami recommendations.
 
-    Wrap the final story in <story> tags.  <think> 
+        Title: Create a controversial question combining the five-second moment with a Miami stereotype.
+
+        Wrap the story in <story> tags. <think>
     """
-    current_app.logger.info(f"HERE IS THE USER PROMPT WOOO: {user_prompt}")
+
+    current_app.logger.debug(f"Generated prompt for {content_type}: {content_instruction}")
 
 
     
@@ -5539,28 +5271,20 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
 
 
 def discussion_question_generator(text, category):
-    emotions = ["controversial"]
+    emotions = ["discussion question", "statement"]
     chosen_emotion = random.choice(emotions)
     
-    emotion_prompt = (
-        f"Emotion you want to invoke in the audience: {chosen_emotion}\n\n"
-        if chosen_emotion
-        else ""
-    )
     
     prompt = (
-        f"You are a discussion question generator. Your goal is to generate a discussion question that results in people commenting. Here are the specifications:\n\n"
-        f"Give a concise, one sentence discussion question that is based on this piece of text: \n\n"
-        f"{text}\n\n"
-        f"The content category is: {category}\n\n"
-        f"Tailor your question to be relevant to the {category} category.\n\n"
-        f"Use 8th grade verbiage\n\n"
-        f"Wrap your response in <question> brackets\n\n"
-        f"The community is recent transplants to Miami that are between 22-26 years old\n\n"
-        f"The discussion question should be at most 12 words\n\n"
-        f"The question must be impossible to ask about any other city without changing key words\n\n"
-        f"{emotion_prompt} <think>"
-    )
+    f"Generate a controversial, one-sentence {chosen_emotion} based on this text:\n\n"
+    f"{text}\n\n"
+    f"Guidelines:\n"
+    f"- Make it specific to Miami and {category}\n"
+    f"- Use direct, everyday language\n"
+    f"- Aim to provoke strong opinions\n"
+    f"- Keep it under 75 characters\n"
+    f"Wrap your response in <question> tags <think>"
+    )   
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20240620",
@@ -5616,23 +5340,32 @@ def discussion_factory():
         number_of_posts = int(request.form.get('number_of_posts', 100))
         content_category_id = int(request.form.get('content_category'))
         content_category = ContentCategory.query.get(content_category_id)
+        content_source = request.form.get('content_source', 'both')
+        
         session_data = {
-            'number_of_posts': number_of_posts
+            'number_of_posts': number_of_posts,
+            'content_source': content_source
         }
         session.update(session_data)
         results = []
         
-        # Fetch ScraperResult and Venue objects matching the category
-        scraper_results = ScraperResult.query.filter(
-            ScraperResult.categories.any(ContentCategory.id == content_category_id)
-        ).all()
+        # Fetch ScraperResult and Venue objects based on the selected content source
+        if content_source in ['scraper_results', 'both']:
+            scraper_results = ScraperResult.query.filter(
+                ScraperResult.categories.any(ContentCategory.id == content_category_id)
+            ).all()
+        else:
+            scraper_results = []
         
-        venues = Venue.query.filter(
-            Venue.categories.any(ContentCategory.id == content_category_id)
-        ).all()
+        if content_source in ['venues', 'both']:
+            venues = Venue.query.filter(
+                Venue.categories.any(ContentCategory.id == content_category_id)
+            ).all()
+        else:
+            venues = []
         
         combined_results = scraper_results + venues
-        
+
         if combined_results:
             results_needed = max(number_of_posts, len(combined_results))
             
@@ -5754,23 +5487,25 @@ def generate_story_2():
     category_id = request.form.get('category_id')
     is_new_seeder = request.form.get('is_new_seeder') == 'true'
     scheduled_date = request.form.get('scheduled_at')
-
-
+    content_source = request.form.get('content_source', 'scraper_results')  # New parameter
+    
+    current_app.logger.debug(f"Generating story with content source: {content_source}")
+    
     category = ContentCategory.query.get(category_id)
     if not category:
         return jsonify({'error': 'Invalid category ID'}), 400
-
+    
     if is_new_seeder:
         seeder_info = json.loads(request.form.get('seeder_info'))
-        # Format seeder_info as needed for generate_story_with_anthropic
         formatted_seeder_info = f"{seeder_info['full_name']} ({seeder_info['alias']}) (0 vaults) ({seeder_info['state']}) ({seeder_info['industry']}) ({seeder_info['neighborhood']})"
     else:
         formatted_seeder_info = request.form.get('seeder_info')
-
+    
     try:
-        story, article_url = generate_story_with_anthropic(five_sec_moment, category, formatted_seeder_info, scheduled_date)
+        story, article_url = generate_story_with_anthropic(five_sec_moment, category, formatted_seeder_info, scheduled_date, content_source)
         return jsonify({'story': story, 'article_url': article_url})
     except Exception as e:
+        current_app.logger.error(f"Error generating story: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -5815,137 +5550,6 @@ def idea_factory_2():
         style_modifiers=style_modifiers
     )
 
-
-from datetime import date
-
-def modify_text_with_openai(text, professional_context, article_category):
-    professional_context = "make it in the context of a 22-26 year old person that just moved to miami"
-    
-    
-    # Initialize context variables
-    context = ""
-    context_type = ""
-    url = None
-
-    if article_category in ["VENUE", "RESTAURANTS"]:
-
-        # Fetch a random venue
-        venue_query = Venue.query.filter(Venue.permanently_closed == False, Venue.temporarily_closed == False)
-        
-        # Add filter for restaurants if the category is RESTAURANT
-        if article_category == "RESTAURANTS":
-            venue_query = venue_query.filter(Venue.main_category == "Restaurant")
-        
-        # Fetch a random venue
-        random_venue = venue_query.order_by(func.random()).first()
-        if random_venue:
-            # Format the total score correctly
-            total_score_str = f"{random_venue.total_score:.1f}" if random_venue.total_score is not None else "N/A"
-            
-            context = (
-                f"Local Venue Spotlight: '{random_venue.title or 'Unnamed Venue'}' "
-                f"in {random_venue.neighborhood or 'an unknown neighborhood'}. "
-                f"Category: {random_venue.category_name or 'Uncategorized'}. "
-                f"Description: {(random_venue.description or 'No description available.')[:100]}... "
-                f"Address: {random_venue.street or 'Unknown street'}, "
-                f"{random_venue.city or 'Unknown city'}, {random_venue.postal_code or 'No postal code'}. "
-                f"Price Range: {random_venue.price or 'Unknown'}. "
-                f"Overall Score: {total_score_str}/5 "
-                f"based on {random_venue.reviews_count or 0} reviews. "
-                f"Status: {'Open' if not random_venue.permanently_closed and not random_venue.temporarily_closed else 'Temporarily Closed' if random_venue.temporarily_closed else 'Permanently Closed'}. "
-            )
-
-
-            if random_venue.menu:
-                context += f"\nHere is the menu: {random_venue.menu}\n"
-            else:
-                context += "Menu information is not available for this venue.\n"
-            
-            # Fetch a recent review for the venue
-            recent_review = Review.query.filter_by(venue_id=random_venue.id).order_by(Review.published_at_date.desc()).first()
-            if recent_review:
-                context += (
-                    f"Recent Review: '{(recent_review.text or 'No review text')[:100]}...' "
-                    f"- Posted on {recent_review.published_at_date.strftime('%B %d, %Y') if recent_review.published_at_date else 'Unknown date'}"
-                )
-            
-            context_type = "Local Venue"
-            url = random_venue.google_search_url
-        else:
-            context = "No local venue information available."
-            context_type = "Local Venue"
-    else:
-        # Fetch a random article for other categories
-        random_article = ScraperResult.query.filter_by(category=CategoryEnum[article_category]).order_by(func.random()).first()
-        
-        if random_article:
-            context = (
-                f"Recent news/event/jobpost from Miami: '{random_article.title}'. "
-                f"Summary: {random_article.text}..."
-            )
-            context_type = "Local Event/News/Job Post"
-            url = random_article.url
-        else:
-            context = "No recent news available."
-            context_type = "Local Event/News/Job Post"
-
-    context_suffix = f"{professional_context}" if professional_context else "make it different from the original post by changing all details"
-    
-    print(context_suffix)
-    
-    # Randomly select the number of paragraphs (1, 2, or 3)
-    max_paragraphs = random.choice([1, 2, 3])
-    
-    today = date.today()
-    week_from_today = today + timedelta(days=7)
-    random_date = today + timedelta(days=random.randint(0, 7))
-
-
-    prompt = (
-        f"Take this Reddit post and extract the universal theme from it: \n\n"
-        f"{text}\n\n"
-        f"and then below that, generate a new post that follows the theme, but dramatically alter the specific details of the post while maintaining the core theme. Incorporate the following local context as the backdrop:\n\n"
-        f"{context_type}: {context}\n\n"
-        f"The post should be written by someone in their early 20s who is a recent Miami transplant. Always include specific dates in your response, keeping in mind that the post should be framed as though it was written on {random_date.strftime('%B %d, %Y')}. "
-        "Pretend you are a young adult. The new post needs to follow these guidelines for making it more personable and viral:\n\n"
-        f"Authenticity: The content feels genuine and honest, reflecting the individual's true thoughts or feelings. "
-        "It doesn't feel scripted or generic.\n"
-        f"Detail-Oriented: Instead of general statements, a personal post includes specific details that reveal more "
-        "about the person's situation or viewpoint. Use the provided local information to add authenticity.\n"
-        f"Emotional Engagement: The post connects on an emotional level, whether it's sharing joy, struggles, doubts, "
-        "or achievements. This helps create a bond with readers. \n"
-        f"Storytelling: Personal posts often incorporate elements of storytelling, which is also a key aspect of virality. "
-        "A clear narrative, a personal journey, or anecdotes make them more engaging and relatable. "
-        f"Weave in the {context_type.lower()} as a setting or backdrop for part of the story.\n"
-        f"Relevance: These posts are relevant to the interests and needs of the community. In a professional or young "
-        "adult setting, topics might include career challenges, educational experiences, personal development, or "
-        "balancing life and work. Relate these to the Miami context.\n"
-        f"Interactive: Personal posts invite interaction by asking questions or seeking advice, thereby fostering a "
-        "community dialogue. Ask for recommendations or experiences related to the {context_type.lower()}.\n"
-        f"Reflective: They often reflect on personal experiences or lessons learned, which can provide valuable insights "
-        "to others in similar situations. \n\n"
-        f"Virality Principles:\n"
-        f"1. Social Currency: Create content that makes people feel informed or 'in the know,' enhancing their social image. Use the {context_type.lower()} information to this effect.\n"
-        f"2. Triggers: Include references to well-known brands, products, or dates to create associative triggers. Mention the {context_type.lower()} by name if applicable.\n"
-        f"3. Emotion: Aim to elicit strong emotions like awe, excitement, amusement, anger, or anxiety which are linked to higher sharing rates.\n"
-        f"4. Public: Encourage behaviors that people can see others doing, fostering a trend or common action.\n"
-        f"5. Practical Value: Offer practical, useful information or tips that people will want to share because it provides value to others. This could relate to the {context_type.lower()}.\n"
-        f"6. Stories: Utilize the power of narrative to make your content more memorable and shareable.\n\n"
-        f"Format your response clearly with the new post, which should be at most {max_paragraphs} paragraph{'s' if max_paragraphs > 1 else ''}, and use 8th grade verbiage."
-    )
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",  # Use the appropriate model
-            messages=[
-                {"role": "system", "content": prompt}
-            ]
-        )
-        text = response.choices[0].message.content.strip() + " (Should be posted on: " + random_date.strftime("%B %d, %Y") + ")"
-        return text, url
-    except Exception as e:
-        print(f"Failed to modify text: {str(e)}")
-        return text  # Return the original text if modification fails
 
 
 
@@ -6658,7 +6262,7 @@ def vault_post():
         )
 
         # Set the appropriate ID based on the item type
-        if item_type == 'scraper_result':
+        if item_type == 'scraperresult':
             new_vault.scraper_result_id = item_id
         elif item_type == 'venue':
             new_vault.venue_id = item_id
@@ -7518,7 +7122,7 @@ from flask import current_app
 
 
 def summarize_text(text):
-    custom_prompt = "Your job is a summarizer. Summarize the piece of text given to you"
+    custom_prompt = "Your job is a summarizer. Summarize the piece of text given to you in one paragraph"
     
     try:
         response = client.chat.completions.create(
@@ -8524,9 +8128,20 @@ def update_traits():
 
 @app.route('/admin/moments', methods=['GET'])
 def moments_of_realization():
+    current_app.logger.debug("Fetching moments of realization")
     moments = MomentOfRealization.query.all()
     categories = ContentCategory.query.all()
-    return render_template('moments_of_realization.html', moments=moments, categories=categories)
+    
+    # Sort moments by category
+    moments_by_category = defaultdict(list)
+    for moment in moments:
+        moments_by_category[moment.category_id].append(moment)
+    
+    current_app.logger.debug(f"Sorted {len(moments)} moments into {len(moments_by_category)} categories")
+    
+    return render_template('moments_of_realization.html', 
+                           moments_by_category=moments_by_category, 
+                           categories=categories)
 
 @app.route('/admin/moments/add', methods=['POST'])
 def add_moment():
@@ -8790,30 +8405,23 @@ def generate_meme_text(meme_context, article_summary, category, pieces_of_text):
         current_app.logger.error(f"Error fetching MomentOfRealization: {str(e)}")
 
     prompt = f"""
-    Generate meme text for a ({meme_context}) meme, capturing a relatable Miami experience in a humorous and slightly controversial way.
-    The meme should be entertaining by quickly conveying a shared experience or cultural reference that resonates with Miami transplants.
-    Key elements:
-        1. Meme format: ({pieces_of_text} separate pieces of text)
-        2. Subject article: ({article_summary})
-        3. Target audience: Recent Miami transplants, ages 22-26
-        4. The meme text content category is {category}
-        5. Tailor the meme text to be relevant to the {category} category
-        6. Cultural reference: Include a subtle nod to Miami culture or a current event
-        7. Controversial angle: Present a mildly provocative viewpoint or question about the subject
-        8. Format: Adapt to the specified meme format, but keep text concise (max 10 words total)
-        9. Language: Use 8th grade level vocabulary and casual, conversational tone
-        10. Insider element: Include a reference to a local spot, event, or Miami-specific experience from the subject article
-        11. Make the meme about this common theme: {common_theme}
-        
-        The meme text should be structured as: 
-       <meme>Text fitting the specified meme format, incorporating the Miami-related subject</meme>
-        
-        Remember:
-        * Tailor the tone and structure to fit the specified meme format
-        * Ensure the content is relatable to young Miami transplants
-        * Keep it funny and slightly edgy to spark engagement
-        * Use the Miami-related topic as the core subject of the meme
-        <think>
+    Generate meme text for a [{meme_context}] meme about this universal theme: [{common_theme}], focusing on the irony of social experiences in Miami.
+
+Key elements:
+1. Format: {pieces_of_text} separate pieces of text, delimited by <text[n]></text[n]> blocks
+2. Target: Recent Miami transplants, ages 22-26
+3. Content: Relate to {category}, incorporating this seed content: ({article_summary})
+5. Tone: Humorous, mildly controversial, and edgy
+6. Language: Casual, conversational (8th grade level)
+7. Concise: Maximum 10 words total
+
+Structure:
+<meme>Text fitting the specified format</meme>
+
+Remember:
+* Balance humor with mild provocation to spark engagement
+
+<think>
     """
     
     current_app.logger.debug(f"Here is the summary of the article used: {article_summary}")
@@ -8861,48 +8469,51 @@ def generate_meme(meme, text):
     # Parse the input text
     text_elements = re.findall(r'<text(\d+)>(.*?)</text\1>', text)
     current_app.logger.debug(f"Parsed text elements: {text_elements}")
-
     for i, (_, element_text) in enumerate(text_elements):
         if i >= meme.text_count:
             current_app.logger.warning(f"More text elements provided than meme supports. Ignoring extra elements.")
             break
-
         position = meme.text_positions[i]
         font_type = meme.font_types[i]
         font_size = position['font_size']
         max_chars = position['max_chars']
         x, y = position['x'], position['y']
-
         text_style = meme.text_styles[i]
         text_color = text_style.get('color', 'white')
         outline_color = text_style.get('outline_color')
         has_outline = text_style.get('has_outline', False)
-
         try:
             font = ImageFont.truetype(f"static/fonts/{font_type}.ttf", font_size)
         except IOError:
             current_app.logger.error(f"Font file not found: {font_type}.ttf. Using default font.")
             font = ImageFont.truetype("static/fonts/impact.ttf", font_size)
-
+        
         # Wrap text respecting max_chars
         wrapped_text = textwrap.wrap(element_text, width=max_chars)
         
-        # Calculate total text height
+        # Calculate total text height and maximum line width
         line_spacing = 0.3 * font_size
         line_heights = [font.getbbox(line)[3] - font.getbbox(line)[1] + line_spacing for line in wrapped_text]
         total_text_height = sum(line_heights) - line_spacing
-
+        max_line_width = max(font.getbbox(line)[2] - font.getbbox(line)[0] for line in wrapped_text)
+        
         # Adjust y position if text goes out of bounds
         if y + total_text_height > img.height:
             y = max(0, img.height - total_text_height)
-
+        
+        # Calculate the leftmost x-coordinate for centering
+        left_x = max(0, x - max_line_width // 2)
+        
         for line in wrapped_text:
             bbox = font.getbbox(line)
             line_width = bbox[2] - bbox[0]
             line_height = bbox[3] - bbox[1]
-
+            
+            # Calculate centered x position for this line
+            x_text = left_x + (max_line_width - line_width) // 2
+            
             # Ensure x is within image bounds
-            x_text = max(0, min(x, img.width - line_width))
+            x_text = max(0, min(x_text, img.width - line_width))
             
             # Draw text outline
             if has_outline and outline_color:
@@ -8913,7 +8524,7 @@ def generate_meme(meme, text):
             # Draw text
             draw.text((x_text, y), line, font=font, fill=text_color)
             y += line_height + line_spacing
-
+    
     # Save the image
     output_path = os.path.join('static', 'memes', 'generated_memes', f"meme_{meme.id}_{int(time.time())}.jpg")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -8925,18 +8536,24 @@ def generate_meme(meme, text):
 def generate_meme_route():
     if request.method == 'POST':
         category_id = request.form.get('category_id')
+        meme_id = request.form.get('meme_id')
         content_category = ContentCategory.query.get(category_id)
-        meme = Meme.query.order_by(func.random()).first()
+        
+        if meme_id == 'all':
+            meme = Meme.query.order_by(func.random()).first()
+        else:
+            meme = Meme.query.get(meme_id)
+        
         item = fetch_random_item(category_id)
         
         if item is None:
             current_app.logger.error("No suitable item found for meme generation")
             return jsonify({'error': 'No suitable item found'}), 400
-
+        
         full_text = construct_item_text(item)
         item_type = item.__class__.__name__.lower()
         current_app.logger.debug(f"Full text for meme: {full_text}")
-
+        
         meme_text = generate_meme_text(meme.context, full_text, content_category.name, meme.text_count)
         current_app.logger.debug(f"Generated meme text: {meme_text}")
         
@@ -8948,13 +8565,15 @@ def generate_meme_route():
             'meme_text': meme_text,
             'item_id': item.id,
             'item_type': item_type,
-            'full_text': full_text
+            'full_text': full_text,
+            'meme_id': meme.id
         })
-
-    # The GET method remains the same
+    
+    # The GET method
     communities = Community.query.all()
     community_dict = {c.id: c.name for c in communities}
     categories = ContentCategory.query.all()
+    memes = Meme.query.all()  # Fetch all memes
     
     seeders_with_counts = db.session.query(
         OfficialSeeder,
@@ -8966,6 +8585,7 @@ def generate_meme_route():
         'generate_meme.html',
         communities=communities,
         categories=categories,
+        memes=memes,  # Pass memes to the template
         seeders_with_counts=seeders_with_counts,
         State=State,
         Industry=Industry,
@@ -8974,7 +8594,6 @@ def generate_meme_route():
         writing_styles=writing_styles,
         style_modifiers=style_modifiers
     )
-
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -9029,6 +8648,7 @@ def manage_memes():
                     })
                 
                 new_meme = Meme(
+                    title=request.form['title'],
                     image_filename=filename,
                     context=request.form['context'],
                     text_count=text_count,
@@ -9045,34 +8665,50 @@ def manage_memes():
     return render_template('manage_memes.html', memes=memes, meme_folder=MEME_FOLDER)
 
 
-@app.route('/admin/update-venue-summaries', methods=['GET'])
-def update_venue_summaries_route():
-    try:
-        # Use joinedload to efficiently load reviews along with venues
-        venues = Venue.query.options(joinedload(Venue.reviews)).all()
+
+@app.route('/edit_meme/<int:meme_id>', methods=['GET', 'POST'])
+def edit_meme(meme_id):
+    meme = Meme.query.get_or_404(meme_id)
+    if request.method == 'POST':
+        meme.context = request.form['context']
+        meme.text_count = int(request.form['text_count'])
+        meme.font_types = request.form.getlist('font_type')
+        text_positions = []
+        text_styles = []
         
-        for venue in venues:
-            # Summarize menu
-            if venue.menu:
-                menu_text = json.dumps(venue.menu, indent=2)  # Convert JSONB to formatted string
-                venue.menu_text = summarize_text(menu_text)
-            
-            # Summarize reviews
-            if venue.reviews:
-                all_reviews = " ".join([review.text for review in venue.reviews if review.text])
-                venue.review_text = summarize_text(all_reviews)
-            
-            current_app.logger.info(f"Updated summaries for venue: {venue.id}")
-            db.session.commit()
+        for i in range(meme.text_count):
+            text_positions.append({
+                'x': int(request.form[f'x_{i}']),
+                'y': int(request.form[f'y_{i}']),
+                'font_size': int(request.form[f'font_size_{i}']),
+                'max_chars': int(request.form[f'max_chars_{i}'])
+            })
+            text_styles.append({
+                'color': request.form[f'text_color_{i}'],
+                'has_outline': request.form[f'has_outline_{i}'] == 'true',
+                'outline_color': request.form[f'outline_color_{i}'] if request.form[f'has_outline_{i}'] == 'true' else None
+            })
         
+        meme.text_positions = text_positions
+        meme.text_styles = text_styles
         
-        current_app.logger.info("Finished updating all venue summaries")
-        
-        return jsonify({"message": "Venue summaries updated successfully"}), 200
-    except Exception as e:
-        current_app.logger.error(f"Error updating venue summaries: {str(e)}")
-        db.session.rollback()
-        return jsonify({"error": "An error occurred while updating venue summaries"}), 500
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(MEME_FOLDER, filename)
+                file.save(file_path)
+                # Delete old image file
+                old_file_path = os.path.join(MEME_FOLDER, meme.image_filename)
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
+                meme.image_filename = filename
+
+        db.session.commit()
+        flash('Meme updated successfully', 'success')
+        return redirect(url_for('manage_memes'))
+    
+    return render_template('edit_meme.html', meme=meme)
 
 
 if __name__ == '__main__':

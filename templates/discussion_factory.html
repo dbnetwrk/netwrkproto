@@ -1,20 +1,13 @@
 {% extends "admin_panel_base.html" %}
-
 {% block content %}
 <div class="container">
     <h2>Netwrk Discussion Factory</h2>
     <p>Welcome to the Netwrk discussion Factory. This is where discussions are born.</p>
     <form method="POST" action="{{ url_for('discussion_factory') }}">
-        
-
-        
-
         <div class="mb-3">
             <label for="number_of_posts" class="form-label">Number of Discussions to Generate</label>
             <input type="number" class="form-control" id="number_of_posts" name="number_of_posts" value="{{ session.get('number_of_posts', 10) }}">
         </div>
-
-
         <div class="mb-3">
             <label for="content_category" class="form-label">Select Content Category:</label>
             <select class="form-select" id="content_category" name="content_category">
@@ -23,9 +16,27 @@
                 {% endfor %}
             </select>
         </div>
-
-        
-
+        <div class="mb-3">
+            <label class="form-label">Select Content Source:</label>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="content_source" id="scraper_results" value="scraper_results" checked>
+                <label class="form-check-label" for="scraper_results">
+                    Scraper Results
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="content_source" id="venues" value="venues">
+                <label class="form-check-label" for="venues">
+                    Venues
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="content_source" id="both" value="both">
+                <label class="form-check-label" for="both">
+                    Both
+                </label>
+            </div>
+        </div>
         <button type="submit" class="btn btn-primary">Scrape</button>
     </form>
 

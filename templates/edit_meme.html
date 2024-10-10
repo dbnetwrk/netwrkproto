@@ -1,0 +1,73 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container">
+    <h1>Edit Meme</h1>
+    
+    <form action="{{ url_for('edit_meme', meme_id=meme.id) }}" method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="file">Meme Image:</label>
+            <input type="file" class="form-control-file" id="file" name="file">
+            <small class="form-text text-muted">Leave empty to keep the current image.</small>
+        </div>
+        <div class="form-group">
+            <label for="context">Meme Context:</label>
+            <textarea class="form-control" id="context" name="context" required>{{ meme.context }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="text_count">Number of Text Elements:</label>
+            <input type="number" class="form-control" id="text_count" name="text_count" min="1" value="{{ meme.text_count }}" required>
+        </div>
+        
+        {% for i in range(meme.text_count) %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>Text Element {{ i+1 }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="font_type_{{ i }}">Font Type:</label>
+                        <input type="text" class="form-control" id="font_type_{{ i }}" name="font_type" value="{{ meme.font_types[i] }}" required>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="x_{{ i }}">X Position:</label>
+                        <input type="number" class="form-control" id="x_{{ i }}" name="x_{{ i }}" value="{{ meme.text_positions[i]['x'] }}" required>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="y_{{ i }}">Y Position:</label>
+                        <input type="number" class="form-control" id="y_{{ i }}" name="y_{{ i }}" value="{{ meme.text_positions[i]['y'] }}" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-3">
+                        <label for="font_size_{{ i }}">Font Size:</label>
+                        <input type="number" class="form-control" id="font_size_{{ i }}" name="font_size_{{ i }}" value="{{ meme.text_positions[i]['font_size'] }}" required>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="max_chars_{{ i }}">Max Characters:</label>
+                        <input type="number" class="form-control" id="max_chars_{{ i }}" name="max_chars_{{ i }}" value="{{ meme.text_positions[i]['max_chars'] }}" required>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="text_color_{{ i }}">Text Color:</label>
+                        <input type="color" class="form-control" id="text_color_{{ i }}" name="text_color_{{ i }}" value="{{ meme.text_styles[i]['color'] }}" required>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="has_outline_{{ i }}">Has Outline:</label>
+                        <select class="form-control" id="has_outline_{{ i }}" name="has_outline_{{ i }}" required>
+                            <option value="true" {% if meme.text_styles[i]['has_outline'] %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if not meme.text_styles[i]['has_outline'] %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="outline_color_{{ i }}">Outline Color:</label>
+                    <input type="color" class="form-control" id="outline_color_{{ i }}" name="outline_color_{{ i }}" value="{{ meme.text_styles[i]['outline_color'] or '#000000' }}">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <button type="submit" class="btn btn-primary">Update Meme</button>
+    </form>
+</div>
+{% endblock %}

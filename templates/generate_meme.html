@@ -10,11 +10,21 @@
             {% endfor %}
         </select>
     </div>
+    <div class="mb-3">
+        <label for="meme" class="form-label">Select Meme:</label>
+        <select class="form-select" id="meme">
+            <option value="all">All (Random)</option>
+            {% for meme in memes %}
+            <option value="{{ meme.id }}">{{ meme.title }}</option>
+            {% endfor %}
+        </select>
+    </div>
     <button id="generateMeme" class="btn btn-primary">Generate Meme</button>
     <div id="memeResult" class="mt-4" style="display: none;">
         <img id="memeImage" src="" alt="Generated Meme" class="img-fluid">
         <h3 id="itemTitle" class="mt-2"></h3>
         <p id="memeText"></p>
+        <p>Meme ID: <span id="memeId"></span></p>
     </div>
 
 
@@ -140,25 +150,35 @@
 </div>
 
 <script>
+
 document.getElementById('generateMeme').addEventListener('click', function() {
     const categoryId = document.getElementById('category').value;
+    const memeId = document.getElementById('meme').value;
     fetch('/generate_meme', { 
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: 'category_id=' + categoryId
+        body: `category_id=${categoryId}&meme_id=${memeId}`
     })
     .then(response => response.json())
     .then(data => {
         document.getElementById('memeImage').src = data.meme_path;
         document.getElementById('itemTitle').textContent = data.item_title;
         document.getElementById('memeText').textContent = data.meme_text;
+        document.getElementById('memeId').textContent = data.meme_id;
         document.getElementById('memeResult').style.display = 'block';
         
         // Set the item_id and item_type for the vault post form
         document.getElementById('item_id').value = data.item_id;
         document.getElementById('item_type').value = data.item_type;
+
+        // Log the values to console for debugging
+        console.log('Item ID set to:', data.item_id);
+        console.log('Item Type set to:', data.item_type);
+    })
+    .catch(error => {
+        console.error('Error generating meme:', error);
     });
 });
 

@@ -20,22 +20,22 @@
         <button type="submit" class="btn btn-primary">Add Moment</button>
     </form>
     
-    <!-- List of existing moments -->
+    <!-- List of existing moments, sorted by category -->
+    {% for category in categories %}
+    <h3>{{ category.name }}</h3>
     <table class="table">
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Text</th>
-                <th>Category</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            {% for moment in moments %}
+            {% for moment in moments_by_category[category.id] %}
             <tr>
                 <td>{{ moment.id }}</td>
                 <td>{{ moment.text }}</td>
-                <td>{{ moment.category.name }}</td>
                 <td>
                     <a href="{{ url_for('edit_moment', id=moment.id) }}" class="btn btn-sm btn-warning">Edit</a>
                     <form action="{{ url_for('delete_moment', id=moment.id) }}" method="post" style="display: inline;">
@@ -46,5 +46,6 @@
             {% endfor %}
         </tbody>
     </table>
+    {% endfor %}
 </div>
 {% endblock %}

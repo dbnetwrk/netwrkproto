@@ -15,6 +15,22 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="mb-3">
+    <label class="form-label">Select Content Source:</label>
+    <div class="form-check">
+        <input class="form-check-input" type="radio" name="content_source" id="scraper_results" value="scraper_results" checked>
+        <label class="form-check-label" for="scraper_results">
+            Scraper Results
+        </label>
+    </div>
+    <div class="form-check">
+        <input class="form-check-input" type="radio" name="content_source" id="venues" value="venues">
+        <label class="form-check-label" for="venues">
+            Venues
+        </label>
+    </div>
+    
+</div>
 
         <button id="generateMoment" class="btn btn-primary mb-3">Generate 5 Second Moment</button>
 
