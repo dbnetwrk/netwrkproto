@@ -66,7 +66,18 @@ from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
 
+# Initialize SentenceTransformer model
+# Initialize SentenceTransformer model
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
+# Initialize FAISS index
+embedding_size = 384  # Depends on the model you're using
+# Initialize FAISS indexes
+venue_index = None
+event_index = None
+venue_ids = None
+event_ids = None
+embeddings_initialized = False
 
 
 load_dotenv()
@@ -4460,8 +4471,34 @@ def get_item_text(item):
 
 
 
-
-
+def initialize_embeddings():
+    global venue_index, event_index, venue_ids, event_ids, model
+    
+    current_app.logger.debug("Starting embedding initialization")
+    
+    # Initialize the model if not already done
+    if 'model' not in globals() or model is None:
+        current_app.logger.debug("Initializing SentenceTransformer model")
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    # Load or generate venue embeddings
+    current_app.logger.debug("Loading venue embeddings")
+    venue_index, venue_ids = load_embeddings('venue_index.faiss', 'venue_ids.pkl')
+    if venue_index is None or venue_ids is None:
+        current_app.logger.debug("Generating new venue embeddings")
+        venue_index, venue_ids = generate_and_save_venue_embeddings()
+    
+    # Load or generate event embeddings
+    current_app.logger.debug("Loading event embeddings")
+    event_index, event_ids = load_embeddings('event_index.faiss', 'event_ids.pkl')
+    if event_index is None or event_ids is None:
+        current_app.logger.debug("Generating new event embeddings")
+        event_index, event_ids = generate_and_save_event_embeddings()
+    
+    if venue_index is None or event_index is None:
+        current_app.logger.error("Failed to initialize embeddings")
+    else:
+        current_app.logger.debug("Embeddings initialized successfully")
 
 
 
@@ -4492,21 +4529,21 @@ def generate_comments_for_all_items(content_type='post', chains_per_item=1, item
 
         for _ in range(chains_per_item):
             num_levels = random.randint(2, 5)
-            num_comments = random.randint(2, 4)
+            num_comments = random.randint(7, 10)
 
             # Ensure the number of commenters is at most the number of comments
-            max_commenters = min(num_comments-1, 4)  # We keep the upper limit of 4 from the original code
+            max_commenters = min(num_comments-1, 9)  # We keep the upper limit of 4 from the original code
             num_commenters = random.randint(1, max_commenters)
 
             commenters = select_random_commenters(num_commenters, num_commenters, item, content_type)
 
             current_app.logger.debug(f"Generated {num_comments} comments with {num_commenters} commenters across {num_levels} levels")
             
-            chain_prompt = construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type)
+            chain_prompt, scraper_results = construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type)
             
             try:
                 generated_chain = generate_comment_chain(chain_prompt)
-                save_comment_chain_to_database(generated_chain, item, content_type)
+                save_comment_chain_to_database(generated_chain, item, content_type, scraper_results)
                 results.append(f"Generated and posted comment chain successfully for {content_type} {item.id}")
             except Exception as e:
                 current_app.logger.error(f"Error generating comment chain: {str(e)}")
@@ -4638,7 +4675,7 @@ def construct_additional_info(venues, scraper_results):
         }
         
         
-        #additional_info["local_venues"].append(venue_info)
+        additional_info["seed_info"].append(venue_info)
     
     # Add scraper results info
     for source, result in scraper_results.items():
@@ -4669,33 +4706,31 @@ def construct_additional_info(venues, scraper_results):
 def construct_chain_prompt(item, num_levels, num_comments, category, commenters, content_type):
     # Get the five-second moment if it exists
     five_second_moment = item.five_second_moment if hasattr(item, 'five_second_moment') else None
-    
+
     # Fetch 3 random ScraperResult objects with the specified content category
     random_scraper_results = ScraperResult.query.filter(
         ScraperResult.categories.any(ContentCategory.id == category.id)
     ).order_by(func.random()).limit(2).all()
-    
+
     # Create a dictionary of scraper_results using the ScraperResult's ID as the key
     scraper_results = {result.id: result for result in random_scraper_results}
-
     current_app.logger.debug(f"Fetched {len(scraper_results)} random ScraperResult objects for category {category.name}")
-    
+
     # Initialize venues list
     venues = []
-    
+
     # Check if the Vault has an associated Venue
     if item.venue:
         venues.append(item.venue)
-    
+
     # Get a random venue if we don't have one from the Vault
-   
+
     random_venue = Venue.query.filter(
         Venue.categories.any(id=category.id)
         ).options(joinedload(Venue.reviews)).order_by(func.random()).first()
     if random_venue:
         venues.append(random_venue)
     
-    current_app.logger.debug(f"Venues: {', '.join([str(v.id) for v in venues])}")
     
     # Construct the additional info string using our updated function
     additional_info_str = construct_additional_info(venues, scraper_results)
@@ -4744,9 +4779,9 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     7. Reference this local seed information where relevant: [{additional_info_str}]
 
     Format:
-    -[Comment] By: [Author]
-    --[Reply] By: [Different Author]
-    ---[Reply] By: [Another Author]
+    -[Comment] By: Full name (alias)
+    --[Reply] By: Different Full Name (different_alias)
+    ---[Reply] By: Another full name (another_alias)
     (Continue this pattern for all {num_comments} comments)
 
     Ensure a realistic conversation that casually touches on local Miami experiences and the discussion topic.
@@ -4755,7 +4790,7 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     current_app.logger.debug(f"Prompt constructed: {len(prompt)} characters")
     current_app.logger.debug(f"FULL PROMPT: {prompt}")
 
-    return prompt
+    return prompt, scraper_results
 
 
 
@@ -4788,10 +4823,22 @@ def generate_comment_chain(prompt):
         current_app.logger.error(f"Error in GPT-4 API call: {str(e)}")
         raise
 
-def save_comment_chain_to_database(chain, item, content_type):
+def save_comment_chain_to_database(chain, item, content_type, scraper_results):
     try:
+        # Create a text representation of scraper results
+        scraper_info = "\n\n".join([
+            f"Title: {result.title}\n"
+            f"Content: {result.text}\n"
+            f"Date: {result.event_date}" if result.event_date else f"Title: {result.title}\nContent: {result.text}\n"
+            for result in scraper_results.values()
+        ])
+
+
+        # Prepend scraper_info to the comment chain
+        full_content = f"\n{scraper_info}\n\n{chain}"
+
         new_comment = Comment(
-            content=chain,
+            content=full_content,
             user_id=item.user_id if content_type == 'post' else None,
             official_seeder_id=item.seeder_id if content_type == 'vault' else None,
             post_id=item.id if content_type == 'post' else None,
@@ -4801,6 +4848,9 @@ def save_comment_chain_to_database(chain, item, content_type):
         )
         db.session.add(new_comment)
         db.session.commit()
+
+        current_app.logger.debug(f"Saved comment chain with scraper results for {content_type} {item.id}")
+
     except SQLAlchemyError as e:
         db.session.rollback()
         current_app.logger.error(f"Database error when adding comment chain: {str(e)}")
@@ -7122,7 +7172,7 @@ from flask import current_app
 
 
 def summarize_text(text):
-    custom_prompt = "Your job is a summarizer. Summarize the piece of text given to you in one paragraph"
+    custom_prompt = "Your job is a summarizer. Summarize the piece of text given to you in one concise sentences"
     
     try:
         response = client.chat.completions.create(
@@ -7804,28 +7854,6 @@ def admin_scrape():
 
 
 
-# Initialize SentenceTransformer model
-# Initialize SentenceTransformer model
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
-# Initialize FAISS index
-embedding_size = 384  # Depends on the model you're using
-# Initialize FAISS indexes
-venue_index = None
-event_index = None
-venue_ids = None
-event_ids = None
-embeddings_initialized = False
-
-
-@app.before_request
-def ensure_embeddings_initialized():
-    global embeddings_initialized
-    if not embeddings_initialized:
-        initialize_embeddings()
-        embeddings_initialized = True
-
-
 def generate_and_save_venue_embeddings(index_file='venue_index.faiss', id_file='venue_ids.pkl'):
     venues = Venue.query.all()
     embeddings = []
@@ -7833,36 +7861,30 @@ def generate_and_save_venue_embeddings(index_file='venue_index.faiss', id_file='
     
     for venue in venues:
         venue_text = f"""
-        Title: {venue.title}
-        Category: {venue.category_name}
-        Neighborhood: {venue.neighborhood}
-        Address: {venue.street}, {venue.city}, {venue.postal_code}
-        Description: {venue.description}
+        Menu: {venue.menu_text or ''}
+        Review: {venue.review_text or ''}
+        Description: {venue.description or ''}
         """
         
-        if venue.menu:
-            try:
-                menu_text = json.dumps(venue.menu)
-                venue_text += f"\nMenu: {menu_text}"
-            except:
-                pass
+        # Only generate embedding if there's some non-empty content
+        if venue_text.strip():
+            embedding = model.encode(venue_text)
+            embeddings.append(embedding)
+            ids.append(venue.id)
+    
+    if embeddings:
+        index = faiss.IndexFlatL2(embedding_size)
+        index.add(np.array(embeddings))
         
-        # Handle potential None values in review texts
-        review_texts = ' '.join([review.text or '' for review in venue.reviews])
-        combined_text = f"{venue_text}\nReviews: {review_texts}"
+        faiss.write_index(index, index_file)
+        with open(id_file, 'wb') as f:
+            pickle.dump(ids, f)
         
-        embedding = model.encode(combined_text)
-        embeddings.append(embedding)
-        ids.append(venue.id)
-    
-    index = faiss.IndexFlatL2(embedding_size)
-    index.add(np.array(embeddings))
-    
-    faiss.write_index(index, index_file)
-    with open(id_file, 'wb') as f:
-        pickle.dump(ids, f)
-    
-    return index, ids
+        current_app.logger.debug(f"Generated and saved embeddings for {len(embeddings)} venues")
+        return index, ids
+    else:
+        current_app.logger.warning("No valid venue data to generate embeddings")
+        return None, None
 
 def generate_and_save_event_embeddings(index_file='event_index.faiss', id_file='event_ids.pkl'):
     events = ScraperResult.query.all()
@@ -7870,28 +7892,44 @@ def generate_and_save_event_embeddings(index_file='event_index.faiss', id_file='
     ids = []
     
     for event in events:
-        embedding = model.encode(event.text)
-        embeddings.append(embedding)
-        ids.append(event.id)
+        event_text = f"""
+        Title: {event.title or ''}
+        Description: {event.text or ''}
+        """
+        
+        # Only generate embedding if there's some non-empty content
+        if event_text.strip():
+            embedding = model.encode(event_text)
+            embeddings.append(embedding)
+            ids.append(event.id)
     
-    index = faiss.IndexFlatL2(embedding_size)
-    index.add(np.array(embeddings))
-    
-    faiss.write_index(index, index_file)
-    with open(id_file, 'wb') as f:
-        pickle.dump(ids, f)
-    
-    return index, ids
-
-
+    if embeddings:
+        index = faiss.IndexFlatL2(embedding_size)
+        index.add(np.array(embeddings))
+        
+        faiss.write_index(index, index_file)
+        with open(id_file, 'wb') as f:
+            pickle.dump(ids, f)
+        
+        current_app.logger.debug(f"Generated and saved embeddings for {len(embeddings)} events")
+        return index, ids
+    else:
+        current_app.logger.warning("No valid event data to generate embeddings")
+        return None, None
 
 def load_embeddings(index_file, id_file):
     if os.path.exists(index_file) and os.path.exists(id_file):
-        index = faiss.read_index(index_file)
-        with open(id_file, 'rb') as f:
-            ids = pickle.load(f)
-        return index, ids
+        try:
+            index = faiss.read_index(index_file)
+            with open(id_file, 'rb') as f:
+                ids = pickle.load(f)
+            current_app.logger.debug(f"Loaded embeddings from {index_file} and {id_file}")
+            return index, ids
+        except Exception as e:
+            current_app.logger.error(f"Error loading embeddings: {str(e)}")
+            return None, None
     else:
+        current_app.logger.warning(f"Embedding files not found: {index_file} or {id_file}")
         return None, None
 
 
@@ -8017,16 +8055,7 @@ def admin_generate_comment():
 
 
 
-def initialize_embeddings():
-    with app.app_context():
-        global venue_index, venue_ids, event_index, event_ids
-        venue_index, venue_ids = load_embeddings('venue_index.faiss', 'venue_ids.pkl')
-        if venue_index is None:
-            venue_index, venue_ids = generate_and_save_venue_embeddings()
 
-        event_index, event_ids = load_embeddings('event_index.faiss', 'event_ids.pkl')
-        if event_index is None:
-            event_index, event_ids = generate_and_save_event_embeddings()
 
 
 
