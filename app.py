@@ -1048,6 +1048,18 @@ class Meme(db.Model):
     text_styles = db.Column(ARRAY(JSON), nullable=False)
 
 
+class Bot(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    profile_picture = db.Column(db.String(255), nullable=True)
+    prompt = db.Column(db.Text, nullable=False)
+    faiss_file = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f'<Bot {self.name}>'
+
+
 industry_images = {
     1: '/images/education.png',
     2: '/images/construction.png',
@@ -4761,36 +4773,35 @@ def construct_chain_prompt(item, num_levels, num_comments, category, commenters,
     #1. First comment: {first_comment_prompt}, and must be made by anyone other than {original_seeder.full_name} (OP)
 
     prompt = f"""Generate a single, realistic comment chain for a Miami-based instagram post.
+Original post:
+Title: {item.title}
+Content: {item.content}
+Create a conversation with {num_comments} comments in a single chain. Use these characters:
+{commenter_info_str}
+Guidelines:
+1. The first comment must be made by anyone other than {original_seeder.full_name} (OP)
+2. The first comment must {first_comment_prompt} in response to the original post
+3. Subsequent comments: Direct replies to the previous comment.
+4. Reflect each character's unique writing style.
+5. Incorporate natural disagreement where appropriate.
+6. Keep comments under 30 words
+7. Optionally reference the provided local information, but do so vaguely without mentioning specific names. Use it to inform the conversation naturally if relevant: [{additional_info_str}]
+Format:
+-[Comment] By: Full name (alias)
+--[Reply] By: Different Full Name (different_alias)
+---[Reply] By: Another full name (another_alias)
+(Continue this pattern for all {num_comments} comments)
 
-    Original post:
-    Title: {item.title}
-    Content: {item.content}
-
-    Create a conversation with {num_comments} comments in a single chain. Use these characters:
-    {commenter_info_str}
-
-    Guidelines:
-    1. The first comment must be made by anyone other than {original_seeder.full_name} (OP)
-    2. The first comment must {first_comment_prompt} in response to the original post
-    3. Subsequent comments: Direct replies to the previous comment.
-    4. Reflect each character's unique writing style.
-    5. Incorporate natural disagreement where appropriate.
-    6. Keep comments under 30 words
-    7. Reference this local seed information where relevant: [{additional_info_str}]
-
-    Format:
-    -[Comment] By: Full name (alias)
-    --[Reply] By: Different Full Name (different_alias)
-    ---[Reply] By: Another full name (another_alias)
-    (Continue this pattern for all {num_comments} comments)
-
-    Ensure a realistic conversation that casually touches on local Miami experiences and the discussion topic.
+Ensure a realistic conversation that casually touches on Miami experiences and the discussion topic, leaving room for specific details to be added later.
     """
 
     current_app.logger.debug(f"Prompt constructed: {len(prompt)} characters")
     current_app.logger.debug(f"FULL PROMPT: {prompt}")
 
     return prompt, scraper_results
+
+
+
 
 
 
@@ -5278,7 +5289,7 @@ def generate_story_with_anthropic(five_sec_moment, category, seeder_info, schedu
         4. {content_instruction}
         5. End with a question asking for local Miami recommendations.
 
-        Title: Create a controversial question combining the five-second moment with a Miami stereotype.
+        Title: Create a 70 character, controversial title that is personal and encapsulates the story
 
         Wrap the story in <story> tags. <think>
     """
@@ -5326,15 +5337,13 @@ def discussion_question_generator(text, category):
     
     
     prompt = (
-    f"Generate a controversial, one-sentence {chosen_emotion} based on this text:\n\n"
-    f"{text}\n\n"
-    f"Guidelines:\n"
-    f"- Make it specific to Miami and {category}\n"
-    f"- Use direct, everyday language\n"
-    f"- Aim to provoke strong opinions\n"
-    f"- Keep it under 75 characters\n"
-    f"Wrap your response in <question> tags <think>"
-    )   
+    f"Generate a one-sentence discussion question about {category} in Miami. "
+    f"Focus on controversial issues that result in practical information or opinions being gatherered"
+    f"Use clear, everyday language. Keep it under 75 characters."
+    f"\n\nBased on this text:\n{text}\n"
+    f"\nUse specifics wherever you can"
+    f"\nWrap your response in <question> tags"
+    )  
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20240620",
@@ -7208,194 +7217,146 @@ def run_scraper():
 
         new_results = 0
         skipped_results = 0
+        error_count = 0
         
         for url in urls:
             current_app.logger.debug(f"Processing URL {url.url} Categories: {url.categories}")
 
-            if url.url == "https://www.JobTrigger.com":
-                run_input = {
-                    "contractType": "F",
-                    "experienceLevel": "3",
-                    "location": "Miami",
-                    "proxy": {
-                        "useApifyProxy": True,
-                        "apifyProxyGroups": ["RESIDENTIAL"]
-                    },
-                    "publishedAt": "r604800",
-                    "rows": url.max_results,
-                    "workType": "1",
-                    "title": ""
-                }
-                
-                run = client.actor("bebity/linkedin-jobs-scraper").call(run_input=run_input)
-                
-                unique_companies = {}
-                
-                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                    company_name = item.get('companyName', '')
-                    if company_name not in unique_companies:
-                        unique_companies[company_name] = item
-                
-                for company_name, item in unique_companies.items():
-                    existing_result = ScraperResult.query.filter_by(url=item.get('jobUrl', '')).first()
-                    
-                    if not existing_result:
-                        original_text = f"Company: {company_name}\n" \
-                                        f"Location: {item.get('location', '')}\n" \
-                                        f"Posted: {item.get('postedTime', '')}\n" \
-                                        f"Contract Type: {item.get('contractType', '')}\n" \
-                                        f"Experience Level: {item.get('experienceLevel', '')}\n" \
-                                        f"Description: {item.get('description', '')}"
-                        summarized_text = summarize_text(original_text)
-                        
-                        scraper_result = ScraperResult(
-                            url=item.get('jobUrl', ''),
-                            title=item.get('title', ''),
-                            text=summarized_text,
-                            categories=url.categories,
-                            source='Regular'
-                        )
-                        db.session.add(scraper_result)
-                        try:
-                            db.session.commit()
-                            new_results += 1
-                            current_app.logger.debug(f"Added new LinkedIn job result for company: {company_name}")
-                        except IntegrityError:
-                            db.session.rollback()
-                            skipped_results += 1
-                            current_app.logger.warning(f"IntegrityError for LinkedIn job URL: {item.get('jobUrl', '')}")
-                    else:
-                        skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing LinkedIn job result for company: {company_name}")
+            try:
 
-            elif url.scraper_type == 'Puppeteer':
-                run_input = {
-                    "startUrls": [{"url": url.url}],
-                    "maxCrawlingDepth": 2,
-                    "linkSelector": url.link_selector,
-                    "pageFunction": url.page_function,
-                    "maxResultsPerCrawl": url.max_results
-                }
-                
-                run = client.actor("apify/puppeteer-scraper").call(run_input=run_input)
-                
-                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                    current_app.logger.debug(f"Processing Puppeteer item: {item.get('url', '')}")
-                    existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                if url.url == "https://www.JobTrigger.com":
+                    run_input = {
+                        "contractType": "F",
+                        "experienceLevel": "3",
+                        "location": "Miami",
+                        "proxy": {
+                            "useApifyProxy": True,
+                            "apifyProxyGroups": ["RESIDENTIAL"]
+                        },
+                        "publishedAt": "r604800",
+                        "rows": url.max_results,
+                        "workType": "1",
+                        "title": ""
+                    }
                     
-                    if not existing_result:
-                        original_text = item.get('content', '')
-                        summarized_text = summarize_text(original_text)
+                    run = client.actor("bebity/linkedin-jobs-scraper").call(run_input=run_input)
+                    
+                    unique_companies = {}
+                    
+                    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                        company_name = item.get('companyName', '')
+                        if company_name not in unique_companies:
+                            unique_companies[company_name] = item
+                    
+                    for company_name, item in unique_companies.items():
+                        existing_result = ScraperResult.query.filter_by(url=item.get('jobUrl', '')).first()
                         
-                        scraper_result = ScraperResult(
-                            url=item.get('url', ''),
-                            title=item.get('title', ''),
-                            text=summarized_text,
-                            categories=url.categories
-                        )
-                        db.session.add(scraper_result)
-                        try:
-                            db.session.commit()
-                            new_results += 1
-                            current_app.logger.debug(f"Added new Puppeteer result: {item.get('url', '')}")
-                        except IntegrityError:
-                            db.session.rollback()
-                            skipped_results += 1
-                            current_app.logger.warning(f"IntegrityError for Puppeteer URL: {item.get('url', '')}")
-                    else:
-                        skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing Puppeteer result: {item.get('url', '')}")
-
-            elif url.scraper_type == 'Instagram':
-                run_input = {
-                    "username": [url.url],
-                    "resultsLimit": url.max_results,
-                    "onlyPostsNewerThan": (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
-                }
-                run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
-                
-                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                    existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
-                    
-                    if not existing_result:
-                        original_text = f"Caption: {item.get('caption', '')}"
-                        summarized_text = summarize_text(original_text)
-                        
-                        scraper_result = ScraperResult(
-                            url=item.get('url', ''),
-                            title=f"Instagram post by {item.get('ownerUsername', '')}",
-                            text=summarized_text,
-                            categories=url.categories,
-                            source='Instagram'
-                        )
-                        db.session.add(scraper_result)
-                        try:
-                            db.session.commit()
-                            new_results += 1
-                        except IntegrityError:
-                            db.session.rollback()
-                            skipped_results += 1
-                    else:
-                        skipped_results += 1
-
-            elif url.scraper_type == 'Groupon':
-                content_data = scrape_groupon(url.url)
-                
-                for item in content_data:
-                    existing_result = ScraperResult.query.filter_by(url=item['url']).first()
-                    
-                    if not existing_result:
-                        original_text = item['description']
-                        summarized_text = summarize_text(original_text)
-                        
-                        scraper_result = ScraperResult(
-                            url=item['url'],
-                            title=item['title'],
-                            text=summarized_text,
-                            categories=url.categories,
-                            source='Groupon',
-                            price=item['price']
-                        )
-                        db.session.add(scraper_result)
-                        try:
-                            db.session.commit()
-                            new_results += 1
-                            current_app.logger.debug(f"Added new Groupon result: {item['url']}")
-                        except IntegrityError:
-                            db.session.rollback()
-                            skipped_results += 1
-                            current_app.logger.warning(f"IntegrityError for Groupon URL: {item['url']}")
-                    else:
-                        skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing Groupon result: {item['url']}")
-
-            elif url.scraper_type == 'Eventbrite':
-                content_data = scrape_eventbrite(url.url)
-                
-                for item in content_data:
-                    existing_result = ScraperResult.query.filter_by(url=item['url']).first()
-                    
-                    if not existing_result:
-                        is_valid_date = True
-                        if item.get('event_date'):
-                            today = datetime.now().date()
+                        if not existing_result:
+                            original_text = f"Company: {company_name}\n" \
+                                            f"Location: {item.get('location', '')}\n" \
+                                            f"Posted: {item.get('postedTime', '')}\n" \
+                                            f"Contract Type: {item.get('contractType', '')}\n" \
+                                            f"Experience Level: {item.get('experienceLevel', '')}\n" \
+                                            f"Description: {item.get('description', '')}"
+                            summarized_text = summarize_text(original_text)
                             
-                            if isinstance(item['event_date'], str):
-                                try:
-                                    event_date = datetime.strptime(item['event_date'], '%Y-%m-%d').date()
-                                except ValueError:
-                                    current_app.logger.warning(f"Invalid date format for Eventbrite event: {item['url']}")
-                                    continue
-                            elif isinstance(item['event_date'], datetime):
-                                event_date = item['event_date'].date()
-                            else:
-                                event_date = item['event_date']
-                            
-                            week_before = today - timedelta(days=7)
-                            week_after = today + timedelta(days=7)
-                            is_valid_date = week_before <= event_date <= week_after
+                            scraper_result = ScraperResult(
+                                url=item.get('jobUrl', ''),
+                                title=item.get('title', ''),
+                                text=summarized_text,
+                                categories=url.categories,
+                                source='Regular'
+                            )
+                            db.session.add(scraper_result)
+                            try:
+                                db.session.commit()
+                                new_results += 1
+                                current_app.logger.debug(f"Added new LinkedIn job result for company: {company_name}")
+                            except IntegrityError:
+                                db.session.rollback()
+                                skipped_results += 1
+                                current_app.logger.warning(f"IntegrityError for LinkedIn job URL: {item.get('jobUrl', '')}")
+                        else:
+                            skipped_results += 1
+                            current_app.logger.debug(f"Skipped existing LinkedIn job result for company: {company_name}")
+
+                elif url.scraper_type == 'Puppeteer':
+                    run_input = {
+                        "startUrls": [{"url": url.url}],
+                        "maxCrawlingDepth": 2,
+                        "linkSelector": url.link_selector,
+                        "pageFunction": url.page_function,
+                        "maxResultsPerCrawl": url.max_results
+                    }
+                    
+                    run = client.actor("apify/puppeteer-scraper").call(run_input=run_input)
+                    
+                    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                        current_app.logger.debug(f"Processing Puppeteer item: {item.get('url', '')}")
+                        existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                         
-                        if is_valid_date:
+                        if not existing_result:
+                            original_text = item.get('content', '')
+                            summarized_text = summarize_text(original_text)
+                            
+                            scraper_result = ScraperResult(
+                                url=item.get('url', ''),
+                                title=item.get('title', ''),
+                                text=summarized_text,
+                                categories=url.categories
+                            )
+                            db.session.add(scraper_result)
+                            try:
+                                db.session.commit()
+                                new_results += 1
+                                current_app.logger.debug(f"Added new Puppeteer result: {item.get('url', '')}")
+                            except IntegrityError:
+                                db.session.rollback()
+                                skipped_results += 1
+                                current_app.logger.warning(f"IntegrityError for Puppeteer URL: {item.get('url', '')}")
+                        else:
+                            skipped_results += 1
+                            current_app.logger.debug(f"Skipped existing Puppeteer result: {item.get('url', '')}")
+
+                elif url.scraper_type == 'Instagram':
+                    run_input = {
+                        "username": [url.url],
+                        "resultsLimit": url.max_results,
+                        "onlyPostsNewerThan": (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+                    }
+                    run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
+                    
+                    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                        existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                        
+                        if not existing_result:
+                            original_text = f"Caption: {item.get('caption', '')}"
+                            summarized_text = summarize_text(original_text)
+                            
+                            scraper_result = ScraperResult(
+                                url=item.get('url', ''),
+                                title=f"Instagram post by {item.get('ownerUsername', '')}",
+                                text=summarized_text,
+                                categories=url.categories,
+                                source='Instagram'
+                            )
+                            db.session.add(scraper_result)
+                            try:
+                                db.session.commit()
+                                new_results += 1
+                            except IntegrityError:
+                                db.session.rollback()
+                                skipped_results += 1
+                        else:
+                            skipped_results += 1
+
+                elif url.scraper_type == 'Groupon':
+                    content_data = scrape_groupon(url.url)
+                    
+                    for item in content_data:
+                        existing_result = ScraperResult.query.filter_by(url=item['url']).first()
+                        
+                        if not existing_result:
                             original_text = item['description']
                             summarized_text = summarize_text(original_text)
                             
@@ -7404,91 +7365,147 @@ def run_scraper():
                                 title=item['title'],
                                 text=summarized_text,
                                 categories=url.categories,
-                                source='Eventbrite',
-                                event_date=event_date if 'event_date' in locals() else None
+                                source='Groupon',
+                                price=item['price']
                             )
                             db.session.add(scraper_result)
                             try:
                                 db.session.commit()
                                 new_results += 1
-                                current_app.logger.debug(f"Added new Eventbrite result: {item['url']}")
+                                current_app.logger.debug(f"Added new Groupon result: {item['url']}")
                             except IntegrityError:
                                 db.session.rollback()
                                 skipped_results += 1
-                                current_app.logger.warning(f"IntegrityError for Eventbrite URL: {item['url']}")
+                                current_app.logger.warning(f"IntegrityError for Groupon URL: {item['url']}")
                         else:
                             skipped_results += 1
-                            current_app.logger.debug(f"Skipped Eventbrite result due to invalid date: {item['url']}")
-                    else:
-                        skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing Eventbrite result: {item['url']}")
+                            current_app.logger.debug(f"Skipped existing Groupon result: {item['url']}")
 
-            elif url.scraper_type == 'Timeout':
-                content_data = scrape_timeout(url.url)
-                
-                for item in content_data:
-                    existing_result = ScraperResult.query.filter_by(url=url.url, title=item['title']).first()
+                elif url.scraper_type == 'Eventbrite':
+                    content_data = scrape_eventbrite(url.url)
                     
-                    if not existing_result:
-                        original_text = item['summary']
-                        summarized_text = summarize_text(original_text)
+                    for item in content_data:
+                        existing_result = ScraperResult.query.filter_by(url=item['url']).first()
                         
-                        scraper_result = ScraperResult(
-                            url=url.url,
-                            title=item['title'],
-                            text=summarized_text,
-                            categories=url.categories,
-                            source='Timeout'
-                        )
-                        db.session.add(scraper_result)
-                        try:
-                            db.session.commit()
-                            new_results += 1
-                            current_app.logger.debug(f"Added new Timeout result: {item['title']}")
-                        except IntegrityError:
-                            db.session.rollback()
+                        if not existing_result:
+                            is_valid_date = True
+                            if item.get('event_date'):
+                                today = datetime.now().date()
+                                
+                                if isinstance(item['event_date'], str):
+                                    try:
+                                        event_date = datetime.strptime(item['event_date'], '%Y-%m-%d').date()
+                                    except ValueError:
+                                        current_app.logger.warning(f"Invalid date format for Eventbrite event: {item['url']}")
+                                        continue
+                                elif isinstance(item['event_date'], datetime):
+                                    event_date = item['event_date'].date()
+                                else:
+                                    event_date = item['event_date']
+                                
+                                week_before = today - timedelta(days=7)
+                                week_after = today + timedelta(days=7)
+                                is_valid_date = week_before <= event_date <= week_after
+                            
+                            if is_valid_date:
+                                original_text = item['description']
+                                summarized_text = summarize_text(original_text)
+                                
+                                scraper_result = ScraperResult(
+                                    url=item['url'],
+                                    title=item['title'],
+                                    text=summarized_text,
+                                    categories=url.categories,
+                                    source='Eventbrite',
+                                    event_date=event_date if 'event_date' in locals() else None
+                                )
+                                db.session.add(scraper_result)
+                                try:
+                                    db.session.commit()
+                                    new_results += 1
+                                    current_app.logger.debug(f"Added new Eventbrite result: {item['url']}")
+                                except IntegrityError:
+                                    db.session.rollback()
+                                    skipped_results += 1
+                                    current_app.logger.warning(f"IntegrityError for Eventbrite URL: {item['url']}")
+                            else:
+                                skipped_results += 1
+                                current_app.logger.debug(f"Skipped Eventbrite result due to invalid date: {item['url']}")
+                        else:
                             skipped_results += 1
-                            current_app.logger.warning(f"IntegrityError for Timeout event: {item['title']}")
-                    else:
-                        skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing Timeout result: {item['title']}")
+                            current_app.logger.debug(f"Skipped existing Eventbrite result: {item['url']}")
 
-            else:
-                run_input = {
-                    "startUrls": [{"url": url.url}],
-                    "maxCrawlDepth": 1,
-                    "maxResults": url.max_results
-                }
-                
-                run = client.actor("apify/website-content-crawler").call(run_input=run_input)
-                
-                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                    current_app.logger.debug(f"Processing item: {item.get('url', '')}")
-                    existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                elif url.scraper_type == 'Timeout':
+                    content_data = scrape_timeout(url.url)
                     
-                    if not existing_result:
-                        original_text = item.get('text', '')
-                        summarized_text = summarize_text(original_text)
+                    for item in content_data:
+                        existing_result = ScraperResult.query.filter_by(url=url.url, title=item['title']).first()
                         
-                        scraper_result = ScraperResult(
-                            url=item.get('url', ''),
-                            title=item.get('title', ''),
-                            text=summarized_text,
-                            categories=url.categories,
-                            source='Regular'
-                        )
-                        db.session.add(scraper_result)
-                        try:
-                            db.session.commit()
-                            new_results += 1
-                            current_app.logger.debug(f"Added new result: {item.get('url', '')}")
-                        except IntegrityError:
-                            db.session.rollback()
+                        if not existing_result:
+                            original_text = item['summary']
+                            summarized_text = summarize_text(original_text)
+                            
+                            scraper_result = ScraperResult(
+                                url=url.url,
+                                title=item['title'],
+                                text=summarized_text,
+                                categories=url.categories,
+                                source='Timeout'
+                            )
+                            db.session.add(scraper_result)
+                            try:
+                                db.session.commit()
+                                new_results += 1
+                                current_app.logger.debug(f"Added new Timeout result: {item['title']}")
+                            except IntegrityError:
+                                db.session.rollback()
+                                skipped_results += 1
+                                current_app.logger.warning(f"IntegrityError for Timeout event: {item['title']}")
+                        else:
                             skipped_results += 1
-                            current_app.logger.warning(f"IntegrityError for URL: {item.get('url', '')}")
-                    else:
-                        skipped_results += 1
-                        current_app.logger.debug(f"Skipped existing result: {item.get('url', '')}")
+                            current_app.logger.debug(f"Skipped existing Timeout result: {item['title']}")
+
+                else:
+                    run_input = {
+                        "startUrls": [{"url": url.url}],
+                        "maxCrawlDepth": 1,
+                        "maxResults": url.max_results
+                    }
+                    
+                    run = client.actor("apify/website-content-crawler").call(run_input=run_input)
+                    
+                    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                        current_app.logger.debug(f"Processing item: {item.get('url', '')}")
+                        existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
+                        
+                        if not existing_result:
+                            original_text = item.get('text', '')
+                            summarized_text = summarize_text(original_text)
+                            
+                            scraper_result = ScraperResult(
+                                url=item.get('url', ''),
+                                title=item.get('title', ''),
+                                text=summarized_text,
+                                categories=url.categories,
+                                source='Regular'
+                            )
+                            db.session.add(scraper_result)
+                            try:
+                                db.session.commit()
+                                new_results += 1
+                                current_app.logger.debug(f"Added new result: {item.get('url', '')}")
+                            except IntegrityError:
+                                db.session.rollback()
+                                skipped_results += 1
+                                current_app.logger.warning(f"IntegrityError for URL: {item.get('url', '')}")
+                        else:
+                            skipped_results += 1
+                            current_app.logger.debug(f"Skipped existing result: {item.get('url', '')}")
+
+            except Exception as e:
+                error_count += 1
+                current_app.logger.error(f"Error processing URL {url.url}: {str(e)}")
+                continue  # Skip to the next URL
         current_app.logger.info(f"Scraper completed. New results: {new_results}, Skipped: {skipped_results}")
         flash(f"Scraper completed for {', '.join(selected_categories)}. {new_results} new results saved. {skipped_results} existing results skipped.", "success")
     
@@ -8738,6 +8755,284 @@ def edit_meme(meme_id):
         return redirect(url_for('manage_memes'))
     
     return render_template('edit_meme.html', meme=meme)
+
+
+#BOT SHID
+
+
+
+FAISS_UPLOAD_FOLDER = 'C:\\flasker\\faiss'  # Define the path where you want to store .faiss files
+
+@app.route('/bots')
+def list_bots():
+    bots = Bot.query.all()
+    current_app.logger.debug(f"Fetched {len(bots)} bots from the database")
+    return render_template('bots/list.html', bots=bots)
+
+@app.route('/bots/create', methods=['GET', 'POST'])
+def create_bot():
+    if request.method == 'POST':
+        name = request.form['name']
+        description = request.form['description']
+        profile_picture = request.form['profile_picture']
+        prompt = request.form['prompt']
+        
+        faiss_file = request.files.get('faiss_file')
+        faiss_filename = None
+        if faiss_file and faiss_file.filename.endswith('.faiss'):
+            faiss_filename = secure_filename(f"{name}_{faiss_file.filename}")
+            faiss_file.save(os.path.join(FAISS_UPLOAD_FOLDER, faiss_filename))
+        
+        new_bot = Bot(name=name, description=description, profile_picture=profile_picture, prompt=prompt, faiss_file=faiss_filename)
+        db.session.add(new_bot)
+        db.session.commit()
+        current_app.logger.debug(f"Created new bot: {new_bot}")
+        return redirect(url_for('list_bots'))
+    
+    return render_template('bots/create.html')
+
+@app.route('/bots/edit/<int:id>', methods=['GET', 'POST'])
+def edit_bot(id):
+    bot = Bot.query.get_or_404(id)
+    if request.method == 'POST':
+        bot.name = request.form['name']
+        bot.description = request.form['description']
+        bot.profile_picture = request.form['profile_picture']
+        bot.prompt = request.form['prompt']
+        
+        faiss_file = request.files.get('faiss_file')
+        if faiss_file and faiss_file.filename.endswith('.faiss'):
+            if bot.faiss_file:
+                old_faiss_path = os.path.join(FAISS_UPLOAD_FOLDER, bot.faiss_file)
+                if os.path.exists(old_faiss_path):
+                    os.remove(old_faiss_path)
+            
+            faiss_filename = secure_filename(f"{bot.name}_{faiss_file.filename}")
+            faiss_file.save(os.path.join(FAISS_UPLOAD_FOLDER, faiss_filename))
+            bot.faiss_file = faiss_filename
+        
+        db.session.commit()
+        current_app.logger.debug(f"Updated bot: {bot}")
+        return redirect(url_for('list_bots'))
+    
+    return render_template('bots/edit.html', bot=bot)
+
+@app.route('/bots/delete/<int:id>')
+def delete_bot(id):
+    bot = Bot.query.get_or_404(id)
+    if bot.faiss_file:
+        faiss_path = os.path.join(FAISS_UPLOAD_FOLDER, bot.faiss_file)
+        if os.path.exists(faiss_path):
+            os.remove(faiss_path)
+    db.session.delete(bot)
+    db.session.commit()
+    current_app.logger.debug(f"Deleted bot: {bot}")
+    return redirect(url_for('list_bots'))
+
+
+@app.route('/bot-prompter')
+def bot_prompter():
+    bots = Bot.query.all()
+    return render_template('bots/bot_prompter.html', bots=bots)
+
+MAX_CONTEXT_LENGTH = 2000  # Adjust this value as needed
+
+@app.route('/bot-prompter/<int:bot_id>', methods=['POST'])
+def bot_chat(bot_id):
+    bot = Bot.query.get_or_404(bot_id)
+    user_input = request.json.get('user_input')
+    current_app.logger.debug(f"Received user input: {user_input}")
+    
+    # Initialize or get the conversation history
+    conversation_key = f'conversation_history_{bot_id}'
+    conversation_history = session.get(conversation_key, [])
+    
+    # Add the new user message to the history
+    conversation_history.append({"role": "user", "content": user_input})
+    
+    # Prepare the messages for the API call
+    messages = [
+        {"role": "system", "content": bot.prompt},
+        {"role": "system", "content": "Here's the conversation history:"}
+    ]
+    
+    # Add conversation history, keeping track of total length
+    current_length = len(bot.prompt)
+    for message in reversed(conversation_history[:-1]):  # Exclude the latest user message
+        message_length = len(message['content'])
+        if current_length + message_length > MAX_CONTEXT_LENGTH:
+            break
+        messages.append(message)
+        current_length += message_length
+    
+    # Add a clear separator for the current request
+    messages.append({"role": "system", "content": "The user's current request is:"})
+    messages.append(conversation_history[-1])  # Add the latest user message
+    
+    # Load the FAISS index for this bot
+    if bot.faiss_file:
+        current_app.logger.debug(f"BOT DOES have FAISS FILE: {bot.faiss_file}")
+        current_app.logger.debug(f"Current working directory: {os.getcwd()}")
+        faiss_path = os.path.join(FAISS_UPLOAD_FOLDER, bot.faiss_file)
+        mapping_filename = bot.faiss_file.replace('.faiss', '_mapping.json')
+        mapping_path = os.path.join(FAISS_UPLOAD_FOLDER, mapping_filename)
+        current_app.logger.debug(f"Constructed FAISS path: {faiss_path}")
+        current_app.logger.debug(f"Absolute FAISS path: {os.path.abspath(faiss_path)}")
+        current_app.logger.debug(f"Constructed mapping path: {mapping_path}")
+        current_app.logger.debug(f"Absolute mapping path: {os.path.abspath(mapping_path)}")
+        if os.path.exists(faiss_path):
+
+            current_app.logger.debug("OS PATH DOES EXIST")
+
+        if os.path.exists(mapping_path):
+            current_app.logger.debug("OS mapping DOES EXIST")
+        else:
+            current_app.logger.debug("OS mapping DOES NOT EXIST")
+
+        if os.path.exists(faiss_path) and os.path.exists(mapping_path):
+            current_app.logger.debug("OS PATH DOES EXIST and ID mapping found")
+            index = faiss.read_index(faiss_path)
+            current_app.logger.debug(f"FAISS index loaded, total vectors: {index.ntotal}")
+
+            with open(mapping_path, 'r') as f:
+                id_mapping = json.load(f)
+            current_app.logger.debug(f"ID mapping loaded, total mappings: {len(id_mapping)}")
+            
+            # Convert user input to embedding
+            user_embedding = model.encode([user_input])[0].astype('float32').reshape(1, -1)
+            current_app.logger.debug(f"User input embedded, shape: {user_embedding.shape}")
+            
+            # Perform the search
+            k = 5  # Number of top results to retrieve
+            distances, indices = index.search(user_embedding, k)
+            current_app.logger.debug(f"FAISS search completed. Distances: {distances}, Indices: {indices}")
+            
+            # Retrieve corresponding ScraperResult objects
+            relevant_results = []
+            for i, idx in enumerate(indices[0]):
+                try:
+                    # Convert numpy.int64 to standard Python int
+                    result_id = id_mapping[str(int(idx))]
+                    current_app.logger.debug(f"Mapped FAISS index {idx} to ScraperResult ID: {result_id}")
+                    result = ScraperResult.query.get(result_id)
+                    if result:
+                        relevant_results.append(f"Title: {result.title}\nText: {result.text}")
+                        current_app.logger.debug(f"Retrieved ScraperResult: ID {result.id}, Title: {result.title}")
+                    else:
+                        current_app.logger.warning(f"No ScraperResult found for ID: {result_id}")
+                except Exception as e:
+                    current_app.logger.error(f"Error retrieving ScraperResult for index {idx}: {str(e)}")
+            
+            # Add relevant results to the context
+            if relevant_results:
+                current_app.logger.debug(f"Retrieved {len(relevant_results)} relevant results")
+                context = "Here are some relevant pieces of information:\n\n" + "\n\n".join(relevant_results)
+                messages.append({"role": "system", "content": context})
+                debug_message = f"Bot {bot.name} responded to user input with FAISS-enhanced context.\n"
+                debug_message += "Relevant results:\n"
+                for i, result in enumerate(relevant_results, 1):
+                    debug_message += f"{i}. {result}...\n"  # Truncate each result for readability
+                
+                current_app.logger.debug(debug_message)
+            else:
+                current_app.logger.warning("No relevant results found from FAISS search")
+        else:
+            current_app.logger.error(f"OS PATH DOES NOT EXIST: {faiss_path}")
+            current_app.logger.debug(f"Directory contents of FAISS_FOLDER: {os.listdir(FAISS_UPLOAD_FOLDER)}")
+    else:
+        current_app.logger.debug("BOT DOES NOT HAVE FAISS FILE")
+            
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Adjust model as necessary
+            messages=messages
+        )
+        bot_response = response.choices[0].message.content.strip()
+        
+        # Add the bot's response to the conversation history
+        conversation_history.append({"role": "assistant", "content": bot_response})
+        
+        # Trim the conversation history if it exceeds the maximum length
+        while sum(len(m['content']) for m in conversation_history) > MAX_CONTEXT_LENGTH:
+            conversation_history.pop(0)
+        
+        # Save the updated conversation history in the session
+        session[conversation_key] = conversation_history
+
+
+        
+        current_app.logger.debug(f"Bot {bot.name} responded to user input with FAISS-enhanced context")
+        return jsonify({"response": bot_response})
+    except Exception as e:
+        current_app.logger.error(f"Error in bot chat: {str(e)}")
+        return jsonify({"error": "An error occurred while processing your request"}), 500
+
+@app.route('/bot-prompter/clear/<int:bot_id>', methods=['POST'])
+def clear_conversation(bot_id):
+    conversation_key = f'conversation_history_{bot_id}'
+    session.pop(conversation_key, None)
+    return jsonify({"message": "Conversation cleared"})
+
+
+
+#bot faiss generator
+
+FAISS_FOLDER = 'faiss/generated_files'  # Define the path where you want to store .faiss files
+
+@app.route('/faiss-generator', methods=['GET', 'POST'])
+def faiss_generator():
+    categories = ContentCategory.query.all()
+    
+    if request.method == 'POST':
+        selected_categories = request.form.getlist('categories')
+        current_app.logger.debug(f"Selected categories: {selected_categories}")
+        
+        # Fetch ScraperResults for selected categories
+        results = ScraperResult.query.filter(ScraperResult.categories.any(ContentCategory.id.in_(selected_categories))).all()
+        current_app.logger.debug(f"Retrieved {len(results)} ScraperResults")
+        
+        if not results:
+            flash('No results found for the selected categories.', 'warning')
+            return redirect(url_for('faiss_generator'))
+        
+        # Prepare texts for embedding and create ID mapping
+        texts = []
+        id_mapping = {}
+        for i, result in enumerate(results):
+            texts.append(f"{result.title} {result.text}")
+            id_mapping[i] = result.id
+        
+        current_app.logger.debug(f"Prepared {len(texts)} texts for embedding")
+        
+        # Generate embeddings
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        embeddings = model.encode(texts)
+        current_app.logger.debug(f"Generated embeddings with shape: {embeddings.shape}")
+        
+        # Create FAISS index
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dimension)
+        index.add(embeddings.astype('float32'))
+        current_app.logger.debug(f"Created FAISS index with {index.ntotal} vectors")
+        
+        # Save FAISS index
+        filename = f"faiss_index_{'-'.join(selected_categories)}.faiss"
+        faiss_path = os.path.join(FAISS_FOLDER, filename)
+        faiss.write_index(index, faiss_path)
+        current_app.logger.debug(f"Saved FAISS index to {faiss_path}")
+        
+        # Save ID mapping
+        mapping_filename = f"id_mapping_{'-'.join(selected_categories)}.json"
+        mapping_path = os.path.join(FAISS_FOLDER, mapping_filename)
+        with open(mapping_path, 'w') as f:
+            json.dump(id_mapping, f)
+        current_app.logger.debug(f"Saved ID mapping to {mapping_path}")
+        
+        flash(f'FAISS index generated and saved as {filename}', 'success')
+        return redirect(url_for('faiss_generator'))
+    
+    return render_template('faiss_generator.html', categories=categories)
+
 
 
 if __name__ == '__main__':

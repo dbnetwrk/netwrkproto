@@ -1,0 +1,29 @@
+{% extends "admin_panel_base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Bots</h1>
+    <a href="{{ url_for('create_bot') }}" class="btn btn-primary mb-3">Create New Bot</a>
+    <div class="row">
+        {% for bot in bots %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                {% if bot.profile_picture %}
+                <img src="{{ bot.profile_picture }}" class="card-img-top" alt="{{ bot.name }}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ bot.name }}</h5>
+                    <p class="card-text">{{ bot.description|truncate(100) }}</p>
+                    {% if bot.faiss_file %}
+                    <p class="card-text"><small class="text-muted">Has FAISS file: {{ bot.faiss_file }}</small></p>
+                    {% else %}
+                    <p class="card-text"><small class="text-muted">No FAISS file</small></p>
+                    {% endif %}
+                    <a href="{{ url_for('edit_bot', id=bot.id) }}" class="btn btn-warning">Edit</a>
+                    <a href="{{ url_for('delete_bot', id=bot.id) }}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this bot?')">Delete</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

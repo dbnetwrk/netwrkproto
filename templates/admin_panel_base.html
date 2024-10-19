@@ -63,6 +63,20 @@
                     <li><a class="dropdown-item" href="{{ url_for('manage_traits') }}">Trait Manager</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('pre_invites') }}">Invite List ({{ total_invites }})</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('manage_styles') }}">Style Manager</a></li>
+                    
+                </ul>
+            </li>
+
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="botsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Bots
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('list_bots') }}">Bot Manager</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('bot_prompter') }}">Bot Prompter</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('faiss_generator') }}">Faiss Generator</a></li>
+                    
+                    
                 </ul>
             </li>
 
