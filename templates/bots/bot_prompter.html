@@ -34,6 +34,47 @@
             </div>
         </div>
     </div>
+
+
+<!-- Debug Panel -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                Debug Panel
+            </div>
+            <div class="card-body">
+                <!-- Max Content Length Control -->
+                <div class="mb-3">
+                    <label for="max-content-length" class="form-label">Max Content Length</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="max-content-length" 
+                               value="{{ MAX_CONTEXT_LENGTH }}" min="100" step="100">
+                        <button class="btn btn-primary" id="update-max-length">Update</button>
+                    </div>
+                </div>
+                
+                <!-- Similarity Results -->
+                <div class="mb-3">
+                    <h5>Current Similarity Results</h5>
+                    <div id="similarity-results" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                        <div class="alert alert-info">No similarity results yet</div>
+                    </div>
+                </div>
+                
+                <!-- Conversation History -->
+                <div class="mb-3">
+                    <h5>Conversation Knowledge</h5>
+                    <div id="conversation-knowledge" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                        <div class="alert alert-info">No conversation history yet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 </div>
 
 <style>
@@ -53,10 +94,25 @@
         background-color: #f1f1f1;
         align-self: flex-start;
     }
+
+
+    .debug-panel {
+    font-size: 0.9em;
+}
+
+.debug-panel .card-header {
+    font-weight: bold;
+}
+
+.similarity-score {
+    font-size: 0.8em;
+    color: #666;
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Move all variable declarations to the top
     const botSelector = document.getElementById('bot-selector');
     const chatContainer = document.getElementById('chat-container');
     const chatForm = document.getElementById('chat-form');
@@ -64,7 +120,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const botPicture = document.getElementById('bot-picture');
     const botName = document.getElementById('bot-name');
     const clearConversationBtn = document.getElementById('clear-conversation');
+    const maxContentLength = document.getElementById('max-content-length');
+    const updateMaxLengthBtn = document.getElementById('update-max-length');
+    const similarityResults = document.getElementById('similarity-results');
+    const conversationKnowledge = document.getElementById('conversation-knowledge');
     let currentBotId = null;
+
+    // Debug logging
+    console.log('=== DOM Elements Initialized ===');
+    console.log('similarityResults element:', similarityResults);
+    console.log('conversationKnowledge element:', conversationKnowledge);
+    
+    // Element check
+    if (!similarityResults) {
+        console.error('similarityResults element not found!');
+    }
+    if (!conversationKnowledge) {
+        console.error('conversationKnowledge element not found!');
+    }
 
     botSelector.addEventListener('change', function() {
         currentBotId = this.value;
@@ -96,6 +169,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Update max length event listener
+    updateMaxLengthBtn.addEventListener('click', function() {
+        const newLength = parseInt(maxContentLength.value);
+        fetch('/bot-prompter/update-max-length', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ max_length: newLength }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Max content length updated successfully');
+            } else {
+                alert('Failed to update max content length');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating max content length');
+        });
+    });
+
     function appendMessage(sender, message) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
@@ -105,6 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function fetchBotResponse(userMessage) {
+        console.log('Sending request with message:', userMessage);
         fetch(`/bot-prompter/${currentBotId}`, {
             method: 'POST',
             headers: {
@@ -114,14 +212,53 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
+            console.log('Received response data:', data);
+            
             if (data.error) {
+                console.error('Error in response:', data.error);
                 appendMessage('bot', 'Sorry, an error occurred. Please try again.');
+                return;
+            }
+            
+            appendMessage('bot', data.response);
+            
+            // Debug info handling
+            if (data.debug_info) {
+                console.log('Processing debug info:', data.debug_info);
+                
+                // Update similarity results
+                if (data.debug_info.similarity_results && data.debug_info.similarity_results.length > 0) {
+                    const similarityHTML = data.debug_info.similarity_results.map(result => `
+                        <div class="mb-2 p-2 border rounded">
+                            <div class="fw-bold">Rank: ${result.rank} (Score: ${(result.similarity_score * 100).toFixed(2)}%)</div>
+                            <pre class="text-muted" style="white-space: pre-wrap;">${result.content}</pre>
+                        </div>
+                    `).join('');
+                    similarityResults.innerHTML = similarityHTML;
+                } else {
+                    similarityResults.innerHTML = '<div class="alert alert-info">No similarity results for this query</div>';
+                }
+                
+                // Update conversation history
+                if (data.debug_info.conversation_history && data.debug_info.conversation_history.length > 0) {
+                    const conversationHTML = data.debug_info.conversation_history.map(msg => `
+                        <div class="mb-2 p-2 border rounded ${msg.role === 'user' ? 'bg-light' : 'bg-info bg-opacity-10'}">
+                            <div class="fw-bold">${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}</div>
+                            <pre style="white-space: pre-wrap;">${msg.content}</pre>
+                        </div>
+                    `).join('');
+                    conversationKnowledge.innerHTML = conversationHTML;
+                } else {
+                    conversationKnowledge.innerHTML = '<div class="alert alert-info">No conversation history yet</div>';
+                }
             } else {
-                appendMessage('bot', data.response);
+                console.warn('No debug_info in response data');
+                similarityResults.innerHTML = '<div class="alert alert-warning">Debug info not available</div>';
+                conversationKnowledge.innerHTML = '<div class="alert alert-warning">Debug info not available</div>';
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Fetch error:', error);
             appendMessage('bot', 'Sorry, an error occurred. Please try again.');
         });
     }
@@ -141,5 +278,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
 </script>
 {% endblock %}

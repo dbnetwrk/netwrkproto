@@ -1029,7 +1029,7 @@ class ScraperResult(db.Model):
     title = db.Column(db.String(500))
     text = db.Column(db.Text)
     scrape_date = db.Column(db.DateTime, default=datetime.utcnow)
-    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', 'Timeout', name='scraper_source'), nullable=False, default='Regular')
+    source = db.Column(db.Enum('Groupon', 'Instagram', 'Eventbrite', 'Regular', 'Timeout', 'Reddit', name='scraper_source'), nullable=False, default='Regular')
     price = db.Column(db.Numeric(10, 2))
     event_date = db.Column(db.DateTime)
     categories = db.relationship('ContentCategory', secondary=scraper_result_categories,
@@ -3435,36 +3435,74 @@ def redfeed():
 
 @app.route('/reddit_scraper/', methods=['GET', 'POST'])
 def reddit_scraper():
-    communities = Community.query.options(joinedload(Community.subreddits)).all()  # Preload subreddits with communities
+    current_app.logger.debug("Accessing reddit_scraper route")
+    communities = Community.query.options(joinedload(Community.subreddits)).all()
+
     if request.method == 'POST':
         clear_image_directory()
         selected_community_id = request.form.get('community_id')
-        subreddit_name = request.form.get('subreddit')  # Direct input of subreddit name
+        subreddit_name = request.form.get('subreddit')
         number_of_posts = int(request.form.get('number_of_posts', 100))
         sort_option = request.form.get('sort_option', 'hot')
+        include_comments = request.form.get('include_comments') == 'true'
+        comment_depth = int(request.form.get('comment_depth', 1))
+        comment_limit = int(request.form.get('comment_limit', 5))
+
+        current_app.logger.debug(f"Processing scrape request: subreddit={subreddit_name}, "
+                               f"posts={number_of_posts}, sort={sort_option}, "
+                               f"comments={include_comments}, depth={comment_depth}")
 
         session_data = {
             'subreddit_name': subreddit_name,
             'number_of_posts': number_of_posts,
             'sort_option': sort_option,
-            'selected_community_id': selected_community_id
+            'selected_community_id': selected_community_id,
+            'include_comments': include_comments,
+            'comment_depth': comment_depth,
+            'comment_limit': comment_limit
         }
         session.update(session_data)
-
-        results = []
-        if subreddit_name:
-            results = scrape_reddit_posts(subreddit_name, number_of_posts, sort_option)
-        elif selected_community_id:
-            community = Community.query.get(selected_community_id)
-            for subreddit in community.subreddits:
-                results.extend(scrape_reddit_posts(subreddit.prompt, number_of_posts, sort_option))
         
-        if results:
-            flash(f"Scraped {len(results)} posts")
+        results = []
+        try:
+            if subreddit_name:
+                results = scrape_reddit_posts(
+                    subreddit_name, 
+                    number_of_posts, 
+                    sort_option,
+                    include_comments=include_comments,
+                    comment_depth=comment_depth,
+                    comment_limit=comment_limit
+                )
+            elif selected_community_id:
+                community = Community.query.get(selected_community_id)
+                for subreddit in community.subreddits:
+                    subreddit_results = scrape_reddit_posts(
+                        subreddit.prompt, 
+                        number_of_posts, 
+                        sort_option,
+                        include_comments=include_comments,
+                        comment_depth=comment_depth,
+                        comment_limit=comment_limit
+                    )
+                    results.extend(subreddit_results)
 
-        return render_template('reddit_scraper.html', results=results, communities=communities, session=session)
+            current_app.logger.debug(f"Successfully scraped {len(results)} posts")
+            flash(f"Successfully scraped {len(results)} posts with their comments")
+            
+        except Exception as e:
+            current_app.logger.error(f"Error during scraping: {str(e)}")
+            flash(f"Error during scraping: {str(e)}", "error")
+            results = []
 
-    return render_template('reddit_scraper.html', communities=communities, session=session)
+        return render_template('reddit_scraper.html', 
+                             results=results, 
+                             communities=communities, 
+                             session=session)
+
+    return render_template('reddit_scraper.html', 
+                         communities=communities, 
+                         session=session)
 
 
 def post_exists(title, reddit_post_id=None):
@@ -3488,49 +3526,264 @@ def post_exists(title, reddit_post_id=None):
     return exists_in_posts or exists_in_scheduled
 
 
-def scrape_reddit_posts(subreddit_name, limit, sort_option):
+def get_comments(submission, depth=1, limit=10):
+    """
+    Recursively get comments from a submission up to specified depth.
+    """
+    current_app.logger.debug(f"Fetching comments for submission {submission.id} with depth {depth} and limit {limit}")
+    comments_list = []
+    
+    try:
+        submission.comments.replace_more(limit=0)  # Replace MoreComments objects with actual comments
+        for comment in submission.comments.list()[:limit]:
+            comment_data = {
+                'id': comment.id,
+                'author': str(comment.author) if comment.author else '[deleted]',
+                'body': comment.body,
+                'score': comment.score,
+                'created_utc': datetime.fromtimestamp(comment.created_utc),
+                'replies': []
+            }
+            
+            # If we haven't reached max depth and the comment has replies, get them
+            if depth > 1 and comment.replies:
+                for reply in comment.replies.list()[:limit]:
+                    reply_data = {
+                        'id': reply.id,
+                        'author': str(reply.author) if reply.author else '[deleted]',
+                        'body': reply.body,
+                        'score': reply.score,
+                        'created_utc': datetime.fromtimestamp(reply.created_utc)
+                    }
+                    comment_data['replies'].append(reply_data)
+            
+            comments_list.append(comment_data)
+    except Exception as e:
+        current_app.logger.error(f"Error fetching comments for submission {submission.id}: {str(e)}")
+    
+    return comments_list
+
+def process_local_content(text):
+    """
+    Process content for RAG system, focusing on venues, events, and activities
+    Returns structured data optimized for semantic similarity search
+    """
+    
+    # Dynamically fetch categories from the database
+    current_app.logger.debug("Fetching valid categories from database")
+    try:
+        valid_categories = [cat.name for cat in ContentCategory.query.all()]
+        current_app.logger.debug(f"Found {len(valid_categories)} valid categories")
+    except Exception as e:
+        current_app.logger.error(f"Error fetching categories: {str(e)}")
+        valid_categories = []
+    
+    analysis_prompt = f"""
+    Analyze this content and structure it for a local recommendations database.
+    If the content doesn't contain specific, useful information about local venues, events, or activities, return "null" for all fields.
+    
+    Required Output Format (JSON):
+    {{
+        "rag_title": "A detailed, search-optimized title that captures the specific venue/activity/event (make it detailed and unique)",
+        "rag_body": "A detailed summary including specific details like location, prices, times, unique features, and key information from comments. Include actual quotes when relevant",
+        "categories": ["list", "of", "relevant", "categories"],
+        "is_valid": boolean
+    }}
+    
+    Rules:
+    1. If content isn't about actual places/events/activities in the local area, set is_valid to false
+    2. Title must be specific and detailed for semantic search (e.g., "Authentic Venezuelan Arepas at La Casa de las Arepas in Doral - Local Favorite Since 2010")
+    3. Body must include specific details useful for recommendations and be at most 4 sentences long
+    4. Only use these categories: {', '.join(valid_categories)}
+    5. If content is personal/dating/jobs/housing/complaints without useful venue info, set is_valid to false
+    6. Content must be relevant to young adults aged 22-28. Set is_valid to false for:
+       - Family-oriented content
+       - Children's focused content
+       - Senior-focused content
+       - Content primarily targeted at teenagers or students
+    7. When generating the rag body, emphasize aspects that appeal to young professionals:
+       - Atmosphere and vibe
+       - Popular times for the target age group
+       - Price points relative to young professional budgets
+       - Social aspects and networking opportunities
+       - Instagram-worthy features
+       - Unique or trendy aspects
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Using GPT-4 for better analysis
+            messages=[
+                {"role": "system", "content": analysis_prompt},
+                {"role": "user", "content": text}
+            ],
+            response_format={ "type": "json_object" }
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        
+        # Validate that returned categories exist in our database
+        if result.get('is_valid', False):
+            result['categories'] = [
+                cat for cat in result.get('categories', [])
+                if cat in valid_categories
+            ]
+        
+        # If content is not valid or categories are empty, return null
+        if not result.get('is_valid', False) or not result.get('categories'):
+            current_app.logger.debug(f"Content marked as invalid or no categories found")
+            return {
+                "rag_title": "null",
+                "rag_body": "null",
+                "categories": [],
+                "is_valid": False
+            }
+            
+        current_app.logger.debug(f"Processed RAG content: {result['rag_title'][:100]}...")
+        return result
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in content processing: {str(e)}")
+        return {
+            "rag_title": "null",
+            "rag_body": "null",
+            "categories": [],
+            "is_valid": False
+        }
+
+def get_ai_summary(post_data):
+    """
+    Combine post data and comments into a single text for AI analysis
+    and create ScraperResult objects for valid results
+    """
+    current_app.logger.debug(f"Processing AI summary for post: {post_data['title'][:50]}...")
+    
+    text_parts = [
+        f"Title: {post_data['title']}",
+        f"Content: {post_data['content']}"
+    ]
+    
+    if post_data['comments']:
+        comments_text = []
+        for comment in post_data['comments']:
+            comments_text.append(f"Comment by {comment['author']}: {comment['body']}")
+            if comment.get('replies'):
+                for reply in comment['replies']:
+                    comments_text.append(f"Reply by {reply['author']}: {reply['body']}")
+        text_parts.append("Comments: " + "\n".join(comments_text))
+    
+    combined_text = "\n\n".join(text_parts)
+    result = process_local_content(combined_text)
+    
+    if result['is_valid']:
+        try:
+            # Find the corresponding category objects
+            category_objects = []
+            for category_name in result['categories']:
+                category = ContentCategory.query.filter_by(name=category_name).first()
+                if category:
+                    category_objects.append(category)
+            
+            # Create new ScraperResult object
+            scraper_result = ScraperResult(
+                url=None,
+                title=result['rag_title'],
+                text=result['rag_body'],
+                source='Reddit',
+                categories=category_objects
+            )
+            
+            # Add and commit to database
+            db.session.add(scraper_result)
+            db.session.commit()
+            
+            current_app.logger.debug(f"Successfully created ScraperResult: {scraper_result.id}")
+            
+            # Return the summary for display
+            return {
+                'title': result['rag_title'],
+                'body': result['rag_body'],
+                'categories': result['categories']
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Error creating ScraperResult: {str(e)}")
+            db.session.rollback()
+            # Still return the summary even if saving failed
+            return {
+                'title': result['rag_title'],
+                'body': result['rag_body'],
+                'categories': result['categories']
+            }
+    else:
+        current_app.logger.debug("Invalid result, skipping ScraperResult creation")
+        return {
+            'title': 'null',
+            'body': 'null',
+            'categories': []
+        }
+
+def scrape_reddit_posts(subreddit_name, limit, sort_option, include_comments=False, comment_depth=1, comment_limit=10):
+    current_app.logger.debug(f"Starting Reddit scrape for r/{subreddit_name} with {sort_option} sorting")
+    
     reddit = praw.Reddit(
         client_id='i-SqiFyPh8Jgk34GFXwLCw',
         client_secret='mbAJH8RDW3G3S7L-gLb9HIUwj_on-g',
         user_agent='script:subreddit image and text downloader:v1.0 (by /u/DoodleChoco6642)'
     )
-
+    
     subreddit = reddit.subreddit(subreddit_name)
     fetch_method = {
         'hot': subreddit.hot,
         'top': subreddit.top,
         'new': subreddit.new
     }.get(sort_option, subreddit.hot)
-
+    
     results = []
     for submission in fetch_method(limit=limit):
-        if not post_exists(submission.title, submission.id):  # Ensure you have a function to check for duplicate posts
-            if submission.url.endswith(('jpg', 'jpeg', 'png')) and not submission.is_self:
-                file_name = f"{submission.id}.jpg"
-                local_filename = os.path.join('static', 'images', 'content', file_name)
-                download_image(submission.url, local_filename)  # Make sure download_image handles errors properly
-
-                web_path = os.path.join('images/content', file_name)
-                web_path = web_path.replace(os.sep, '/')
-                result = {
+        if not post_exists(submission.title, submission.id):
+            try:
+                post_data = {
                     'subreddit': subreddit_name,
-                    'image': web_path,
                     'title': submission.title,
                     'content': submission.selftext,
-                    'reddit_post_id': submission.id
+                    'reddit_post_id': submission.id,
+                    'score': submission.score,
+                    'upvote_ratio': submission.upvote_ratio,
+                    'created_utc': datetime.fromtimestamp(submission.created_utc),
+                    'author': str(submission.author) if submission.author else '[deleted]',
+                    'num_comments': submission.num_comments,
+                    'permalink': f"https://reddit.com{submission.permalink}",
+                    'comments': [] if include_comments else None
                 }
-                results.append(result)
-            elif submission.is_self:
-                # For text posts, just check it's not one of the image extensions
-                if not submission.url.endswith(('jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff')):
-                    results.append({
-                        'subreddit': subreddit_name,
-                        'title': submission.title,
-                        'content': submission.selftext,
-                        'image': None,  # No image associated with text posts
-                        'reddit_post_id': submission.id
-                    })
 
+                # Handle image posts
+                if submission.url.endswith(('jpg', 'jpeg', 'png')) and not submission.is_self:
+                    file_name = f"{submission.id}.jpg"
+                    local_filename = os.path.join('static', 'images', 'content', file_name)
+                    download_image(submission.url, local_filename)
+                    web_path = os.path.join('images/content', file_name)
+                    web_path = web_path.replace(os.sep, '/')
+                    post_data['image'] = web_path
+                else:
+                    post_data['image'] = None
+
+                # Fetch comments if requested
+                if include_comments:
+                    current_app.logger.debug(f"Fetching comments for submission {submission.id}")
+                    post_data['comments'] = get_comments(submission, depth=comment_depth, limit=comment_limit)
+                
+                # Generate AI summary
+                current_app.logger.debug(f"Generating AI summary for submission {submission.id}")
+                post_data['ai_summary'] = get_ai_summary(post_data)
+                
+                results.append(post_data)
+                
+            except Exception as e:
+                current_app.logger.error(f"Error processing submission {submission.id}: {str(e)}")
+                continue
+
+    current_app.logger.debug(f"Completed scraping {len(results)} posts from r/{subreddit_name}")
     return results
 
 
@@ -7181,7 +7434,11 @@ from flask import current_app
 
 
 def summarize_text(text):
-    custom_prompt = "Your job is a summarizer. Summarize the piece of text given to you in one concise sentences"
+    custom_prompt = """
+
+    Summarize the given text in two concise sentences.
+
+    """
     
     try:
         response = client.chat.completions.create(
@@ -7192,10 +7449,11 @@ def summarize_text(text):
             ]
         )
         summarized_text = response.choices[0].message.content
+        current_app.logger.debug(f"Summarized text: {summarized_text[:100]}...")  # Log first 100 chars of summary
         return summarized_text
     except Exception as e:
         current_app.logger.error(f"Error in summarization: {str(e)}")
-        return text  # Return original text if summarization fails
+        return f"![LOW_QUALITY]{text[:200]}..." 
 
 @app.route('/run-scraper', methods=['GET', 'POST'])
 def run_scraper():
@@ -7217,6 +7475,7 @@ def run_scraper():
 
         new_results = 0
         skipped_results = 0
+        low_quality_results = 0
         error_count = 0
         
         for url in urls:
@@ -7259,6 +7518,10 @@ def run_scraper():
                                             f"Experience Level: {item.get('experienceLevel', '')}\n" \
                                             f"Description: {item.get('description', '')}"
                             summarized_text = summarize_text(original_text)
+                            #if summarized_text.startswith('![LOW_QUALITY]'):
+                             #   low_quality_results += 1
+                             #   current_app.logger.debug(f"Skipped low quality content: {item.get('url', '')}")
+                              #  continue
                             
                             scraper_result = ScraperResult(
                                 url=item.get('jobUrl', ''),
@@ -7299,6 +7562,7 @@ def run_scraper():
                             original_text = item.get('content', '')
                             summarized_text = summarize_text(original_text)
                             
+                            
                             scraper_result = ScraperResult(
                                 url=item.get('url', ''),
                                 title=item.get('title', ''),
@@ -7333,6 +7597,7 @@ def run_scraper():
                             original_text = f"Caption: {item.get('caption', '')}"
                             summarized_text = summarize_text(original_text)
                             
+                            
                             scraper_result = ScraperResult(
                                 url=item.get('url', ''),
                                 title=f"Instagram post by {item.get('ownerUsername', '')}",
@@ -7359,6 +7624,7 @@ def run_scraper():
                         if not existing_result:
                             original_text = item['description']
                             summarized_text = summarize_text(original_text)
+                            
                             
                             scraper_result = ScraperResult(
                                 url=item['url'],
@@ -7411,6 +7677,7 @@ def run_scraper():
                                 original_text = item['description']
                                 summarized_text = summarize_text(original_text)
                                 
+                                
                                 scraper_result = ScraperResult(
                                     url=item['url'],
                                     title=item['title'],
@@ -7444,6 +7711,7 @@ def run_scraper():
                         if not existing_result:
                             original_text = item['summary']
                             summarized_text = summarize_text(original_text)
+                            
                             
                             scraper_result = ScraperResult(
                                 url=url.url,
@@ -7481,6 +7749,7 @@ def run_scraper():
                         if not existing_result:
                             original_text = item.get('text', '')
                             summarized_text = summarize_text(original_text)
+                            
                             
                             scraper_result = ScraperResult(
                                 url=item.get('url', ''),
@@ -8759,7 +9028,8 @@ def edit_meme(meme_id):
 
 #BOT SHID
 
-
+import tiktoken
+MAX_TOKENS = 3000
 
 FAISS_UPLOAD_FOLDER = 'C:\\flasker\\faiss'  # Define the path where you want to store .faiss files
 
@@ -8780,13 +9050,21 @@ def create_bot():
         faiss_file = request.files.get('faiss_file')
         faiss_filename = None
         if faiss_file and faiss_file.filename.endswith('.faiss'):
-            faiss_filename = secure_filename(f"{name}_{faiss_file.filename}")
-            faiss_file.save(os.path.join(FAISS_UPLOAD_FOLDER, faiss_filename))
+            # Create a directory for the bot if it doesn't exist
+            bot_directory = os.path.join(FAISS_UPLOAD_FOLDER, secure_filename(name))
+            os.makedirs(bot_directory, exist_ok=True)
+            
+            faiss_filename = secure_filename(faiss_file.filename)
+            file_path = os.path.join(bot_directory, faiss_filename)
+            faiss_file.save(file_path)
+            
+            # Store the relative path in the database
+            faiss_filename = os.path.relpath(file_path, FAISS_UPLOAD_FOLDER)
         
         new_bot = Bot(name=name, description=description, profile_picture=profile_picture, prompt=prompt, faiss_file=faiss_filename)
         db.session.add(new_bot)
         db.session.commit()
-        current_app.logger.debug(f"Created new bot: {new_bot}")
+        current_app.logger.debug(f"Created new bot: {new_bot} with FAISS file: {faiss_filename}")
         return redirect(url_for('list_bots'))
     
     return render_template('bots/create.html')
@@ -8795,6 +9073,7 @@ def create_bot():
 def edit_bot(id):
     bot = Bot.query.get_or_404(id)
     if request.method == 'POST':
+        old_name = bot.name
         bot.name = request.form['name']
         bot.description = request.form['description']
         bot.profile_picture = request.form['profile_picture']
@@ -8802,14 +9081,35 @@ def edit_bot(id):
         
         faiss_file = request.files.get('faiss_file')
         if faiss_file and faiss_file.filename.endswith('.faiss'):
+            # Remove old FAISS file if it exists
             if bot.faiss_file:
-                old_faiss_path = os.path.join(FAISS_UPLOAD_FOLDER, bot.faiss_file)
-                if os.path.exists(old_faiss_path):
-                    os.remove(old_faiss_path)
+                old_file_path = os.path.join(FAISS_UPLOAD_FOLDER, bot.faiss_file)
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
+                    current_app.logger.debug(f"Removed old FAISS file: {old_file_path}")
             
-            faiss_filename = secure_filename(f"{bot.name}_{faiss_file.filename}")
-            faiss_file.save(os.path.join(FAISS_UPLOAD_FOLDER, faiss_filename))
-            bot.faiss_file = faiss_filename
+            # Create or update bot directory
+            bot_directory = os.path.join(FAISS_UPLOAD_FOLDER, secure_filename(bot.name))
+            os.makedirs(bot_directory, exist_ok=True)
+            
+            # If bot name changed, move files from old directory to new
+            if old_name != bot.name:
+                old_directory = os.path.join(FAISS_UPLOAD_FOLDER, secure_filename(old_name))
+                if os.path.exists(old_directory):
+                    for file in os.listdir(old_directory):
+                        old_file = os.path.join(old_directory, file)
+                        new_file = os.path.join(bot_directory, file)
+                        os.rename(old_file, new_file)
+                    os.rmdir(old_directory)
+                    current_app.logger.debug(f"Moved files from {old_directory} to {bot_directory}")
+            
+            faiss_filename = secure_filename(faiss_file.filename)
+            file_path = os.path.join(bot_directory, faiss_filename)
+            faiss_file.save(file_path)
+            
+            # Store the relative path in the database
+            bot.faiss_file = os.path.relpath(file_path, FAISS_UPLOAD_FOLDER)
+            current_app.logger.debug(f"Updated FAISS file for bot {bot.name}: {bot.faiss_file}")
         
         db.session.commit()
         current_app.logger.debug(f"Updated bot: {bot}")
@@ -8837,6 +9137,9 @@ def bot_prompter():
 
 MAX_CONTEXT_LENGTH = 2000  # Adjust this value as needed
 
+# Initialize the tokenizer for the model
+encoding = tiktoken.encoding_for_model("gpt-4o")  # Adjust model as necessary
+
 @app.route('/bot-prompter/<int:bot_id>', methods=['POST'])
 def bot_chat(bot_id):
     bot = Bot.query.get_or_404(bot_id)
@@ -8850,99 +9153,147 @@ def bot_chat(bot_id):
     # Add the new user message to the history
     conversation_history.append({"role": "user", "content": user_input})
     
+    # Prepare the system prompt
+    bot_prompt = (
+        f"{bot.prompt}\n\n"
+        "As you assist the user, please only use the information provided in the context. "
+        "If no relevant information is available, inform the user that you don't have "
+        "up-to-date information on that topic instead of using general knowledge."
+    )
+    
     # Prepare the messages for the API call
     messages = [
-        {"role": "system", "content": bot.prompt},
-        {"role": "system", "content": "Here's the conversation history:"}
+        {"role": "system", "content": bot_prompt}
     ]
     
-    # Add conversation history, keeping track of total length
-    current_length = len(bot.prompt)
-    for message in reversed(conversation_history[:-1]):  # Exclude the latest user message
-        message_length = len(message['content'])
-        if current_length + message_length > MAX_CONTEXT_LENGTH:
-            break
+    # Add the conversation history in correct order
+    for message in conversation_history:
         messages.append(message)
-        current_length += message_length
-    
-    # Add a clear separator for the current request
-    messages.append({"role": "system", "content": "The user's current request is:"})
-    messages.append(conversation_history[-1])  # Add the latest user message
     
     # Load the FAISS index for this bot
+
+    relevant_results = []
     if bot.faiss_file:
-        current_app.logger.debug(f"BOT DOES have FAISS FILE: {bot.faiss_file}")
-        current_app.logger.debug(f"Current working directory: {os.getcwd()}")
-        faiss_path = os.path.join(FAISS_UPLOAD_FOLDER, bot.faiss_file)
-        mapping_filename = bot.faiss_file.replace('.faiss', '_mapping.json')
-        mapping_path = os.path.join(FAISS_UPLOAD_FOLDER, mapping_filename)
-        current_app.logger.debug(f"Constructed FAISS path: {faiss_path}")
-        current_app.logger.debug(f"Absolute FAISS path: {os.path.abspath(faiss_path)}")
-        current_app.logger.debug(f"Constructed mapping path: {mapping_path}")
-        current_app.logger.debug(f"Absolute mapping path: {os.path.abspath(mapping_path)}")
-        if os.path.exists(faiss_path):
-
-            current_app.logger.debug("OS PATH DOES EXIST")
-
-        if os.path.exists(mapping_path):
-            current_app.logger.debug("OS mapping DOES EXIST")
-        else:
-            current_app.logger.debug("OS mapping DOES NOT EXIST")
-
+        current_app.logger.debug(f"Bot has FAISS file: {bot.faiss_file}")
+        bot_folder = os.path.join(FAISS_UPLOAD_FOLDER, secure_filename(bot.name))
+        faiss_path = os.path.join(bot_folder, os.path.basename(bot.faiss_file))
+        mapping_filename = os.path.basename(bot.faiss_file).replace('.faiss', '_mapping.json')
+        mapping_path = os.path.join(bot_folder, mapping_filename)
+        
+        current_app.logger.debug(f"Looking for FAISS file at: {faiss_path}")
+        current_app.logger.debug(f"Looking for mapping file at: {mapping_path}")
+        
         if os.path.exists(faiss_path) and os.path.exists(mapping_path):
-            current_app.logger.debug("OS PATH DOES EXIST and ID mapping found")
-            index = faiss.read_index(faiss_path)
-            current_app.logger.debug(f"FAISS index loaded, total vectors: {index.ntotal}")
-
-            with open(mapping_path, 'r') as f:
-                id_mapping = json.load(f)
-            current_app.logger.debug(f"ID mapping loaded, total mappings: {len(id_mapping)}")
-            
-            # Convert user input to embedding
-            user_embedding = model.encode([user_input])[0].astype('float32').reshape(1, -1)
-            current_app.logger.debug(f"User input embedded, shape: {user_embedding.shape}")
-            
-            # Perform the search
-            k = 5  # Number of top results to retrieve
-            distances, indices = index.search(user_embedding, k)
-            current_app.logger.debug(f"FAISS search completed. Distances: {distances}, Indices: {indices}")
-            
-            # Retrieve corresponding ScraperResult objects
-            relevant_results = []
-            for i, idx in enumerate(indices[0]):
-                try:
-                    # Convert numpy.int64 to standard Python int
-                    result_id = id_mapping[str(int(idx))]
-                    current_app.logger.debug(f"Mapped FAISS index {idx} to ScraperResult ID: {result_id}")
-                    result = ScraperResult.query.get(result_id)
-                    if result:
-                        relevant_results.append(f"Title: {result.title}\nText: {result.text}")
-                        current_app.logger.debug(f"Retrieved ScraperResult: ID {result.id}, Title: {result.title}")
-                    else:
-                        current_app.logger.warning(f"No ScraperResult found for ID: {result_id}")
-                except Exception as e:
-                    current_app.logger.error(f"Error retrieving ScraperResult for index {idx}: {str(e)}")
-            
-            # Add relevant results to the context
-            if relevant_results:
-                current_app.logger.debug(f"Retrieved {len(relevant_results)} relevant results")
-                context = "Here are some relevant pieces of information:\n\n" + "\n\n".join(relevant_results)
-                messages.append({"role": "system", "content": context})
-                debug_message = f"Bot {bot.name} responded to user input with FAISS-enhanced context.\n"
-                debug_message += "Relevant results:\n"
-                for i, result in enumerate(relevant_results, 1):
-                    debug_message += f"{i}. {result}...\n"  # Truncate each result for readability
+            current_app.logger.debug("FAISS index and mapping file found.")
+            try:
+                # Load FAISS index
+                index = faiss.read_index(faiss_path)
+                current_app.logger.debug(f"FAISS index loaded, total vectors: {index.ntotal}")
                 
-                current_app.logger.debug(debug_message)
-            else:
-                current_app.logger.warning("No relevant results found from FAISS search")
+                # Load ID mapping
+                with open(mapping_path, 'r') as f:
+                    id_mapping = json.load(f)
+                current_app.logger.debug(f"ID mapping loaded, total mappings: {len(id_mapping)}")
+                
+                # Convert user input to embedding
+                user_embedding = model.encode([user_input])[0].astype('float32').reshape(1, -1)
+                current_app.logger.debug(f"User input embedded, shape: {user_embedding.shape}")
+                
+                # Perform the search
+                k = 3  # Number of top results to retrieve
+                distances, indices = index.search(user_embedding, k)
+                current_app.logger.debug(f"FAISS search completed. Distances: {distances}, Indices: {indices}")
+                
+                # Retrieve corresponding ScraperResult objects
+                for idx in indices[0]:
+                    try:
+                        result_id = id_mapping[str(int(idx))]
+                        current_app.logger.debug(f"Mapped FAISS index {idx} to ScraperResult ID: {result_id}")
+                        result = ScraperResult.query.get(result_id)
+                        if result:
+                            # Start with required fields
+                            result_info = [f"Title: {result.title}", f"Text: {result.text}"]
+                            
+                            # Add optional fields if they exist
+                            if result.url:
+                                result_info.append(f"URL: {result.url}")
+                            
+                            if result.source and result.source != 'Regular':
+                                result_info.append(f"Source: {result.source}")
+                            
+                            if result.price is not None:
+                                result_info.append(f"Price: ${result.price:.2f}")
+                            
+                            if result.event_date:
+                                formatted_date = result.event_date.strftime('%B %d, %Y at %I:%M %p')
+                                result_info.append(f"Event Date: {formatted_date}")
+                            
+                            # Join all the information with newlines
+                            relevant_results.append("\n".join(result_info))
+                            current_app.logger.debug(f"Retrieved ScraperResult: ID {result.id}, Title: {result.title}")
+                        else:
+                            current_app.logger.warning(f"No ScraperResult found for ID: {result_id}")
+                    except Exception as e:
+                        current_app.logger.error(f"Error retrieving ScraperResult for index {idx}: {str(e)}")
+            except Exception as e:
+                current_app.logger.error(f"Error loading FAISS index or mapping: {str(e)}")
         else:
-            current_app.logger.error(f"OS PATH DOES NOT EXIST: {faiss_path}")
-            current_app.logger.debug(f"Directory contents of FAISS_FOLDER: {os.listdir(FAISS_UPLOAD_FOLDER)}")
+            current_app.logger.error("FAISS index or mapping file does not exist.")
+            current_app.logger.debug(f"Bot folder contents: {os.listdir(bot_folder)}")
     else:
-        current_app.logger.debug("BOT DOES NOT HAVE FAISS FILE")
-            
+        current_app.logger.debug("Bot does not have a FAISS file.")
+
+
+    debug_info = {
+        'max_content_length': MAX_CONTEXT_LENGTH,
+        'similarity_results': [],
+        'conversation_history': session.get(f'conversation_history_{bot_id}', [])
+    }
+
+    current_app.logger.debug(f"Initial debug_info: {debug_info}")
+    
+    # If relevant results are found, integrate them as an assistant message
+    if relevant_results:
+        context = "\n\n".join(relevant_results)
+        assistant_context_message = {
+            "role": "assistant",
+            "content": f"Here are some pieces of information that might help:\n\n{context}"
+        }
+        messages.append(assistant_context_message)
+        current_app.logger.debug(f"Integrated {len(relevant_results)} relevant results into assistant message.")
+
+
+        for idx, (distance, result) in enumerate(zip(distances[0], relevant_results)):
+            similarity_score = float(1 - distance)
+            debug_info['similarity_results'].append({
+                'content': result,
+                'similarity_score': similarity_score,
+                'rank': idx + 1
+            })
+            current_app.logger.debug(f"Added similarity result {idx + 1} with score: {similarity_score}")
+    
+    # Token counting function
+    def count_tokens(messages):
+        total_tokens = 0
+        for msg in messages:
+            content_tokens = len(encoding.encode(msg['content']))
+            total_tokens += content_tokens
+        return total_tokens
+    
+    # Manage token limit
+    total_tokens = count_tokens(messages)
+    while total_tokens > MAX_TOKENS:
+        # Remove the second message (after the system prompt)
+        if len(messages) > 2:
+            removed_message = messages.pop(1)
+            total_tokens = count_tokens(messages)
+            current_app.logger.debug(f"Removed oldest message to maintain token limit: {removed_message}")
+        else:
+            break  # Cannot remove any more messages
+    current_app.logger.debug(f"Total tokens after trimming: {total_tokens}")
+    
     try:
+        # Call the OpenAI API
         response = client.chat.completions.create(
             model="gpt-4o",  # Adjust model as necessary
             messages=messages
@@ -8952,17 +9303,12 @@ def bot_chat(bot_id):
         # Add the bot's response to the conversation history
         conversation_history.append({"role": "assistant", "content": bot_response})
         
-        # Trim the conversation history if it exceeds the maximum length
-        while sum(len(m['content']) for m in conversation_history) > MAX_CONTEXT_LENGTH:
-            conversation_history.pop(0)
-        
         # Save the updated conversation history in the session
         session[conversation_key] = conversation_history
-
-
         
-        current_app.logger.debug(f"Bot {bot.name} responded to user input with FAISS-enhanced context")
-        return jsonify({"response": bot_response})
+        current_app.logger.debug(f"Bot {bot.name} responded to user input.")
+        current_app.logger.debug(f"Final debug_info being sent: {debug_info}")
+        return jsonify({"response": bot_response, "debug_info": debug_info})
     except Exception as e:
         current_app.logger.error(f"Error in bot chat: {str(e)}")
         return jsonify({"error": "An error occurred while processing your request"}), 500
@@ -8973,6 +9319,16 @@ def clear_conversation(bot_id):
     session.pop(conversation_key, None)
     return jsonify({"message": "Conversation cleared"})
 
+
+@app.route('/bot-prompter/update-max-length', methods=['POST'])
+def update_max_length():
+    new_length = request.json.get('max_length')
+    if new_length and isinstance(new_length, int):
+        global MAX_CONTEXT_LENGTH
+        MAX_CONTEXT_LENGTH = new_length
+        current_app.logger.debug(f"Updated MAX_CONTEXT_LENGTH to {new_length}")
+        return jsonify({"success": True, "new_length": MAX_CONTEXT_LENGTH})
+    return jsonify({"success": False, "error": "Invalid length provided"}), 400
 
 
 #bot faiss generator
@@ -9015,24 +9371,77 @@ def faiss_generator():
         index.add(embeddings.astype('float32'))
         current_app.logger.debug(f"Created FAISS index with {index.ntotal} vectors")
         
+        # Generate base filename
+        base_filename = f"faiss_index_{'-'.join(selected_categories)}"
+        
         # Save FAISS index
-        filename = f"faiss_index_{'-'.join(selected_categories)}.faiss"
-        faiss_path = os.path.join(FAISS_FOLDER, filename)
+        faiss_filename = f"{base_filename}.faiss"
+        faiss_path = os.path.join(FAISS_FOLDER, faiss_filename)
         faiss.write_index(index, faiss_path)
         current_app.logger.debug(f"Saved FAISS index to {faiss_path}")
         
         # Save ID mapping
-        mapping_filename = f"id_mapping_{'-'.join(selected_categories)}.json"
+        mapping_filename = f"{base_filename}_mapping.json"
         mapping_path = os.path.join(FAISS_FOLDER, mapping_filename)
         with open(mapping_path, 'w') as f:
             json.dump(id_mapping, f)
         current_app.logger.debug(f"Saved ID mapping to {mapping_path}")
         
-        flash(f'FAISS index generated and saved as {filename}', 'success')
+        flash(f'FAISS index generated and saved as {faiss_filename}', 'success')
         return redirect(url_for('faiss_generator'))
     
     return render_template('faiss_generator.html', categories=categories)
 
+
+
+
+
+##Prompt poet
+
+
+from prompt_poet import Prompt
+import yaml
+
+# Add these routes to your app.py
+@app.route('/prompt-designer', methods=['GET'])
+def prompt_designer():
+    app.logger.debug("Accessing prompt designer page")
+    return render_template('prompt_designer.html')
+
+@app.route('/test-prompt', methods=['POST'])
+def test_prompt():
+    app.logger.debug("Testing prompt with provided template and data")
+    try:
+        raw_template = request.form.get('template')
+        template_data = yaml.safe_load(request.form.get('template_data'))
+        
+        prompt = Prompt(
+            raw_template=raw_template,
+            template_data=template_data
+        )
+        
+        # Get the processed prompt string
+        processed_prompt = prompt.string
+        
+        # Optional: Use with your existing OpenAI client
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": processed_prompt}]
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'prompt': processed_prompt,
+            'response': response.choices[0].message.content if response else None,
+            'token_count': len(prompt.tokenize()) if hasattr(prompt, 'tokenize') else None
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error processing prompt: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
 
 
 if __name__ == '__main__':
