@@ -69,6 +69,13 @@
                         <div class="alert alert-info">No conversation history yet</div>
                     </div>
                 </div>
+
+                <div class="mb-3">
+    <h5>Composite Query Information</h5>
+    <div id="composite-query-info" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+        <div class="alert alert-info">No composite query information yet</div>
+    </div>
+</div>
             </div>
         </div>
     </div>
@@ -251,10 +258,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     conversationKnowledge.innerHTML = '<div class="alert alert-info">No conversation history yet</div>';
                 }
+
+                if (data.debug_info.composite_query) {
+                const compositeQueryHTML = `
+                    <div class="mb-2 p-2 border rounded">
+                        <div class="fw-bold">Composite Query:</div>
+                        <pre class="text-muted">${data.debug_info.composite_query.query}</pre>
+                        <div class="fw-bold mt-2">Messages Used (${data.debug_info.composite_query.message_count}):</div>
+                        <ul class="list-unstyled">
+                            ${data.debug_info.composite_query.used_messages.map((msg, idx) => `
+                                <li class="text-muted">${idx + 1}. ${msg}</li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+                document.getElementById('composite-query-info').innerHTML = compositeQueryHTML;
+            } else {
+                document.getElementById('composite-query-info').innerHTML = 
+                    '<div class="alert alert-info">No composite query information available</div>';
+            }
+                
             } else {
                 console.warn('No debug_info in response data');
                 similarityResults.innerHTML = '<div class="alert alert-warning">Debug info not available</div>';
                 conversationKnowledge.innerHTML = '<div class="alert alert-warning">Debug info not available</div>';
+                document.getElementById('composite-query-info').innerHTML = 
+                    '<div class="alert alert-warning">Debug info not available</div>';
             }
         })
         .catch(error => {

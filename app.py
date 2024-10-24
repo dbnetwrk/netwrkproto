@@ -9148,6 +9148,28 @@ def bot_prompter():
     bots = Bot.query.all()
     return render_template('bots/bot_prompter.html', bots=bots)
 
+
+def get_composite_query(conversation_history, n=3):
+    """Build a composite query from the last n user messages"""
+    relevant_messages = []
+    message_count = 0
+    
+    # Go through messages backwards
+    for message in reversed(conversation_history):
+        if message["role"] == "user":
+            content = message["content"].strip()
+            # Skip simple acknowledgments
+            if content:
+                relevant_messages.append(content)
+                message_count += 1
+                
+        if message_count >= n:
+            break
+    
+    # Combine messages in chronological order
+    composite_query = " ".join(reversed(relevant_messages))
+    return composite_query, relevant_messages
+
 MAX_CONTEXT_LENGTH = 2000  # Adjust this value as needed
 
 # Initialize the tokenizer for the model
@@ -9166,6 +9188,11 @@ def bot_chat(bot_id):
     # Add the new user message to the history
     conversation_history.append({"role": "user", "content": user_input})
     
+    # Build composite query from last N messages
+    composite_query, used_messages = get_composite_query(conversation_history, n=3)
+    current_app.logger.debug(f"Built composite query: {composite_query}")
+    current_app.logger.debug(f"Using messages: {used_messages}")
+    
     # Prepare the system prompt
     bot_prompt = (
         f"{bot.prompt}\n\n"
@@ -9183,89 +9210,63 @@ def bot_chat(bot_id):
     for message in conversation_history:
         messages.append(message)
     
-    # Load the FAISS index for this bot
-
     relevant_results = []
-    if bot.faiss_file:
-        current_app.logger.debug(f"Bot has FAISS file: {bot.faiss_file}")
+    if bot.faiss_file and len(composite_query.split()) >= 2:  # Only search if we have enough context
+        current_app.logger.debug(f"Bot has FAISS file and sufficient query context")
         bot_folder = os.path.join(FAISS_UPLOAD_FOLDER, secure_filename(bot.name))
         faiss_path = os.path.join(bot_folder, os.path.basename(bot.faiss_file))
         mapping_filename = os.path.basename(bot.faiss_file).replace('.faiss', '_mapping.json')
         mapping_path = os.path.join(bot_folder, mapping_filename)
         
-        current_app.logger.debug(f"Looking for FAISS file at: {faiss_path}")
-        current_app.logger.debug(f"Looking for mapping file at: {mapping_path}")
-        
         if os.path.exists(faiss_path) and os.path.exists(mapping_path):
-            current_app.logger.debug("FAISS index and mapping file found.")
             try:
                 # Load FAISS index
                 index = faiss.read_index(faiss_path)
-                current_app.logger.debug(f"FAISS index loaded, total vectors: {index.ntotal}")
-                
-                # Load ID mapping
                 with open(mapping_path, 'r') as f:
                     id_mapping = json.load(f)
-                current_app.logger.debug(f"ID mapping loaded, total mappings: {len(id_mapping)}")
                 
-                # Convert user input to embedding
-                user_embedding = model.encode([user_input])[0].astype('float32').reshape(1, -1)
-                current_app.logger.debug(f"User input embedded, shape: {user_embedding.shape}")
+                # Use composite query for embedding
+                user_embedding = model.encode([composite_query])[0].astype('float32').reshape(1, -1)
+                current_app.logger.debug(f"Created embedding for composite query")
                 
-                # Perform the search
-                k = 3  # Number of top results to retrieve
+                k = 3
                 distances, indices = index.search(user_embedding, k)
-                current_app.logger.debug(f"FAISS search completed. Distances: {distances}, Indices: {indices}")
                 
-                # Retrieve corresponding ScraperResult objects
+                # Process results as before
                 for idx in indices[0]:
                     try:
                         result_id = id_mapping[str(int(idx))]
-                        current_app.logger.debug(f"Mapped FAISS index {idx} to ScraperResult ID: {result_id}")
                         result = ScraperResult.query.get(result_id)
                         if result:
-                            # Start with required fields
                             result_info = [f"Title: {result.title}", f"Text: {result.text}"]
                             
-                            # Add optional fields if they exist
                             if result.url:
                                 result_info.append(f"URL: {result.url}")
-                            
                             if result.source and result.source != 'Regular':
                                 result_info.append(f"Source: {result.source}")
-                            
                             if result.price is not None:
                                 result_info.append(f"Price: ${result.price:.2f}")
-                            
                             if result.event_date:
                                 formatted_date = result.event_date.strftime('%B %d, %Y at %I:%M %p')
                                 result_info.append(f"Event Date: {formatted_date}")
                             
-                            # Join all the information with newlines
                             relevant_results.append("\n".join(result_info))
-                            current_app.logger.debug(f"Retrieved ScraperResult: ID {result.id}, Title: {result.title}")
-                        else:
-                            current_app.logger.warning(f"No ScraperResult found for ID: {result_id}")
                     except Exception as e:
-                        current_app.logger.error(f"Error retrieving ScraperResult for index {idx}: {str(e)}")
+                        current_app.logger.error(f"Error processing result: {str(e)}")
             except Exception as e:
-                current_app.logger.error(f"Error loading FAISS index or mapping: {str(e)}")
-        else:
-            current_app.logger.error("FAISS index or mapping file does not exist.")
-            current_app.logger.debug(f"Bot folder contents: {os.listdir(bot_folder)}")
-    else:
-        current_app.logger.debug("Bot does not have a FAISS file.")
-
+                current_app.logger.error(f"Error in FAISS search: {str(e)}")
 
     debug_info = {
         'max_content_length': MAX_CONTEXT_LENGTH,
         'similarity_results': [],
-        'conversation_history': session.get(f'conversation_history_{bot_id}', [])
+        'conversation_history': conversation_history,
+        'composite_query': {
+            'query': composite_query,
+            'used_messages': used_messages,
+            'message_count': len(used_messages)
+        }
     }
 
-    current_app.logger.debug(f"Initial debug_info: {debug_info}")
-    
-    # If relevant results are found, integrate them as an assistant message
     if relevant_results:
         context = "\n\n".join(relevant_results)
         assistant_context_message = {
@@ -9273,8 +9274,7 @@ def bot_chat(bot_id):
             "content": f"Here are some pieces of information that might help:\n\n{context}"
         }
         messages.append(assistant_context_message)
-        current_app.logger.debug(f"Integrated {len(relevant_results)} relevant results into assistant message.")
-
+        conversation_history.append(assistant_context_message)
 
         for idx, (distance, result) in enumerate(zip(distances[0], relevant_results)):
             similarity_score = float(1 - distance)
@@ -9296,13 +9296,15 @@ def bot_chat(bot_id):
     # Manage token limit
     total_tokens = count_tokens(messages)
     while total_tokens > MAX_TOKENS:
-        # Remove the second message (after the system prompt)
         if len(messages) > 2:
             removed_message = messages.pop(1)
+            if len(conversation_history) > 0:
+                removed_history = conversation_history.pop(0)
+                current_app.logger.debug(f"Removed from history: {removed_history}")
             total_tokens = count_tokens(messages)
             current_app.logger.debug(f"Removed oldest message to maintain token limit: {removed_message}")
         else:
-            break  # Cannot remove any more messages
+            break
     current_app.logger.debug(f"Total tokens after trimming: {total_tokens}")
     
     try:
