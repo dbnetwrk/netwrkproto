@@ -3563,93 +3563,7 @@ def get_comments(submission, depth=1, limit=10):
     
     return comments_list
 
-def process_local_content(text):
-    """
-    Process content for RAG system, focusing on venues, events, and activities
-    Returns structured data optimized for semantic similarity search
-    """
-    
-    # Dynamically fetch categories from the database
-    current_app.logger.debug("Fetching valid categories from database")
-    try:
-        valid_categories = [cat.name for cat in ContentCategory.query.all()]
-        current_app.logger.debug(f"Found {len(valid_categories)} valid categories")
-    except Exception as e:
-        current_app.logger.error(f"Error fetching categories: {str(e)}")
-        valid_categories = []
-    
-    analysis_prompt = f"""
-    Analyze this content and structure it for a local recommendations database.
-    If the content doesn't contain specific, useful information about local venues, events, or activities, return "null" for all fields.
-    
-    Required Output Format (JSON):
-    {{
-        "rag_title": "A detailed, search-optimized title that captures the specific venue/activity/event (make it detailed and unique)",
-        "rag_body": "A detailed summary including specific details like location, prices, times, unique features, and key information from comments. Include actual quotes when relevant",
-        "categories": ["list", "of", "relevant", "categories"],
-        "is_valid": boolean
-    }}
-    
-    Rules:
-    1. If content isn't about actual places/events/activities in the local area, set is_valid to false
-    2. Title must be specific and detailed for semantic search (e.g., "Authentic Venezuelan Arepas at La Casa de las Arepas in Doral - Local Favorite Since 2010")
-    3. Body must include specific details useful for recommendations and be at most 4 sentences long
-    4. Only use these categories: {', '.join(valid_categories)}
-    5. If content is personal/dating/jobs/housing/complaints without useful venue info, set is_valid to false
-    6. Content must be relevant to young adults aged 22-28. Set is_valid to false for:
-       - Family-oriented content
-       - Children's focused content
-       - Senior-focused content
-       - Content primarily targeted at teenagers or students
-    7. When generating the rag body, emphasize aspects that appeal to young professionals:
-       - Atmosphere and vibe
-       - Popular times for the target age group
-       - Price points relative to young professional budgets
-       - Social aspects and networking opportunities
-       - Instagram-worthy features
-       - Unique or trendy aspects
-    """
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",  # Using GPT-4 for better analysis
-            messages=[
-                {"role": "system", "content": analysis_prompt},
-                {"role": "user", "content": text}
-            ],
-            response_format={ "type": "json_object" }
-        )
-        
-        result = json.loads(response.choices[0].message.content)
-        
-        # Validate that returned categories exist in our database
-        if result.get('is_valid', False):
-            result['categories'] = [
-                cat for cat in result.get('categories', [])
-                if cat in valid_categories
-            ]
-        
-        # If content is not valid or categories are empty, return null
-        if not result.get('is_valid', False) or not result.get('categories'):
-            current_app.logger.debug(f"Content marked as invalid or no categories found")
-            return {
-                "rag_title": "null",
-                "rag_body": "null",
-                "categories": [],
-                "is_valid": False
-            }
-            
-        current_app.logger.debug(f"Processed RAG content: {result['rag_title'][:100]}...")
-        return result
-        
-    except Exception as e:
-        current_app.logger.error(f"Error in content processing: {str(e)}")
-        return {
-            "rag_title": "null",
-            "rag_body": "null",
-            "categories": [],
-            "is_valid": False
-        }
+
 
 def get_ai_summary(post_data):
     """
@@ -7455,6 +7369,111 @@ def summarize_text(text):
         current_app.logger.error(f"Error in summarization: {str(e)}")
         return f"![LOW_QUALITY]{text[:200]}..." 
 
+
+def process_local_content(text):
+    """
+    Process content for RAG system, focusing on venues, events, and activities
+    Returns structured data optimized for semantic similarity search
+    """
+    
+    # Dynamically fetch categories from the database
+    current_app.logger.debug("Fetching valid categories from database")
+    try:
+        valid_categories = [cat.name for cat in ContentCategory.query.all()]
+        current_app.logger.debug(f"Found {len(valid_categories)} valid categories")
+    except Exception as e:
+        current_app.logger.error(f"Error fetching categories: {str(e)}")
+        valid_categories = []
+    
+    analysis_prompt = f"""
+    Analyze this content and structure it for a local recommendations database.
+    If the content doesn't contain specific, useful information about local venues, events, or activities, return "null" for all fields.
+    
+    Required Output Format (JSON):
+    {{
+        "rag_title": "A detailed, search-optimized title that captures the specific venue/activity/event (make it detailed and unique)",
+        "rag_body": "A detailed summary including specific details like location, prices, times, unique features, and key information from comments. Include actual quotes when relevant",
+        "categories": ["list", "of", "relevant", "categories"],
+        "is_valid": boolean
+    }}
+    
+    Rules:
+    1. If content isn't about actual places/events/activities in the local area, set is_valid to false
+    2. Title must be specific and detailed for semantic search (e.g., "Authentic Venezuelan Arepas at La Casa de las Arepas in Doral - Local Favorite Since 2010")
+    3. Body must include specific details useful for recommendations and be at most 4 sentences long
+    4. Only use these categories: {', '.join(valid_categories)}
+    5. If content is personal/dating/jobs/housing/complaints without useful venue info, set is_valid to false
+    6. Content must be relevant to young adults aged 22-28. Set is_valid to false for:
+       - Family-oriented content
+       - Children's focused content
+       - Senior-focused content
+       - Content primarily targeted at teenagers or students
+    7. When generating the rag body, emphasize aspects that appeal to young professionals:
+       - Atmosphere and vibe
+       - Popular times for the target age group
+       - Price points relative to young professional budgets
+       - Social aspects and networking opportunities
+       - Instagram-worthy features
+       - Unique or trendy aspects
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Using GPT-4 for better analysis
+            messages=[
+                {"role": "system", "content": analysis_prompt},
+                {"role": "user", "content": text}
+            ],
+            response_format={ "type": "json_object" }
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        
+        # Validate that returned categories exist in our database
+        if result.get('is_valid', False):
+            result['categories'] = [
+                cat for cat in result.get('categories', [])
+                if cat in valid_categories
+            ]
+        
+        # If content is not valid or categories are empty, return null
+        if not result.get('is_valid', False) or not result.get('categories'):
+            current_app.logger.debug(f"Content marked as invalid or no categories found")
+            return {
+                "rag_title": "null",
+                "rag_body": "null",
+                "categories": [],
+                "is_valid": False
+            }
+            
+        current_app.logger.debug(f"Processed RAG content: {result['rag_title'][:100]}...")
+        return result
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in content processing: {str(e)}")
+        return {
+            "rag_title": "null",
+            "rag_body": "null",
+            "categories": [],
+            "is_valid": False
+        }
+
+
+def process_content_for_scraper(original_text):
+    """Helper function to process content and create scraper result fields"""
+    current_app.logger.debug(f"Processing content for RAG system")
+    
+    processed_content = process_local_content(original_text)
+    
+    if not processed_content['is_valid']:
+        current_app.logger.debug("Content marked as invalid by RAG processor")
+        return None
+        
+    return {
+        'title': processed_content['rag_title'],
+        'text': processed_content['rag_body']
+    }
+
 @app.route('/run-scraper', methods=['GET', 'POST'])
 def run_scraper():
     categories = ContentCategory.query.all()
@@ -7559,14 +7578,13 @@ def run_scraper():
                         existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                         
                         if not existing_result:
-                            original_text = item.get('content', '')
-                            summarized_text = summarize_text(original_text)
+                            processed_content = process_content_for_scraper(item.get('content', ''))
                             
                             
                             scraper_result = ScraperResult(
                                 url=item.get('url', ''),
-                                title=item.get('title', ''),
-                                text=summarized_text,
+                                title=processed_content['title'],
+                                text=processed_content['text'],
                                 categories=url.categories
                             )
                             db.session.add(scraper_result)
@@ -7594,14 +7612,13 @@ def run_scraper():
                         existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                         
                         if not existing_result:
-                            original_text = f"Caption: {item.get('caption', '')}"
-                            summarized_text = summarize_text(original_text)
+                            processed_content = process_content_for_scraper(f"Caption: {item.get('caption', '')}")
                             
                             
                             scraper_result = ScraperResult(
                                 url=item.get('url', ''),
-                                title=f"Instagram post by {item.get('ownerUsername', '')}",
-                                text=summarized_text,
+                                title=processed_content['title'],
+                                text=processed_content['text'],
                                 categories=url.categories,
                                 source='Instagram'
                             )
@@ -7622,14 +7639,13 @@ def run_scraper():
                         existing_result = ScraperResult.query.filter_by(url=item['url']).first()
                         
                         if not existing_result:
-                            original_text = item['description']
-                            summarized_text = summarize_text(original_text)
+                            processed_content = process_content_for_scraper(item['description'])
                             
                             
                             scraper_result = ScraperResult(
                                 url=item['url'],
-                                title=item['title'],
-                                text=summarized_text,
+                                title=processed_content['title'],
+                                text=processed_content['text'],
                                 categories=url.categories,
                                 source='Groupon',
                                 price=item['price']
@@ -7674,14 +7690,13 @@ def run_scraper():
                                 is_valid_date = week_before <= event_date <= week_after
                             
                             if is_valid_date:
-                                original_text = item['description']
-                                summarized_text = summarize_text(original_text)
+                                processed_content = process_content_for_scraper(item['description'])
                                 
                                 
                                 scraper_result = ScraperResult(
                                     url=item['url'],
-                                    title=item['title'],
-                                    text=summarized_text,
+                                    title=processed_content['title'],
+                                    text=processed_content['text'],
                                     categories=url.categories,
                                     source='Eventbrite',
                                     event_date=event_date if 'event_date' in locals() else None
@@ -7709,14 +7724,13 @@ def run_scraper():
                         existing_result = ScraperResult.query.filter_by(url=url.url, title=item['title']).first()
                         
                         if not existing_result:
-                            original_text = item['summary']
-                            summarized_text = summarize_text(original_text)
+                            processed_content = process_content_for_scraper(item['summary'])
                             
                             
                             scraper_result = ScraperResult(
                                 url=url.url,
-                                title=item['title'],
-                                text=summarized_text,
+                                title=processed_content['title'],
+                                text=processed_content['text'],
                                 categories=url.categories,
                                 source='Timeout'
                             )
@@ -7747,14 +7761,13 @@ def run_scraper():
                         existing_result = ScraperResult.query.filter_by(url=item.get('url', '')).first()
                         
                         if not existing_result:
-                            original_text = item.get('text', '')
-                            summarized_text = summarize_text(original_text)
+                            processed_content = process_content_for_scraper(item.get('text', ''))
                             
                             
                             scraper_result = ScraperResult(
                                 url=item.get('url', ''),
-                                title=item.get('title', ''),
-                                text=summarized_text,
+                                title=processed_content['title'],
+                                text=processed_content['text'],
                                 categories=url.categories,
                                 source='Regular'
                             )
