@@ -76,6 +76,13 @@
         <div class="alert alert-info">No composite query information yet</div>
     </div>
 </div>
+
+<div class="mb-3">
+    <h5>Intent Analysis</h5>
+    <div id="intent-analysis" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+        <div class="alert alert-info">No intent analysis yet</div>
+    </div>
+</div>
             </div>
         </div>
     </div>
@@ -85,6 +92,28 @@
 </div>
 
 <style>
+
+    /* Add these styles to your existing CSS */
+.user-context {
+    background-color: #f8f9fa;
+    border-left: 3px solid #007bff;
+}
+
+.assistant-context {
+    background-color: #f8f9fa;
+    border-left: 3px solid #28a745;
+}
+
+.context-messages {
+    font-size: 0.9em;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.message-item {
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
     .message {
         margin-bottom: 10px;
         padding: 10px;
@@ -277,7 +306,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('composite-query-info').innerHTML = 
                     '<div class="alert alert-info">No composite query information available</div>';
             }
-                
+
+            if (data.debug_info && data.debug_info.intent_analysis) {
+        const intentHTML = `
+            <div class="mb-2 p-2 border rounded">
+                <div class="fw-bold">Current Intent:</div>
+                <div class="alert ${data.debug_info.intent_analysis.classification === 'seeking information' ? 
+                    'alert-info' : 'alert-warning'}">
+                    ${data.debug_info.intent_analysis.classification}
+                </div>
+                <div class="fw-bold mt-2">Context Used:</div>
+                <div class="context-messages">
+                    ${data.debug_info.intent_analysis.context_used.map(msg => `
+                        <div class="message-item ${msg.role === 'user' ? 'user-context' : 'assistant-context'} p-2 mb-1">
+                            <strong>${msg.role}:</strong> ${msg.content}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.getElementById('intent-analysis').innerHTML = intentHTML;
+    } else {
+        document.getElementById('intent-analysis').innerHTML = 
+            '<div class="alert alert-info">No intent analysis available</div>';
+    }
+
             } else {
                 console.warn('No debug_info in response data');
                 similarityResults.innerHTML = '<div class="alert alert-warning">Debug info not available</div>';

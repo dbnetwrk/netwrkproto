@@ -9149,6 +9149,61 @@ def bot_prompter():
     return render_template('bots/bot_prompter.html', bots=bots)
 
 
+
+
+def classify_intent(conversation_history, n=5):
+    """
+    Classify user intent from conversation history
+    """
+    current_app.logger.debug(f"Classifying intent from conversation history with n={n}")
+    
+    # Filter and get last n relevant messages
+    filtered_messages = []
+    for message in reversed(conversation_history):
+        # Skip context messages
+        if (message["role"] == "assistant" and 
+            message["content"].startswith("Here are some pieces of information that might help")):
+            continue
+            
+        filtered_messages.append(message)
+        if len(filtered_messages) >= n:
+            break
+    
+    # Reverse back to chronological order
+    filtered_messages.reverse()
+    
+    # Format conversation for classification
+    conversation_text = "\n".join([
+        f"{msg['role']}: {msg['content']}" 
+        for msg in filtered_messages
+    ])
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": """
+                Classify if this user in this chain of messages between this user and a chatbot 
+                is seeking information or not information. Return with a simple message that 
+                either says "seeking information" or "not seeking information"
+                """},
+                {"role": "user", "content": conversation_text}
+            ]
+        )
+        classification = response.choices[0].message.content.strip()
+        current_app.logger.debug(f"Intent classification result: {classification}")
+        return {
+            "classification": classification,
+            "context": filtered_messages
+        }
+    except Exception as e:
+        current_app.logger.error(f"Error in intent classification: {str(e)}")
+        return {
+            "classification": "not seeking information",
+            "context": filtered_messages
+        }
+
+
 def get_composite_query(conversation_history, n=3):
     """Build a composite query from the last n user messages"""
     relevant_messages = []
@@ -9187,6 +9242,10 @@ def bot_chat(bot_id):
     
     # Add the new user message to the history
     conversation_history.append({"role": "user", "content": user_input})
+
+    # Classify intent before processing relevant results
+    intent_result = classify_intent(conversation_history)
+    current_app.logger.debug(f"Intent classification: {intent_result['classification']}")
     
     # Build composite query from last N messages
     composite_query, used_messages = get_composite_query(conversation_history, n=3)
@@ -9256,6 +9315,7 @@ def bot_chat(bot_id):
             except Exception as e:
                 current_app.logger.error(f"Error in FAISS search: {str(e)}")
 
+    # Update debug_info to include intent information
     debug_info = {
         'max_content_length': MAX_CONTEXT_LENGTH,
         'similarity_results': [],
@@ -9264,6 +9324,10 @@ def bot_chat(bot_id):
             'query': composite_query,
             'used_messages': used_messages,
             'message_count': len(used_messages)
+        },
+        'intent_analysis': {
+            'classification': intent_result['classification'],
+            'context_used': intent_result['context']
         }
     }
 
